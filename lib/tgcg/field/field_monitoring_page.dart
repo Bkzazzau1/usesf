@@ -346,6 +346,7 @@ class _FieldMonitoringPageState extends State<FieldMonitoringPage> {
                       uploaderId: reporterId,
                       contentHash: captured[index].contentHash,
                       mimeType: captured[index].mimeType,
+                      sourceReference: captured[index].path,
                       latitude: captured[index].latitude,
                       longitude: captured[index].longitude,
                       caption:
