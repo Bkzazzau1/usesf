@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../domain/permissions.dart';
 import '../field/field_operations_store.dart';
@@ -22,9 +23,24 @@ class _SecurityResponsePortalPageState extends State<SecurityResponsePortalPage>
     final session = TgcgSession.of(context);
     final emergency = EmergencyResponse.of(context);
     final field = FieldOperations.of(context);
-    final dispatches = emergency.dispatchesForScope(session.scope);
+    final isAgencyOfficer = session.role == TgcgRole.securityOfficer;
+    final agencyId = isAgencyOfficer ? session.agencyId : null;
+    final agency = agencyId == null ? null : emergency.agencyById(agencyId);
+    final dispatches = isAgencyOfficer
+        ? agencyId == null
+            ? <EmergencyDispatch>[]
+            : emergency.dispatchesForAgency(
+                scope: session.scope,
+                agencyId: agencyId,
+              )
+        : emergency.dispatchesForScope(session.scope);
     final incidents = field.incidentsForScope(session.scope);
-    final agencies = emergency.agenciesForScope(session.scope);
+    final agencies = isAgencyOfficer
+        ? agency == null
+            ? <EmergencyAgency>[]
+            : <EmergencyAgency>[agency]
+        : emergency.agenciesForScope(session.scope);
+    final incidentCount = dispatches.map((item) => item.incidentId).toSet().length;
     final active = dispatches
         .where((item) =>
             item.status != EmergencyDispatchStatus.resolved &&
@@ -66,23 +82,33 @@ class _SecurityResponsePortalPageState extends State<SecurityResponsePortalPage>
       session.scope,
       TgcgCapability.assignIncident,
     );
+    final canRespond = TgcgPermissionPolicy.may(
+      session.role!,
+      session.scope,
+      TgcgCapability.respondToDispatch,
+    );
 
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
         TgcgPageHeader(
-          eyebrow: 'Emergency coordination',
-          title: 'Security & Emergency Response',
-          subtitle:
-              '${session.scope.label}: dispatch verified incidents to authorized response agencies and track response status.',
+          eyebrow: isAgencyOfficer ? 'AUTHORIZED AGENCY RESPONSE' : 'EMERGENCY COORDINATION',
+          title: isAgencyOfficer
+              ? '${agency?.shortName ?? 'Security'} Response Desk'
+              : 'Security & Emergency Response',
+          subtitle: isAgencyOfficer
+              ? '${session.scope.label}: only incidents assigned to your agency are visible. Review evidence, coordinates and update the response stage.'
+              : '${session.scope.label}: dispatch verified incidents to authorized response agencies and track response status.',
           trailing: Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
-              const TgcgStatusPill(
-                label: 'RESPONSE DESK',
-                color: TgcgColors.success,
-                icon: Icons.shield_outlined,
+              TgcgStatusPill(
+                label: isAgencyOfficer ? 'AGENCY-ONLY ACCESS' : 'RESPONSE DESK',
+                color: isAgencyOfficer ? TgcgColors.accentStrong : TgcgColors.success,
+                icon: isAgencyOfficer
+                    ? Icons.verified_user_outlined
+                    : Icons.shield_outlined,
               ),
               if (canAssign)
                 FilledButton.icon(
@@ -106,7 +132,7 @@ class _SecurityResponsePortalPageState extends State<SecurityResponsePortalPage>
           awaiting: awaiting,
           responding: responding,
           agencies: agencies.length,
-          incidents: incidents.length,
+          incidents: incidentCount,
         ),
         const SizedBox(height: 16),
         LayoutBuilder(
@@ -126,6 +152,9 @@ class _SecurityResponsePortalPageState extends State<SecurityResponsePortalPage>
               actorId: session.accessId.isEmpty
                   ? session.operatorName
                   : session.accessId,
+              canRespond: canRespond,
+              actingAgencyId: agencyId,
+              agencyRestricted: isAgencyOfficer,
             );
             if (constraints.maxWidth < 1020) {
               return Column(
