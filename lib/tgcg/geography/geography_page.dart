@@ -150,6 +150,7 @@ class _GeographyPageState extends State<GeographyPage> {
           children: visibleChildren,
           units: visibleUnits,
           membership: membership,
+          assignments: assignments,
           field: field,
           results: results,
           canVerifyCoordinates: canVerifyPollingUnit,
@@ -625,6 +626,7 @@ class _DirectoryPanel extends StatelessWidget {
     required this.children,
     required this.units,
     required this.membership,
+    required this.assignments,
     required this.field,
     required this.results,
     required this.canVerifyCoordinates,
@@ -639,6 +641,7 @@ class _DirectoryPanel extends StatelessWidget {
   final List<GeographicScope> children;
   final List<CanonicalPollingUnit> units;
   final MembershipOperationsController membership;
+  final AssignmentController assignments;
   final FieldOperationsController field;
   final ResultOperationsController results;
   final bool canVerifyCoordinates;
