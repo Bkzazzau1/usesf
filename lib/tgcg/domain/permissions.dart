@@ -189,6 +189,15 @@ class TgcgPermissionPolicy {
       TgcgCapability.joinMeeting,
       TgcgCapability.viewEvidence,
     },
+    TgcgRole.member: {
+      TgcgCapability.viewGeography,
+      TgcgCapability.viewCommunications,
+      TgcgCapability.sendOperationalMessage,
+      TgcgCapability.viewDiscussionRoom,
+      TgcgCapability.postDiscussionReply,
+      TgcgCapability.viewMeetingRoom,
+      TgcgCapability.joinMeeting,
+    },
     TgcgRole.pollingUnitAgent: {
       TgcgCapability.viewGeography,
       TgcgCapability.createIncident,
