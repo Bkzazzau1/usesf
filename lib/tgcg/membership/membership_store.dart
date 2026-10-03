@@ -62,7 +62,7 @@ class MembershipOperationsController extends ChangeNotifier {
 
   factory MembershipOperationsController.prototypeSeed(
     GeographyRegistry geography, {
-    required OfflinePersistenceController persistence,
+    OfflinePersistenceController? persistence,
   }) {
     final now = DateTime.utc(2026, 9, 27, 7, 30);
     final kdPu = geography.pollingUnit('KD-KN-W01-PU001')!.scope;
@@ -221,7 +221,7 @@ class MembershipOperationsController extends ChangeNotifier {
         'MEM-0011': lgaScope('Lere'),
         'MEM-0012': lgaScope('Kagarko'),
       },
-      persistence: persistence,
+      persistence: persistence ?? OfflinePersistenceController(),
       agents: [
         AccreditedAgent(
           id: 'ACC-0001',
