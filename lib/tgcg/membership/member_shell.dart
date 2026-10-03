@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../assignments/assignment_location_service.dart';
 import '../assignments/assignment_store.dart';
+import '../assignments/assignment_tracking_store.dart';
 import '../devices/managed_device_store.dart';
 import '../evidence/device_evidence_service.dart';
 import '../geography/geography_registry.dart';
@@ -257,6 +258,7 @@ class _MemberAssignmentCardState extends State<_MemberAssignmentCard> {
   @override
   Widget build(BuildContext context) {
     final assignments = Assignments.of(context);
+    final tracking = AssignmentTracking.of(context);
     final session = TgcgSession.of(context, listen: false);
     final current =
         assignments.assignmentById(widget.assignment.id) ?? widget.assignment;
@@ -344,6 +346,13 @@ class _MemberAssignmentCardState extends State<_MemberAssignmentCard> {
                             icon: Icons.phone_android_outlined,
                             compact: true,
                           ),
+                        if (tracking.isTrackingAssignment(current.id))
+                          const TgcgStatusPill(
+                            label: 'LIVE GPS',
+                            color: TgcgColors.success,
+                            icon: Icons.location_searching_rounded,
+                            compact: true,
+                          ),
                         TgcgStatusPill(
                           label: '${current.evidence.length} EVIDENCE',
                           color: current.evidence.isEmpty
@@ -428,6 +437,38 @@ class _MemberAssignmentCardState extends State<_MemberAssignmentCard> {
               spacing: 8,
               runSpacing: 8,
               children: [
+                FilledButton.tonalIcon(
+                  onPressed: _busy || tracking.isStarting
+                      ? null
+                      : () async {
+                          try {
+                            if (tracking.isTrackingAssignment(current.id)) {
+                              await tracking.stop();
+                            } else {
+                              await tracking.start(
+                                assignmentId: current.id,
+                                deviceId: device.id,
+                              );
+                            }
+                          } on StateError catch (error) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(error.message)),
+                            );
+                          }
+                        },
+                  icon: Icon(
+                    tracking.isTrackingAssignment(current.id)
+                        ? Icons.location_disabled_outlined
+                        : Icons.location_searching_rounded,
+                    size: 17,
+                  ),
+                  label: Text(
+                    tracking.isTrackingAssignment(current.id)
+                        ? 'Stop live GPS'
+                        : 'Start live GPS',
+                  ),
+                ),
                 OutlinedButton.icon(
                   onPressed: _busy
                       ? null
@@ -546,6 +587,14 @@ class _MemberAssignmentCardState extends State<_MemberAssignmentCard> {
         status: target,
         actorId: actorId,
       );
+      if (target == AssignmentStatus.completed ||
+          target == AssignmentStatus.cancelled ||
+          target == AssignmentStatus.declined) {
+        final tracking = AssignmentTracking.of(context, listen: false);
+        if (tracking.isTrackingAssignment(assignment.id)) {
+          await tracking.stop();
+        }
+      }
     } on StateError catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -572,6 +621,13 @@ class _MemberAssignmentCardState extends State<_MemberAssignmentCard> {
         accuracyMeters: fix.accuracyMeters,
         capturedAt: fix.capturedAt,
       );
+      if (!mounted) return;
+      if (updated.status == AssignmentStatus.checkedIn) {
+        await AssignmentTracking.of(context, listen: false).start(
+          assignmentId: updated.id,
+          deviceId: device.id,
+        );
+      }
       if (!mounted) return;
       final message = updated.status == AssignmentStatus.checkedIn
           ? 'Presence confirmed inside the assigned polling-unit geofence.'
