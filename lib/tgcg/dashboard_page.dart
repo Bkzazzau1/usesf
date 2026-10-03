@@ -388,11 +388,24 @@ class _CoveragePanel extends StatelessWidget {
                         width: width,
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: active
-                              ? TgcgColors.primarySoft
-                              : TgcgColors.surfaceSoft,
-                          borderRadius: BorderRadius.circular(15),
-                          border: Border.all(color: TgcgColors.border),
+                          gradient: active
+                              ? const LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    TgcgColors.gold100,
+                                    TgcgColors.surface,
+                                    TgcgColors.navy50,
+                                  ],
+                                )
+                              : null,
+                          color: active ? null : TgcgColors.surfaceSoft,
+                          borderRadius: BorderRadius.circular(TgcgRadius.md),
+                          border: Border.all(
+                            color: active
+                                ? TgcgColors.gold200
+                                : TgcgColors.border,
+                          ),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -403,7 +416,9 @@ class _CoveragePanel extends StatelessWidget {
                                   item.scope.level == GeographyLevel.senatorialDistrict
                                       ? Icons.hub_outlined
                                       : Icons.location_city_outlined,
-                                  color: TgcgColors.primary,
+                                  color: active
+                                      ? TgcgColors.accentStrong
+                                      : TgcgColors.primary,
                                   size: 18,
                                 ),
                                 const SizedBox(width: 7),
@@ -540,7 +555,7 @@ class _OperationsProgressPanel extends StatelessWidget {
               Text(
                 '${(readiness * 100).round()}%',
                 style: const TextStyle(
-                  color: TgcgColors.ink,
+                  color: TgcgColors.primaryDark,
                   fontSize: 38,
                   height: 1,
                   fontWeight: FontWeight.w900,
@@ -562,8 +577,8 @@ class _OperationsProgressPanel extends StatelessWidget {
             child: LinearProgressIndicator(
               value: readiness.clamp(0, 1).toDouble(),
               minHeight: 10,
-              backgroundColor: const Color(0xFFE4E7ED),
-              valueColor: const AlwaysStoppedAnimation(TgcgColors.success),
+              backgroundColor: TgcgColors.primarySoft,
+              valueColor: const AlwaysStoppedAnimation(TgcgColors.accentStrong),
             ),
           ),
           const SizedBox(height: 16),
@@ -709,9 +724,15 @@ class _EventRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) => InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(13),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+        borderRadius: BorderRadius.circular(TgcgRadius.md),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          decoration: BoxDecoration(
+            color: TgcgColors.surfaceSoft,
+            borderRadius: BorderRadius.circular(TgcgRadius.md),
+            border: Border.all(color: TgcgColors.border),
+          ),
           child: Row(
             children: [
               Container(
@@ -855,9 +876,18 @@ class _QuickCommandPanel extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.all(13),
                     decoration: BoxDecoration(
-                      color: TgcgColors.surfaceSoft,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: TgcgColors.border),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          TgcgColors.surface,
+                          color.withValues(alpha: .035),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(TgcgRadius.md),
+                      border: Border.all(
+                        color: color.withValues(alpha: .16),
+                      ),
                     ),
                     child: Row(
                       children: [
@@ -865,8 +895,11 @@ class _QuickCommandPanel extends StatelessWidget {
                           width: 38,
                           height: 38,
                           decoration: BoxDecoration(
-                            color: color.withValues(alpha: .09),
-                            borderRadius: BorderRadius.circular(11),
+                            color: color.withValues(alpha: .10),
+                            borderRadius: BorderRadius.circular(TgcgRadius.sm),
+                            border: Border.all(
+                              color: color.withValues(alpha: .10),
+                            ),
                           ),
                           child: Icon(action.icon, color: color, size: 19),
                         ),
