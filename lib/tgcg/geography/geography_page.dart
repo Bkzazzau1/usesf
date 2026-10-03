@@ -484,7 +484,17 @@ class _CoverageHero extends StatelessWidget {
                     runSpacing: gap,
                     children: children.map((child) {
                       final members = membership.memberCountForScope(child);
-                      final agents = membership.agentCountForScope(child);
+                      final activeAssignments = assignments
+                          .assignmentsForScope(child)
+                          .where((item) => !item.isTerminal)
+                          .toList(growable: false);
+                      final present = activeAssignments
+                          .where(
+                            (item) =>
+                                assignments.presenceFor(item) ==
+                                AssignmentPresence.insideGeofence,
+                          )
+                          .length;
                       final openIncidents = field
                           .incidentsForScope(child)
                           .where(
@@ -493,8 +503,6 @@ class _CoverageHero extends StatelessWidget {
                                 item.status != IncidentStatus.closed,
                           )
                           .length;
-                      final resultCount =
-                          results.submissionsForScope(child).length;
 
                       return SizedBox(
                         width: width,
@@ -547,20 +555,20 @@ class _CoverageHero extends StatelessWidget {
                                       ),
                                       Expanded(
                                         child: _DarkMetric(
-                                          value: agents,
-                                          label: 'Agents',
+                                          value: activeAssignments.length,
+                                          label: 'Assigned',
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: _DarkMetric(
+                                          value: present,
+                                          label: 'Present',
                                         ),
                                       ),
                                       Expanded(
                                         child: _DarkMetric(
                                           value: openIncidents,
                                           label: 'Incidents',
-                                        ),
-                                      ),
-                                      Expanded(
-                                        child: _DarkMetric(
-                                          value: resultCount,
-                                          label: 'Results',
                                         ),
                                       ),
                                     ],
