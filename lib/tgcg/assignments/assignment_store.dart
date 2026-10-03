@@ -476,6 +476,7 @@ class AssignmentController extends ChangeNotifier {
     required String assignmentId,
     required String newMemberId,
     required String actorId,
+    GeographicScope? authorizedScope,
   }) async {
     final index =
         _assignments.indexWhere((item) => item.id == assignmentId);
@@ -488,6 +489,24 @@ class AssignmentController extends ChangeNotifier {
     }
 
     final current = _assignments[index];
+    if (authorizedScope != null &&
+        !GeographyRegistry.scopeContains(
+          authorizedScope,
+          current.targetScope,
+        )) {
+      throw StateError(
+        'This assignment is outside the coordinator authorization scope.',
+      );
+    }
+    final memberScope =
+        _membership.registrationScopeForMember(newMemberId);
+    if (authorizedScope != null &&
+        memberScope != null &&
+        !GeographyRegistry.scopeContains(authorizedScope, memberScope)) {
+      throw StateError(
+        'The selected member is outside the coordinator authorization scope.',
+      );
+    }
     final now = DateTime.now().toUtc();
     final device = _devices.deviceForMember(newMemberId);
     final updated = MemberAssignment(
