@@ -1194,6 +1194,18 @@ class _EvidenceIntelligence extends StatelessWidget {
                                             : Icons.verified_outlined,
                                         compact: true,
                                       ),
+                                      TgcgStatusPill(
+                                        label: item.sourceReference == null
+                                            ? 'UPLOAD PENDING'
+                                            : 'MEDIA READY',
+                                        color: item.sourceReference == null
+                                            ? TgcgColors.warning
+                                            : TgcgColors.info,
+                                        icon: item.sourceReference == null
+                                            ? Icons.cloud_upload_outlined
+                                            : Icons.cloud_done_outlined,
+                                        compact: true,
+                                      ),
                                       if (item.latitude != null &&
                                           item.longitude != null)
                                         const TgcgStatusPill(
@@ -1210,8 +1222,13 @@ class _EvidenceIntelligence extends StatelessWidget {
                             IconButton(
                               tooltip: 'Copy evidence reference',
                               onPressed: () async {
-                                final reference =
-                                    '${item.id} • ${item.fileName} • ${item.contentHash ?? 'hash-pending'}';
+                                final reference = [
+                                  item.id,
+                                  item.fileName,
+                                  item.contentHash ?? 'hash-pending',
+                                  if (item.sourceReference != null)
+                                    item.sourceReference!,
+                                ].join(' • ');
                                 await Clipboard.setData(
                                   ClipboardData(text: reference),
                                 );
