@@ -206,11 +206,14 @@ class AssignmentController extends ChangeNotifier {
     required OfflinePersistenceController persistence,
     List<MemberAssignment> assignments = const [],
     List<AssignmentEvent> events = const [],
+    Map<String, int> minimumStaffingByPollingUnit = const {},
   })  : _membership = membership,
         _devices = devices,
         _persistence = persistence,
         _assignments = List<MemberAssignment>.of(assignments),
-        _events = List<AssignmentEvent>.of(events);
+        _events = List<AssignmentEvent>.of(events),
+        _minimumStaffingByPollingUnit =
+            Map<String, int>.of(minimumStaffingByPollingUnit);
 
   factory AssignmentController.prototypeSeed({
     required MembershipOperationsController membership,
@@ -228,6 +231,7 @@ class AssignmentController extends ChangeNotifier {
   final OfflinePersistenceController _persistence;
   final List<MemberAssignment> _assignments;
   final List<AssignmentEvent> _events;
+  final Map<String, int> _minimumStaffingByPollingUnit;
 
   List<MemberAssignment> get assignments =>
       List.unmodifiable(_assignments);
@@ -282,6 +286,50 @@ class AssignmentController extends ChangeNotifier {
       .where((item) => item.status == AssignmentStatus.gpsMismatch)
       .length;
 
+  int minimumStaffingFor(
+    String pollingUnitId, {
+    int fallback = 1,
+  }) =>
+      _minimumStaffingByPollingUnit[pollingUnitId] ?? fallback;
+
+  Future<void> setMinimumStaffing({
+    required String pollingUnitId,
+    required int minimumStaffing,
+    required String actorId,
+    GeographicScope? authorizedScope,
+  }) async {
+    if (minimumStaffing < 0 || minimumStaffing > 100) {
+      throw ArgumentError(
+        'Minimum staffing must be between 0 and 100.',
+      );
+    }
+    final unit = _membership.geography.pollingUnit(pollingUnitId);
+    if (unit == null) {
+      throw ArgumentError('Unknown polling unit: $pollingUnitId');
+    }
+    if (authorizedScope != null &&
+        !GeographyRegistry.scopeContains(authorizedScope, unit.scope)) {
+      throw StateError(
+        'This polling unit is outside the coordinator authorization scope.',
+      );
+    }
+
+    _minimumStaffingByPollingUnit[unit.code] = minimumStaffing;
+    notifyListeners();
+    await _persistence.persistMutation(
+      entityType: 'polling_unit_staffing_requirement',
+      entityId: unit.code,
+      mutationType: SyncMutationType.upsert,
+      scopeKey: scopeStorageKey(unit.scope),
+      payload: {
+        'pollingUnitId': unit.code,
+        'minimumStaffing': minimumStaffing,
+        'updatedBy': actorId,
+        'updatedAt': DateTime.now().toUtc().toIso8601String(),
+      },
+    );
+  }
+
   List<PollingUnitCoverageSnapshot> coverageForScope(
     GeographicScope scope, {
     int minimumStaffing = 1,
@@ -327,7 +375,10 @@ class AssignmentController extends ChangeNotifier {
           enRoute: enRoute,
           staleGps: staleGps,
           gpsMismatch: gpsMismatch,
-          minimumStaffing: minimumStaffing,
+          minimumStaffing: minimumStaffingFor(
+            unit.code,
+            fallback: minimumStaffing,
+          ),
         ),
       );
     }
