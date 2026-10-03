@@ -323,7 +323,19 @@ class _PortalBrandPanel extends StatelessWidget {
                 ),
               ],
             ),
-            if (compact) const SizedBox(height: 20) else const Spacer(),
+            if (compact)
+              const SizedBox(height: 20)
+            else
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: LayoutBuilder(
+                    builder: (context, box) => Center(
+                      child: TgcgLogo(size: box.biggest.shortestSide),
+                    ),
+                  ),
+                ),
+              ),
             Container(
               width: compact ? 44 : 60,
               height: compact ? 44 : 60,
