@@ -62,9 +62,15 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
                     Expanded(flex: 10, child: _brandPanel()),
                     Expanded(
                       flex: 13,
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 250),
-                        child: showSignIn ? _formPanel() : _governorPanel(),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          const _KadunaMapBackdrop(),
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 250),
+                            child: showSignIn ? _formPanel() : _governorPanel(),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -592,6 +598,27 @@ class _Stat extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      );
+}
+
+/// Faded Kaduna State map behind the sign-in area.
+class _KadunaMapBackdrop extends StatelessWidget {
+  const _KadunaMapBackdrop();
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Opacity(
+            opacity: .13,
+            child: Image.asset(
+              'assets/brand/kaduna_map.png',
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.medium,
+              excludeFromSemantics: true,
+            ),
+          ),
         ),
       );
 }
