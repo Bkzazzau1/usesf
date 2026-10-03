@@ -400,8 +400,8 @@ class _MembershipPageState extends State<MembershipPage> {
               child: const Text('Cancel'),
             ),
             FilledButton.icon(
-              onPressed: () {
-                final agent = store.accredit(
+              onPressed: () async {
+                final agent = await store.accredit(
                   memberId: memberId,
                   role: role,
                   scope: scope,
@@ -409,8 +409,11 @@ class _MembershipPageState extends State<MembershipPage> {
                   deviceId: device.text,
                   simFingerprint: sim.text,
                 );
+                if (!mounted) return;
                 setState(() => selectedAgentId = agent.id);
-                Navigator.pop(dialogContext, true);
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext, true);
+                }
               },
               icon: const Icon(Icons.badge_outlined),
               label: const Text('Create pending accreditation'),
@@ -496,8 +499,8 @@ class _MembershipPageState extends State<MembershipPage> {
               child: const Text('Cancel'),
             ),
             FilledButton.icon(
-              onPressed: () {
-                store.updateReadiness(
+              onPressed: () async {
+                await store.updateReadiness(
                   agent.id,
                   trainingCompleted: training,
                   biometricEnrolled: biometric,
@@ -505,7 +508,9 @@ class _MembershipPageState extends State<MembershipPage> {
                       device.text.trim().isEmpty ? null : device.text.trim(),
                   simFingerprint: sim.text.trim().isEmpty ? null : sim.text.trim(),
                 );
-                Navigator.pop(dialogContext, true);
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext, true);
+                }
               },
               icon: const Icon(Icons.save_outlined),
               label: const Text('Save readiness'),
@@ -1159,10 +1164,12 @@ class _AgentInspector extends StatelessWidget {
                       ),
                       PopupMenuButton<AccreditationStatus>(
                         tooltip: 'Change accreditation status',
-                        onSelected: (value) => store.updateAccreditationStatus(
-                          agent!.id,
-                          value,
-                        ),
+                        onSelected: (value) async {
+                          await store.updateAccreditationStatus(
+                            agent!.id,
+                            value,
+                          );
+                        },
                         itemBuilder: (_) => AccreditationStatus.values
                             .map(
                               (status) => PopupMenuItem(
