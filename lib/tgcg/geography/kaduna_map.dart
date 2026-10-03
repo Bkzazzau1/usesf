@@ -19,20 +19,95 @@ final Map<String, String> kadunaLgaDistrict = {
       'KD-${slug.toUpperCase().replaceAll("'", '')}': district.code,
 };
 
-/// Accurate map of Kaduna State's 23 LGAs, coloured by senatorial zone.
-/// Boundaries: GRID3 via geoBoundaries (CC BY 4.0).
-class KadunaMap extends StatelessWidget {
-  const KadunaMap({super.key, this.showLabels = true});
+const _ink = Color(0xFF101828);
+const _gold = Color(0xFFD8AD42);
+
+/// Accurate map of Kaduna State's 23 LGAs. By default LGAs are coloured by
+/// senatorial zone; pass [fillColor] to colour them by anything else (for
+/// example live situation), [badge] for a small per-LGA tag, and [onLgaTap]
+/// to make LGAs selectable. Boundaries: GRID3 via geoBoundaries (CC BY 4.0).
+class KadunaMap extends StatefulWidget {
+  const KadunaMap({
+    super.key,
+    this.showLabels = true,
+    this.fillColor,
+    this.labelColor,
+    this.badge,
+    this.selectedLgaId,
+    this.onLgaTap,
+  });
 
   final bool showLabels;
+  final Color Function(String lgaId)? fillColor;
+  final Color Function(String lgaId)? labelColor;
+  final String? Function(String lgaId)? badge;
+  final String? selectedLgaId;
+  final ValueChanged<String>? onLgaTap;
+
+  @override
+  State<KadunaMap> createState() => _KadunaMapState();
+}
+
+class _KadunaMapState extends State<KadunaMap> {
+  Size? _pathsSize;
+  Map<String, Path> _paths = const {};
+  String? _hovered;
+
+  Map<String, Path> _pathsFor(Size size) {
+    if (_pathsSize != size) {
+      _paths = _KadunaProjection.instance.paths(size);
+      _pathsSize = size;
+    }
+    return _paths;
+  }
+
+  String? _hit(Offset position, Size size) {
+    for (final entry in _pathsFor(size).entries) {
+      if (entry.value.contains(position)) return entry.key;
+    }
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) => AspectRatio(
-        aspectRatio: _KadunaProjection.instance.aspectRatio,
-        child: CustomPaint(
-          painter: _KadunaMapPainter(showLabels: showLabels),
-        ),
-      );
+    aspectRatio: _KadunaProjection.instance.aspectRatio,
+    child: LayoutBuilder(
+      builder: (context, box) {
+        final size = box.biggest;
+        final paint = CustomPaint(
+          size: size,
+          painter: _KadunaMapPainter(
+            paths: _pathsFor(size),
+            showLabels: widget.showLabels,
+            fillColor: widget.fillColor,
+            labelColor: widget.labelColor,
+            badge: widget.badge,
+            selectedLgaId: widget.selectedLgaId,
+            hoveredLgaId: widget.onLgaTap == null ? null : _hovered,
+          ),
+        );
+        if (widget.onLgaTap == null) return paint;
+        return MouseRegion(
+          cursor: _hovered == null
+              ? MouseCursor.defer
+              : SystemMouseCursors.click,
+          onHover: (event) {
+            final hit = _hit(event.localPosition, size);
+            if (hit != _hovered) setState(() => _hovered = hit);
+          },
+          onExit: (_) => setState(() => _hovered = null),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapUp: (details) {
+              final hit = _hit(details.localPosition, size);
+              if (hit != null) widget.onLgaTap!(hit);
+            },
+            child: paint,
+          ),
+        );
+      },
+    ),
+  );
 }
 
 class _KadunaProjection {
@@ -62,12 +137,44 @@ class _KadunaProjection {
     final scale = size.width / ((maxLon - minLon) * lonScale);
     return Offset((lon - minLon) * lonScale * scale, (maxLat - lat) * scale);
   }
+
+  Map<String, Path> paths(Size size) {
+    final result = <String, Path>{};
+    for (final shape in kadunaLgaShapes) {
+      final path = Path();
+      for (final ring in shape.rings) {
+        for (var i = 0; i < ring.length; i += 2) {
+          final point = project(ring[i], ring[i + 1], size);
+          i == 0
+              ? path.moveTo(point.dx, point.dy)
+              : path.lineTo(point.dx, point.dy);
+        }
+        path.close();
+      }
+      result[shape.lgaId] = path;
+    }
+    return result;
+  }
 }
 
 class _KadunaMapPainter extends CustomPainter {
-  const _KadunaMapPainter({required this.showLabels});
+  const _KadunaMapPainter({
+    required this.paths,
+    required this.showLabels,
+    required this.fillColor,
+    required this.labelColor,
+    required this.badge,
+    required this.selectedLgaId,
+    required this.hoveredLgaId,
+  });
 
+  final Map<String, Path> paths;
   final bool showLabels;
+  final Color Function(String lgaId)? fillColor;
+  final Color Function(String lgaId)? labelColor;
+  final String? Function(String lgaId)? badge;
+  final String? selectedLgaId;
+  final String? hoveredLgaId;
 
   // The two Kaduna city LGAs are too small to hold a name, so their labels sit
   // outside with a leader line (offsets in degrees).
@@ -76,75 +183,108 @@ class _KadunaMapPainter extends CustomPainter {
     'KD-KADUNA-SOUTH': Offset(-.42, -.09),
   };
 
+  Color _fill(String lgaId) =>
+      fillColor?.call(lgaId) ??
+      kadunaZoneColors[kadunaLgaDistrict[lgaId]] ??
+      Colors.grey;
+
+  Color _label(String lgaId) {
+    final custom = labelColor?.call(lgaId);
+    if (custom != null) return custom;
+    return _fill(lgaId).computeLuminance() > .45 ? _ink : Colors.white;
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     final projection = _KadunaProjection.instance;
+    final strokeWidth = math.max(1.0, size.width / 450);
     final border = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.stroke
-      ..strokeWidth = math.max(1, size.width / 450)
+      ..strokeWidth = strokeWidth
       ..strokeJoin = StrokeJoin.round;
 
-    final paths = <String, Path>{};
     for (final shape in kadunaLgaShapes) {
-      final path = Path();
-      for (final ring in shape.rings) {
-        for (var i = 0; i < ring.length; i += 2) {
-          final point = projection.project(ring[i], ring[i + 1], size);
-          i == 0 ? path.moveTo(point.dx, point.dy) : path.lineTo(point.dx, point.dy);
-        }
-        path.close();
+      final path = paths[shape.lgaId]!;
+      var color = _fill(shape.lgaId);
+      if (shape.lgaId == hoveredLgaId) {
+        color = Color.lerp(color, Colors.white, .18)!;
       }
-      paths[shape.lgaId] = path;
-      final color = kadunaZoneColors[kadunaLgaDistrict[shape.lgaId]] ?? Colors.grey;
       canvas.drawPath(path, Paint()..color = color);
       canvas.drawPath(path, border);
+    }
+    final selected = selectedLgaId == null ? null : paths[selectedLgaId];
+    if (selected != null) {
+      canvas.drawPath(
+        selected,
+        Paint()
+          ..color = _gold
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = strokeWidth * 3.2
+          ..strokeJoin = StrokeJoin.round,
+      );
     }
 
     if (!showLabels) return;
     for (final shape in kadunaLgaShapes) {
-      final district = kadunaLgaDistrict[shape.lgaId];
-      final onYellow = district == 'SD/054/KD';
       final bounds = paths[shape.lgaId]!.getBounds();
       final offset = _labelOffsets[shape.lgaId];
       final anchor = projection.project(shape.labelLon, shape.labelLat, size);
       final at = offset == null
           ? anchor
-          : projection.project(shape.labelLon + offset.dx, shape.labelLat + offset.dy, size);
+          : projection.project(
+              shape.labelLon + offset.dx,
+              shape.labelLat + offset.dy,
+              size,
+            );
       final fontSize = offset != null
           ? size.width / 58
-          : (math.sqrt(bounds.width * bounds.height) / 7.5)
-              .clamp(size.width / 80, size.width / 38);
+          : (math.sqrt(bounds.width * bounds.height) / 7.5).clamp(
+              size.width / 80,
+              size.width / 38,
+            );
+      final tag = badge?.call(shape.lgaId);
 
       if (offset != null) {
         canvas.drawLine(
           anchor,
           at,
           Paint()
-            ..color = const Color(0xFF101828)
+            ..color = _ink
             ..strokeWidth = math.max(1, size.width / 600),
         );
-        canvas.drawCircle(anchor, size.width / 260, Paint()..color = const Color(0xFF101828));
+        canvas.drawCircle(anchor, size.width / 260, Paint()..color = _ink);
       }
 
-      final text = TextPainter(
-        text: TextSpan(
-          text: shape.name,
-          style: TextStyle(
-            color: offset != null || onYellow ? const Color(0xFF101828) : Colors.white,
-            fontFamily: 'Roboto',
-            fontSize: fontSize,
-            fontWeight: FontWeight.w900,
-            height: 1.05,
-          ),
-        ),
-        textAlign: TextAlign.center,
-        textDirection: TextDirection.ltr,
-      )..layout(
-          maxWidth: offset != null
-              ? fontSize * 7
-              : math.max(bounds.width * .8, fontSize * 3.2),
-        );
+      final text =
+          TextPainter(
+            text: TextSpan(
+              text: shape.name,
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                color: offset != null ? _ink : _label(shape.lgaId),
+                fontSize: fontSize,
+                fontWeight: FontWeight.w900,
+                height: 1.05,
+              ),
+              children: [
+                if (tag != null)
+                  TextSpan(
+                    text: '\n$tag',
+                    style: TextStyle(
+                      fontSize: fontSize * .62,
+                      letterSpacing: .4,
+                    ),
+                  ),
+              ],
+            ),
+            textAlign: TextAlign.center,
+            textDirection: TextDirection.ltr,
+          )..layout(
+            maxWidth: offset != null
+                ? fontSize * 7
+                : math.max(bounds.width * .8, fontSize * 3.2),
+          );
       final topLeft = offset == null
           ? at - Offset(text.width / 2, text.height / 2)
           : at - Offset(text.width + fontSize * .3, text.height / 2);
@@ -163,6 +303,5 @@ class _KadunaMapPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _KadunaMapPainter oldDelegate) =>
-      oldDelegate.showLabels != showLabels;
+  bool shouldRepaint(covariant _KadunaMapPainter oldDelegate) => true;
 }
