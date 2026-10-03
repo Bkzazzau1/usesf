@@ -448,6 +448,7 @@ class _AssignmentStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final current = assignment;
+    final tracking = AssignmentTracking.of(context);
     final presence = current == null
         ? AssignmentPresence.unknown
         : controller.presenceFor(current);
@@ -541,6 +542,14 @@ class _AssignmentStrip extends StatelessWidget {
                                   : TgcgColors.warning,
                           compact: true,
                         ),
+                        if (current != null &&
+                            tracking.isTrackingAssignment(current.id))
+                          const TgcgStatusPill(
+                            label: 'LIVE GPS',
+                            color: TgcgColors.success,
+                            icon: Icons.location_searching_rounded,
+                            compact: true,
+                          ),
                         TgcgStatusPill(
                           label: managedDevice == null
                               ? 'NO MANAGED PHONE'
