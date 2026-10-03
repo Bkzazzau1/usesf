@@ -35,11 +35,15 @@ class TgcgSessionController extends ChangeNotifier {
   TgcgRole? _role;
   String _operatorName = '';
   String _accessId = '';
+  String? _agencyId;
   GeographicScope _scope = GeographicScope.kaduna;
 
   TgcgRole? get role => _role;
   String get operatorName => _operatorName;
   String get accessId => _accessId;
+
+  /// Response agency for a Security Officer session; null for other roles.
+  String? get agencyId => _agencyId;
   GeographicScope get scope => _scope;
   bool get isAuthenticated => _role != null;
 
@@ -48,8 +52,10 @@ class TgcgSessionController extends ChangeNotifier {
     required String operatorName,
     required String accessId,
     GeographicScope scope = GeographicScope.kaduna,
+    String? agencyId,
   }) {
     _role = role;
+    _agencyId = agencyId;
     _operatorName =
         operatorName.trim().isEmpty ? roleLabel(role) : operatorName.trim();
     _accessId = accessId.trim();
@@ -75,6 +81,7 @@ class TgcgSessionController extends ChangeNotifier {
     _role = null;
     _operatorName = '';
     _accessId = '';
+    _agencyId = null;
     _scope = GeographicScope.kaduna;
     notifyListeners();
   }
@@ -115,6 +122,7 @@ String roleLabel(TgcgRole role) => switch (role) {
       TgcgRole.legalOfficer => 'Legal Officer',
       TgcgRole.technicalSupport => 'Technical Support',
       TgcgRole.readOnlyExecutive => 'Executive Viewer',
+      TgcgRole.securityOfficer => 'Security Officer',
     };
 
 String roleDescription(TgcgRole role) => switch (role) {
@@ -142,6 +150,8 @@ String roleDescription(TgcgRole role) => switch (role) {
         'Technical operations, user support, system monitoring and troubleshooting.',
       TgcgRole.readOnlyExecutive =>
         'Read-only state command, incident, collation and audit visibility.',
+      TgcgRole.securityOfficer =>
+        'Agency response to incidents dispatched by the Situation Room.',
     };
 
 IconData roleIcon(TgcgRole role) => switch (role) {
@@ -157,6 +167,7 @@ IconData roleIcon(TgcgRole role) => switch (role) {
       TgcgRole.legalOfficer => Icons.gavel_rounded,
       TgcgRole.technicalSupport => Icons.support_agent_rounded,
       TgcgRole.readOnlyExecutive => Icons.dashboard_customize_rounded,
+      TgcgRole.securityOfficer => Icons.local_police_rounded,
     };
 
 Set<TgcgModule> allowedModules(TgcgRole role) {

@@ -7,7 +7,7 @@ void main() {
     test('state scope sees all prototype incidents', () {
       final store = FieldOperationsController.prototypeSeed();
 
-      expect(store.incidentsForScope(GeographicScope.kaduna).length, 4);
+      expect(store.incidentsForScope(GeographicScope.kaduna).length, 5);
       expect(store.reportsForScope(GeographicScope.kaduna).length, 3);
     });
 

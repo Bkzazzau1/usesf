@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'login_page.dart';
 import 'membership/membership_store.dart';
+import 'security/security_portal_login_page.dart';
 import 'session.dart';
 import 'ui/tgcg_design.dart';
 
@@ -58,6 +59,34 @@ class _PresentationAccessLoginState extends State<PresentationAccessLogin> {
                           vertical: 15,
                         ),
                         side: const BorderSide(color: TgcgColors.gold200),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(TgcgRadius.md),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Material(
+                    elevation: 8,
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(16),
+                    child: FilledButton.icon(
+                      onPressed: resetting
+                          ? null
+                          : () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => const SecurityPortalLoginPage(),
+                                ),
+                              ),
+                      icon: const Icon(Icons.local_police_rounded),
+                      label: const Text('Security Portal'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: TgcgColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 16,
+                        ),
+                        side: const BorderSide(color: TgcgColors.navy700),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(TgcgRadius.md),
                         ),

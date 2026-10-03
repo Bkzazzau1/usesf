@@ -35,6 +35,7 @@ enum TgcgCapability {
   exportReports,
   manageUsers,
   manageSystemSettings,
+  respondToDispatch,
 }
 
 class TgcgPermissionPolicy {
@@ -265,6 +266,11 @@ class TgcgPermissionPolicy {
       TgcgCapability.viewEvidence,
       TgcgCapability.viewAudit,
       TgcgCapability.exportReports,
+    },
+    // Accredited agency personnel: they act only on dispatches assigned to
+    // their own agency through the Security Portal.
+    TgcgRole.securityOfficer: {
+      TgcgCapability.respondToDispatch,
     },
   };
 

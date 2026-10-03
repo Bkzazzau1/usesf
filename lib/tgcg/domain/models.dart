@@ -23,6 +23,7 @@ enum TgcgRole {
   legalOfficer,
   technicalSupport,
   readOnlyExecutive,
+  securityOfficer,
 }
 
 enum RecordStatus {

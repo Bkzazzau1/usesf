@@ -139,6 +139,17 @@ class FieldOperationsController extends ChangeNotifier {
           origin: RecordOrigin.systemDerived,
         ),
         FieldIncident(
+          id: 'INC-0005',
+          title: 'Crowd disturbance near Jema\'a collation centre',
+          category: 'Security',
+          severity: IncidentSeverity.high,
+          status: IncidentStatus.escalated,
+          scope: jemaa,
+          reportedAt: now.subtract(const Duration(minutes: 9)),
+          reporterId: 'AG-JM-032',
+          summary: 'A large crowd has gathered at the collation centre gate; officials request security presence before collation resumes.',
+        ),
+        FieldIncident(
           id: 'INC-0004',
           title: 'Field device unable to synchronize queued report',
           category: 'Technical',

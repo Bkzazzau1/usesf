@@ -463,7 +463,9 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
           return Wrap(
             spacing: gap,
             runSpacing: gap,
-            children: TgcgRole.values.map((role) {
+            children: TgcgRole.values
+                .where((role) => role != TgcgRole.securityOfficer)
+                .map((role) {
               final active = role == selectedRole;
               return InkWell(
                 borderRadius: BorderRadius.circular(14),
