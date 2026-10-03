@@ -426,7 +426,37 @@ class MembershipOperationsController extends ChangeNotifier {
     if (memberById(memberId) == null) {
       throw ArgumentError('Unknown member: $memberId');
     }
-    if (!RegExp(r'^\d{6}  GeographicScope? registrationScopeForMember(String memberId) =>
+    if (!RegExp(r'^\d{6}$').hasMatch(pin)) {
+      throw ArgumentError('Member PIN must contain exactly 6 digits.');
+    }
+    final random = Random.secure();
+    final saltBytes = List<int>.generate(
+      16,
+      (_) => random.nextInt(256),
+      growable: false,
+    );
+    final hash = await _derivePin(pin, saltBytes);
+    _memberPinCredentials[memberId] = _MemberPinCredential(
+      salt: base64UrlEncode(saltBytes),
+      hash: base64UrlEncode(hash),
+    );
+    notifyListeners();
+  }
+
+  Future<bool> verifyMemberPin({
+    required String memberId,
+    required String pin,
+  }) async {
+    final credential = _memberPinCredentials[memberId];
+    if (credential == null || !RegExp(r'^\d{6}$').hasMatch(pin)) {
+      return false;
+    }
+    final salt = base64Url.decode(credential.salt);
+    final actual = base64UrlEncode(await _derivePin(pin, salt));
+    return _constantTimeEquals(credential.hash, actual);
+  }
+
+  GeographicScope? registrationScopeForMember(String memberId) =>
       _memberScopes[memberId];
 
   MemberPollingUnitLink? pollingUnitLinkForMember(String memberId) =>
@@ -716,370 +746,6 @@ class MembershipOperationsController extends ChangeNotifier {
       difference |= a.codeUnitAt(index) ^ b.codeUnitAt(index);
     }
     return difference == 0;
-  }
-
-  static AccreditedAgent _copyAgent(
-    AccreditedAgent current, {
-    AccreditationStatus? status,
-  }) => AccreditedAgent(
-        id: current.id,
-        memberId: current.memberId,
-        agentId: current.agentId,
-        role: current.role,
-        scope: current.scope,
-        status: status ?? current.status,
-        createdAt: current.createdAt,
-        registeredPhoneNumber: current.registeredPhoneNumber,
-        deviceId: current.deviceId,
-        simFingerprint: current.simFingerprint,
-        biometricEnrolled: current.biometricEnrolled,
-        trainingCompleted: current.trainingCompleted,
-        origin: current.origin,
-      );
-}
-
-class MembershipOperations extends InheritedNotifier<MembershipOperationsController> {
-  const MembershipOperations({
-    super.key,
-    required MembershipOperationsController controller,
-    required super.child,
-  }) : super(notifier: controller);
-
-  static MembershipOperationsController of(
-    BuildContext context, {
-    bool listen = true,
-  }) {
-    if (listen) {
-      final value =
-          context.dependOnInheritedWidgetOfExactType<MembershipOperations>();
-      assert(value != null, 'MembershipOperations is missing above this context.');
-      return value!.notifier!;
-    }
-    final element =
-        context.getElementForInheritedWidgetOfExactType<MembershipOperations>();
-    final value = element?.widget as MembershipOperations?;
-    assert(value != null, 'MembershipOperations is missing above this context.');
-    return value!.notifier!;
-  }
-}
-).hasMatch(pin)) {
-      throw ArgumentError('Member PIN must contain exactly 6 digits.');
-    }
-    final random = Random.secure();
-    final saltBytes = List<int>.generate(
-      16,
-      (_) => random.nextInt(256),
-      growable: false,
-    );
-    final hash = await _derivePin(pin, saltBytes);
-    _memberPinCredentials[memberId] = _MemberPinCredential(
-      salt: base64UrlEncode(saltBytes),
-      hash: base64UrlEncode(hash),
-    );
-    notifyListeners();
-  }
-
-  Future<bool> verifyMemberPin({
-    required String memberId,
-    required String pin,
-  }) async {
-    final credential = _memberPinCredentials[memberId];
-    if (credential == null || !RegExp(r'^\d{6}  GeographicScope? registrationScopeForMember(String memberId) =>
-      _memberScopes[memberId];
-
-  List<TgcgMember> membersForScope(GeographicScope scope) => _members
-      .where((member) {
-        final memberScope = _memberScopes[member.id];
-        return memberScope != null &&
-            GeographyRegistry.scopeContains(scope, memberScope);
-      })
-      .toList(growable: false);
-
-  int memberCountForScope(GeographicScope scope) =>
-      membersForScope(scope).length;
-
-  List<AccreditedAgent> agentsForScope(GeographicScope scope) =>
-      _agents
-          .where((agent) => GeographyRegistry.scopeContains(scope, agent.scope))
-          .toList(growable: false);
-
-  int agentCountForScope(GeographicScope scope) =>
-      agentsForScope(scope).length;
-
-  int assignedPollingUnitsWithin(GeographicScope scope) => agentsForScope(scope)
-      .where((agent) =>
-          agent.status == AccreditationStatus.approved &&
-          agent.role == TgcgRole.pollingUnitAgent &&
-          agent.scope.pollingUnitId != null)
-      .map((agent) => agent.scope.pollingUnitId!)
-      .toSet()
-      .length;
-
-  TgcgMember createMember({
-    required String fullName,
-    required String phoneNumber,
-    String? email,
-    GeographicScope registrationScope = GeographicScope.kaduna,
-  }) {
-    final member = TgcgMember(
-      id: 'MEM-${(_members.length + 1).toString().padLeft(4, '0')}',
-      fullName: fullName.trim(),
-      phoneNumber: phoneNumber.trim(),
-      email: email?.trim().isEmpty == true ? null : email?.trim(),
-      membershipNumber:
-          'USESF-${(_members.length + 1).toString().padLeft(6, '0')}',
-      createdAt: DateTime.now().toUtc(),
-      status: RecordStatus.submitted,
-      origin: RecordOrigin.localEntry,
-    );
-    _members.insert(0, member);
-    _memberScopes[member.id] = registrationScope;
-    notifyListeners();
-    return member;
-  }
-
-  AccreditedAgent accredit({
-    required String memberId,
-    required TgcgRole role,
-    required GeographicScope scope,
-    String? phoneNumber,
-    String? deviceId,
-    String? simFingerprint,
-  }) {
-    if (scope.level == GeographyLevel.pollingUnit &&
-        _geography.pollingUnit(scope.pollingUnitId ?? '') == null) {
-      throw ArgumentError(
-        'Polling-unit assignment must use canonical geography.',
-      );
-    }
-
-    final agent = AccreditedAgent(
-      id: 'ACC-${(_agents.length + 1).toString().padLeft(4, '0')}',
-      memberId: memberId,
-      agentId: 'AG-${(_agents.length + 1).toString().padLeft(5, '0')}',
-      role: role,
-      scope: scope,
-      status: AccreditationStatus.pending,
-      createdAt: DateTime.now().toUtc(),
-      registeredPhoneNumber: phoneNumber?.trim(),
-      deviceId: deviceId?.trim().isEmpty == true ? null : deviceId?.trim(),
-      simFingerprint:
-          simFingerprint?.trim().isEmpty == true ? null : simFingerprint?.trim(),
-      origin: RecordOrigin.localEntry,
-    );
-    _agents.insert(0, agent);
-    notifyListeners();
-    return agent;
-  }
-
-  void updateAccreditationStatus(String id, AccreditationStatus status) {
-    final index = _agents.indexWhere((agent) => agent.id == id);
-    if (index < 0) return;
-    _agents[index] = _copyAgent(_agents[index], status: status);
-    notifyListeners();
-  }
-
-  void updateReadiness(
-    String id, {
-    bool? trainingCompleted,
-    bool? biometricEnrolled,
-    String? deviceId,
-    String? simFingerprint,
-  }) {
-    final index = _agents.indexWhere((agent) => agent.id == id);
-    if (index < 0) return;
-    final current = _agents[index];
-    _agents[index] = AccreditedAgent(
-      id: current.id,
-      memberId: current.memberId,
-      agentId: current.agentId,
-      role: current.role,
-      scope: current.scope,
-      status: current.status,
-      createdAt: current.createdAt,
-      registeredPhoneNumber: current.registeredPhoneNumber,
-      deviceId: deviceId ?? current.deviceId,
-      simFingerprint: simFingerprint ?? current.simFingerprint,
-      biometricEnrolled: biometricEnrolled ?? current.biometricEnrolled,
-      trainingCompleted: trainingCompleted ?? current.trainingCompleted,
-      origin: current.origin,
-    );
-    notifyListeners();
-  }
-
-  static AccreditedAgent _copyAgent(
-    AccreditedAgent current, {
-    AccreditationStatus? status,
-  }) => AccreditedAgent(
-        id: current.id,
-        memberId: current.memberId,
-        agentId: current.agentId,
-        role: current.role,
-        scope: current.scope,
-        status: status ?? current.status,
-        createdAt: current.createdAt,
-        registeredPhoneNumber: current.registeredPhoneNumber,
-        deviceId: current.deviceId,
-        simFingerprint: current.simFingerprint,
-        biometricEnrolled: current.biometricEnrolled,
-        trainingCompleted: current.trainingCompleted,
-        origin: current.origin,
-      );
-}
-
-class MembershipOperations extends InheritedNotifier<MembershipOperationsController> {
-  const MembershipOperations({
-    super.key,
-    required MembershipOperationsController controller,
-    required super.child,
-  }) : super(notifier: controller);
-
-  static MembershipOperationsController of(
-    BuildContext context, {
-    bool listen = true,
-  }) {
-    if (listen) {
-      final value =
-          context.dependOnInheritedWidgetOfExactType<MembershipOperations>();
-      assert(value != null, 'MembershipOperations is missing above this context.');
-      return value!.notifier!;
-    }
-    final element =
-        context.getElementForInheritedWidgetOfExactType<MembershipOperations>();
-    final value = element?.widget as MembershipOperations?;
-    assert(value != null, 'MembershipOperations is missing above this context.');
-    return value!.notifier!;
-  }
-}
-).hasMatch(pin)) {
-      return false;
-    }
-    final salt = base64Url.decode(credential.salt);
-    final actual = base64UrlEncode(await _derivePin(pin, salt));
-    return _constantTimeEquals(credential.hash, actual);
-  }
-
-  GeographicScope? registrationScopeForMember(String memberId) =>
-      _memberScopes[memberId];
-
-  List<TgcgMember> membersForScope(GeographicScope scope) => _members
-      .where((member) {
-        final memberScope = _memberScopes[member.id];
-        return memberScope != null &&
-            GeographyRegistry.scopeContains(scope, memberScope);
-      })
-      .toList(growable: false);
-
-  int memberCountForScope(GeographicScope scope) =>
-      membersForScope(scope).length;
-
-  List<AccreditedAgent> agentsForScope(GeographicScope scope) =>
-      _agents
-          .where((agent) => GeographyRegistry.scopeContains(scope, agent.scope))
-          .toList(growable: false);
-
-  int agentCountForScope(GeographicScope scope) =>
-      agentsForScope(scope).length;
-
-  int assignedPollingUnitsWithin(GeographicScope scope) => agentsForScope(scope)
-      .where((agent) =>
-          agent.status == AccreditationStatus.approved &&
-          agent.role == TgcgRole.pollingUnitAgent &&
-          agent.scope.pollingUnitId != null)
-      .map((agent) => agent.scope.pollingUnitId!)
-      .toSet()
-      .length;
-
-  TgcgMember createMember({
-    required String fullName,
-    required String phoneNumber,
-    String? email,
-    GeographicScope registrationScope = GeographicScope.kaduna,
-  }) {
-    final member = TgcgMember(
-      id: 'MEM-${(_members.length + 1).toString().padLeft(4, '0')}',
-      fullName: fullName.trim(),
-      phoneNumber: phoneNumber.trim(),
-      email: email?.trim().isEmpty == true ? null : email?.trim(),
-      membershipNumber:
-          'USESF-${(_members.length + 1).toString().padLeft(6, '0')}',
-      createdAt: DateTime.now().toUtc(),
-      status: RecordStatus.submitted,
-      origin: RecordOrigin.localEntry,
-    );
-    _members.insert(0, member);
-    _memberScopes[member.id] = registrationScope;
-    notifyListeners();
-    return member;
-  }
-
-  AccreditedAgent accredit({
-    required String memberId,
-    required TgcgRole role,
-    required GeographicScope scope,
-    String? phoneNumber,
-    String? deviceId,
-    String? simFingerprint,
-  }) {
-    if (scope.level == GeographyLevel.pollingUnit &&
-        _geography.pollingUnit(scope.pollingUnitId ?? '') == null) {
-      throw ArgumentError(
-        'Polling-unit assignment must use canonical geography.',
-      );
-    }
-
-    final agent = AccreditedAgent(
-      id: 'ACC-${(_agents.length + 1).toString().padLeft(4, '0')}',
-      memberId: memberId,
-      agentId: 'AG-${(_agents.length + 1).toString().padLeft(5, '0')}',
-      role: role,
-      scope: scope,
-      status: AccreditationStatus.pending,
-      createdAt: DateTime.now().toUtc(),
-      registeredPhoneNumber: phoneNumber?.trim(),
-      deviceId: deviceId?.trim().isEmpty == true ? null : deviceId?.trim(),
-      simFingerprint:
-          simFingerprint?.trim().isEmpty == true ? null : simFingerprint?.trim(),
-      origin: RecordOrigin.localEntry,
-    );
-    _agents.insert(0, agent);
-    notifyListeners();
-    return agent;
-  }
-
-  void updateAccreditationStatus(String id, AccreditationStatus status) {
-    final index = _agents.indexWhere((agent) => agent.id == id);
-    if (index < 0) return;
-    _agents[index] = _copyAgent(_agents[index], status: status);
-    notifyListeners();
-  }
-
-  void updateReadiness(
-    String id, {
-    bool? trainingCompleted,
-    bool? biometricEnrolled,
-    String? deviceId,
-    String? simFingerprint,
-  }) {
-    final index = _agents.indexWhere((agent) => agent.id == id);
-    if (index < 0) return;
-    final current = _agents[index];
-    _agents[index] = AccreditedAgent(
-      id: current.id,
-      memberId: current.memberId,
-      agentId: current.agentId,
-      role: current.role,
-      scope: current.scope,
-      status: current.status,
-      createdAt: current.createdAt,
-      registeredPhoneNumber: current.registeredPhoneNumber,
-      deviceId: deviceId ?? current.deviceId,
-      simFingerprint: simFingerprint ?? current.simFingerprint,
-      biometricEnrolled: biometricEnrolled ?? current.biometricEnrolled,
-      trainingCompleted: trainingCompleted ?? current.trainingCompleted,
-      origin: current.origin,
-    );
-    notifyListeners();
   }
 
   static AccreditedAgent _copyAgent(
