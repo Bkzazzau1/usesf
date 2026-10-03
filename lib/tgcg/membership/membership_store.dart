@@ -369,6 +369,9 @@ class MembershipOperationsController extends ChangeNotifier {
     final coordinateRows = await _persistence.readEntities(
       entityType: 'polling_unit_coordinate',
     );
+    final agentRows = await _persistence.readEntities(
+      entityType: 'accredited_agent',
+    );
 
     var changed = false;
 
@@ -433,6 +436,51 @@ class MembershipOperationsController extends ChangeNotifier {
             linkedBy: _nullableText(home['linkedBy']),
           );
         }
+      }
+      changed = true;
+    }
+
+    for (final row in agentRows) {
+      final id = row['id']?.toString();
+      final memberId = row['memberId']?.toString();
+      final agentId = row['agentId']?.toString();
+      final role = _role(row['role']);
+      final scope = geographicScopeFromJson(row['scope']);
+      final status = _accreditationStatus(row['status']);
+      final createdAt =
+          DateTime.tryParse(row['createdAt']?.toString() ?? '')?.toUtc();
+      if (id == null ||
+          memberId == null ||
+          agentId == null ||
+          role == null ||
+          scope == null ||
+          status == null ||
+          createdAt == null) {
+        continue;
+      }
+      if (memberById(memberId) == null) continue;
+
+      final restored = AccreditedAgent(
+        id: id,
+        memberId: memberId,
+        agentId: agentId,
+        role: role,
+        scope: scope,
+        status: status,
+        createdAt: createdAt,
+        registeredPhoneNumber:
+            _nullableText(row['registeredPhoneNumber']),
+        deviceId: _nullableText(row['deviceId']),
+        simFingerprint: _nullableText(row['simFingerprint']),
+        biometricEnrolled: row['biometricEnrolled'] == true,
+        trainingCompleted: row['trainingCompleted'] == true,
+        origin: _recordOrigin(row['origin']) ?? RecordOrigin.localEntry,
+      );
+      final index = _agents.indexWhere((item) => item.id == id);
+      if (index < 0) {
+        _agents.add(restored);
+      } else {
+        _agents[index] = restored;
       }
       changed = true;
     }
@@ -885,14 +933,14 @@ class MembershipOperationsController extends ChangeNotifier {
     return updated;
   }
 
-  AccreditedAgent accredit({
+  Future<AccreditedAgent> accredit({
     required String memberId,
     required TgcgRole role,
     required GeographicScope scope,
     String? phoneNumber,
     String? deviceId,
     String? simFingerprint,
-  }) {
+  }) async {
     if (scope.level == GeographyLevel.pollingUnit &&
         _geography.pollingUnit(scope.pollingUnitId ?? '') == null) {
       throw ArgumentError(
@@ -914,29 +962,35 @@ class MembershipOperationsController extends ChangeNotifier {
           simFingerprint?.trim().isEmpty == true ? null : simFingerprint?.trim(),
       origin: RecordOrigin.localEntry,
     );
+    await _persistAgent(agent);
     _agents.insert(0, agent);
     notifyListeners();
     return agent;
   }
 
-  void updateAccreditationStatus(String id, AccreditationStatus status) {
+  Future<void> updateAccreditationStatus(
+    String id,
+    AccreditationStatus status,
+  ) async {
     final index = _agents.indexWhere((agent) => agent.id == id);
     if (index < 0) return;
-    _agents[index] = _copyAgent(_agents[index], status: status);
+    final updated = _copyAgent(_agents[index], status: status);
+    await _persistAgent(updated);
+    _agents[index] = updated;
     notifyListeners();
   }
 
-  void updateReadiness(
+  Future<void> updateReadiness(
     String id, {
     bool? trainingCompleted,
     bool? biometricEnrolled,
     String? deviceId,
     String? simFingerprint,
-  }) {
+  }) async {
     final index = _agents.indexWhere((agent) => agent.id == id);
     if (index < 0) return;
     final current = _agents[index];
-    _agents[index] = AccreditedAgent(
+    final updated = AccreditedAgent(
       id: current.id,
       memberId: current.memberId,
       agentId: current.agentId,
@@ -951,8 +1005,34 @@ class MembershipOperationsController extends ChangeNotifier {
       trainingCompleted: trainingCompleted ?? current.trainingCompleted,
       origin: current.origin,
     );
+    await _persistAgent(updated);
+    _agents[index] = updated;
     notifyListeners();
   }
+
+  Future<void> _persistAgent(AccreditedAgent agent) =>
+      _persistence.persistMutation(
+        entityType: 'accredited_agent',
+        entityId: agent.id,
+        mutationType: SyncMutationType.upsert,
+        scopeKey: scopeStorageKey(agent.scope),
+        ownerId: agent.memberId,
+        payload: {
+          'id': agent.id,
+          'memberId': agent.memberId,
+          'agentId': agent.agentId,
+          'role': agent.role.name,
+          'scope': geographicScopeToJson(agent.scope),
+          'status': agent.status.name,
+          'createdAt': agent.createdAt.toIso8601String(),
+          'registeredPhoneNumber': agent.registeredPhoneNumber,
+          'deviceId': agent.deviceId,
+          'simFingerprint': agent.simFingerprint,
+          'biometricEnrolled': agent.biometricEnrolled,
+          'trainingCompleted': agent.trainingCompleted,
+          'origin': agent.origin.name,
+        },
+      );
 
   Future<void> _persistMemberState(
     TgcgMember member,
@@ -1010,6 +1090,22 @@ class MembershipOperationsController extends ChangeNotifier {
           'geofenceRadiusMeters': unit.geofenceRadiusMeters,
         },
       );
+
+  static TgcgRole? _role(Object? value) {
+    final name = value?.toString();
+    for (final item in TgcgRole.values) {
+      if (item.name == name) return item;
+    }
+    return null;
+  }
+
+  static AccreditationStatus? _accreditationStatus(Object? value) {
+    final name = value?.toString();
+    for (final item in AccreditationStatus.values) {
+      if (item.name == name) return item;
+    }
+    return null;
+  }
 
   static RecordStatus? _recordStatus(Object? value) {
     final name = value?.toString();
