@@ -305,6 +305,40 @@ class _TgcgAppState extends State<TgcgApp> {
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
       ),
+      navigationBarTheme: NavigationBarThemeData(
+        height: 70,
+        elevation: 0,
+        backgroundColor: TgcgColors.surface,
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: TgcgColors.accentSoft,
+        indicatorShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(TgcgRadius.md),
+          side: const BorderSide(color: TgcgColors.gold200),
+        ),
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            color: states.contains(WidgetState.selected)
+                ? TgcgColors.primaryDark
+                : TgcgColors.muted,
+          ),
+        ),
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (states) => TextStyle(
+            color: states.contains(WidgetState.selected)
+                ? TgcgColors.primaryDark
+                : TgcgColors.muted,
+            fontSize: 10.5,
+            fontWeight: states.contains(WidgetState.selected)
+                ? FontWeight.w900
+                : FontWeight.w700,
+          ),
+        ),
+      ),
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        backgroundColor: TgcgColors.accent,
+        foregroundColor: TgcgColors.primaryDark,
+        elevation: 2,
+      ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: TgcgColors.primaryDark,
