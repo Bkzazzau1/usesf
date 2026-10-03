@@ -260,25 +260,45 @@ class _ZoneCoverage extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: active
-                            ? TgcgColors.primarySoft
-                            : TgcgColors.surfaceSoft,
-                        borderRadius: BorderRadius.circular(15),
+                        gradient: active
+                            ? const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  TgcgColors.gold100,
+                                  TgcgColors.surface,
+                                  TgcgColors.navy50,
+                                ],
+                              )
+                            : null,
+                        color: active ? null : TgcgColors.surfaceSoft,
+                        borderRadius: BorderRadius.circular(TgcgRadius.md),
                         border: Border.all(
                           color: active
-                              ? TgcgColors.primary
+                              ? TgcgColors.gold400
                               : TgcgColors.border,
                         ),
+                        boxShadow: active
+                            ? const [
+                                BoxShadow(
+                                  color: Color(0x0AA97812),
+                                  blurRadius: 18,
+                                  offset: Offset(0, 6),
+                                ),
+                              ]
+                            : null,
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.hub_rounded,
                                 size: 17,
-                                color: TgcgColors.primary,
+                                color: active
+                                    ? TgcgColors.accentStrong
+                                    : TgcgColors.primary,
                               ),
                               const Spacer(),
                               Text(
@@ -303,8 +323,10 @@ class _ZoneCoverage extends StatelessWidget {
                           const SizedBox(height: 7),
                           Text(
                             '$members members',
-                            style: const TextStyle(
-                              color: TgcgColors.primary,
+                            style: TextStyle(
+                              color: active
+                                  ? TgcgColors.primaryDark
+                                  : TgcgColors.primary,
                               fontWeight: FontWeight.w900,
                               fontSize: 16,
                             ),
@@ -384,13 +406,21 @@ class _LgaDirectory extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: selected
-                          ? TgcgColors.primarySoft
-                          : TgcgColors.surfaceSoft,
-                      borderRadius: BorderRadius.circular(13),
+                      gradient: selected
+                          ? const LinearGradient(
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                              colors: [
+                                TgcgColors.gold100,
+                                TgcgColors.surface,
+                              ],
+                            )
+                          : null,
+                      color: selected ? null : TgcgColors.surfaceSoft,
+                      borderRadius: BorderRadius.circular(TgcgRadius.sm),
                       border: Border.all(
                         color: selected
-                            ? TgcgColors.primary
+                            ? TgcgColors.gold400
                             : TgcgColors.border,
                       ),
                     ),
@@ -400,12 +430,21 @@ class _LgaDirectory extends StatelessWidget {
                           width: 38,
                           height: 38,
                           decoration: BoxDecoration(
-                            color: TgcgColors.primarySoft,
-                            borderRadius: BorderRadius.circular(11),
+                            color: selected
+                                ? TgcgColors.accent.withValues(alpha: .12)
+                                : TgcgColors.primarySoft,
+                            borderRadius: BorderRadius.circular(TgcgRadius.sm),
+                            border: Border.all(
+                              color: selected
+                                  ? TgcgColors.gold200
+                                  : TgcgColors.border,
+                            ),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.location_city_outlined,
-                            color: TgcgColors.primary,
+                            color: selected
+                                ? TgcgColors.accentStrong
+                                : TgcgColors.primary,
                             size: 19,
                           ),
                         ),
