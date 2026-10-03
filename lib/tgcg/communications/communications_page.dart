@@ -474,13 +474,21 @@ class _RoomRail extends StatelessWidget {
                       child: Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: active
-                              ? TgcgColors.primarySoft
-                              : TgcgColors.surfaceSoft,
-                          borderRadius: BorderRadius.circular(14),
+                          gradient: active
+                              ? const LinearGradient(
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                  colors: [
+                                    TgcgColors.gold100,
+                                    TgcgColors.surface,
+                                  ],
+                                )
+                              : null,
+                          color: active ? null : TgcgColors.surfaceSoft,
+                          borderRadius: BorderRadius.circular(TgcgRadius.md),
                           border: Border.all(
                             color: active
-                                ? TgcgColors.primary.withValues(alpha: .25)
+                                ? TgcgColors.gold400
                                 : TgcgColors.border,
                           ),
                         ),
@@ -491,16 +499,21 @@ class _RoomRail extends StatelessWidget {
                               height: 38,
                               decoration: BoxDecoration(
                                 color: (active
-                                        ? TgcgColors.primary
+                                        ? TgcgColors.accent
                                         : TgcgColors.muted)
                                     .withValues(alpha: .10),
-                                borderRadius: BorderRadius.circular(11),
+                                borderRadius: BorderRadius.circular(TgcgRadius.sm),
+                                border: Border.all(
+                                  color: active
+                                      ? TgcgColors.gold200
+                                      : TgcgColors.border,
+                                ),
                               ),
                               child: Icon(
                                 _roomIcon(room.type),
                                 size: 19,
                                 color: active
-                                    ? TgcgColors.primary
+                                    ? TgcgColors.accentStrong
                                     : TgcgColors.muted,
                               ),
                             ),
@@ -535,7 +548,7 @@ class _RoomRail extends StatelessWidget {
                             if (active)
                               const Icon(
                                 Icons.chevron_right_rounded,
-                                color: TgcgColors.primary,
+                                color: TgcgColors.accentStrong,
                               ),
                           ],
                         ),
@@ -582,8 +595,10 @@ class _ConversationWorkspace extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(17),
             decoration: const BoxDecoration(
-              color: TgcgColors.primaryDark,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              gradient: TgcgGradients.navigation,
+              borderRadius: BorderRadius.vertical(
+                top: Radius.circular(TgcgRadius.lg),
+              ),
             ),
             child: Row(
               children: [
@@ -591,8 +606,11 @@ class _ConversationWorkspace extends StatelessWidget {
                   width: 42,
                   height: 42,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: .09),
-                    borderRadius: BorderRadius.circular(13),
+                    color: TgcgColors.accent.withValues(alpha: .12),
+                    borderRadius: BorderRadius.circular(TgcgRadius.sm),
+                    border: Border.all(
+                      color: TgcgColors.accent.withValues(alpha: .18),
+                    ),
                   ),
                   child: Icon(_roomIcon(room!.type), color: Colors.white),
                 ),
@@ -615,7 +633,7 @@ class _ConversationWorkspace extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          color: Color(0xFFB8BECC),
+                          color: TgcgColors.gold200,
                           fontSize: 10.5,
                           height: 1.35,
                         ),
@@ -708,8 +726,12 @@ class _MessageBubble extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
-        color: TgcgColors.surfaceSoft,
-        borderRadius: BorderRadius.circular(15),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [TgcgColors.surface, TgcgColors.navy50],
+        ),
+        borderRadius: BorderRadius.circular(TgcgRadius.md),
         border: Border.all(color: TgcgColors.border),
       ),
       child: Column(
@@ -721,13 +743,14 @@ class _MessageBubble extends StatelessWidget {
                 width: 28,
                 height: 28,
                 decoration: BoxDecoration(
-                  color: TgcgColors.primarySoft,
+                  color: TgcgColors.accent.withValues(alpha: .10),
                   borderRadius: BorderRadius.circular(9),
+                  border: Border.all(color: TgcgColors.gold200),
                 ),
                 child: const Icon(
                   Icons.person_outline_rounded,
                   size: 16,
-                  color: TgcgColors.primary,
+                  color: TgcgColors.accentStrong,
                 ),
               ),
               const SizedBox(width: 8),
