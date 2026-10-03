@@ -333,11 +333,13 @@ class _Metrics extends StatelessWidget {
             ),
             TgcgMetricCard(
               width: width,
-              label: 'Agents',
-              value: '${store.agents.length}',
-              detail: 'Field accreditations',
-              icon: Icons.badge_outlined,
-              tone: TgcgMetricTone.neutral,
+              label: 'PU linked',
+              value: '${store.membersWithHomePollingUnit}',
+              detail: '${store.membersWithoutHomePollingUnit} without home PU',
+              icon: Icons.location_on_outlined,
+              tone: store.membersWithoutHomePollingUnit == 0
+                  ? TgcgMetricTone.success
+                  : TgcgMetricTone.warning,
             ),
             TgcgMetricCard(
               width: width,
@@ -465,8 +467,11 @@ class _IdentityForm extends StatelessWidget {
     required this.email,
     required this.voterId,
     required this.lgas,
+    required this.pollingUnits,
     required this.selectedLgaId,
+    required this.selectedPollingUnitId,
     required this.onLgaChanged,
+    required this.onPollingUnitChanged,
     required this.scan,
     required this.created,
     required this.enabled,
@@ -479,8 +484,11 @@ class _IdentityForm extends StatelessWidget {
   final TextEditingController email;
   final TextEditingController voterId;
   final List<CanonicalLga> lgas;
+  final List<CanonicalPollingUnit> pollingUnits;
   final String selectedLgaId;
+  final String? selectedPollingUnitId;
   final ValueChanged<String> onLgaChanged;
+  final ValueChanged<String?> onPollingUnitChanged;
   final PvcRecognitionResult? scan;
   final TgcgMember? created;
   final bool enabled;
@@ -491,7 +499,7 @@ class _IdentityForm extends StatelessWidget {
   Widget build(BuildContext context) => TgcgSectionCard(
         title: 'Confirm identity',
         subtitle:
-            'Review the recognized fields and registration LGA before creating the membership record.',
+            'Review the recognized identity and confirm the home polling unit before creating the membership record.',
         child: Column(
           children: [
             TextField(
@@ -524,6 +532,55 @@ class _IdentityForm extends StatelessWidget {
                     }
                   : null,
             ),
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              key: ValueKey('pu-$selectedLgaId-$selectedPollingUnitId'),
+              initialValue: pollingUnits.any(
+                (unit) => unit.code == selectedPollingUnitId,
+              )
+                  ? selectedPollingUnitId
+                  : null,
+              isExpanded: true,
+              decoration: InputDecoration(
+                labelText: 'Home polling unit',
+                helperText: scan?.pollingUnitCode == null
+                    ? 'Select the member polling unit'
+                    : 'PVC code detected: ${scan!.pollingUnitCode}',
+                prefixIcon: const Icon(Icons.location_on_outlined),
+              ),
+              items: pollingUnits
+                  .map(
+                    (unit) => DropdownMenuItem(
+                      value: unit.code,
+                      child: Text(
+                        '${unit.displayCode} • ${unit.scope.pollingUnitName ?? unit.scope.label}',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: enabled && created == null
+                  ? onPollingUnitChanged
+                  : null,
+            ),
+            if (scan?.pollingUnitCode != null) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TgcgStatusPill(
+                  label: selectedPollingUnitId == null
+                      ? 'PVC PU CODE NOT YET MATCHED'
+                      : 'PVC PU MATCHED',
+                  color: selectedPollingUnitId == null
+                      ? TgcgColors.warning
+                      : TgcgColors.success,
+                  icon: selectedPollingUnitId == null
+                      ? Icons.manage_search_rounded
+                      : Icons.verified_outlined,
+                  compact: true,
+                ),
+              ),
+            ],
             const SizedBox(height: 10),
             TextField(
               controller: phone,
@@ -563,7 +620,11 @@ class _IdentityForm extends StatelessWidget {
               children: [
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: enabled && created == null ? onCreate : null,
+                    onPressed: enabled &&
+                            created == null &&
+                            selectedPollingUnitId != null
+                        ? onCreate
+                        : null,
                     icon: const Icon(Icons.person_add_alt_1_rounded),
                     label: const Text('Create member'),
                   ),
