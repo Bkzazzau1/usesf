@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'assignments/assignment_store.dart';
 import 'communications/bulk_communications_store.dart';
 import 'communications/communications_store.dart';
+import 'devices/managed_device_store.dart';
 import 'field/field_agent_shell.dart';
 import 'field/field_operations_store.dart';
 import 'geography/geography_registry.dart';
@@ -37,6 +39,8 @@ class _TgcgAppState extends State<TgcgApp> {
   late TgcgSessionController sessionController;
   late OfflinePersistenceController offlinePersistenceController;
   late MembershipOperationsController membershipOperationsController;
+  late ManagedDeviceController managedDeviceController;
+  late AssignmentController assignmentController;
   late GovernanceOperationsController governanceOperationsController;
   late FieldOperationsController fieldOperationsController;
   late ResultOperationsController resultOperationsController;
@@ -57,6 +61,15 @@ class _TgcgAppState extends State<TgcgApp> {
     offlinePersistenceController = OfflinePersistenceController();
     membershipOperationsController = MembershipOperationsController.prototypeSeed(
       GeographyRegistry.prototypeSeed(),
+    );
+    managedDeviceController = ManagedDeviceController.prototypeSeed(
+      membership: membershipOperationsController,
+      persistence: offlinePersistenceController,
+    );
+    assignmentController = AssignmentController.prototypeSeed(
+      membership: membershipOperationsController,
+      devices: managedDeviceController,
+      persistence: offlinePersistenceController,
     );
     governanceOperationsController = GovernanceOperationsController.prototypeSeed();
     fieldOperationsController = FieldOperationsController.prototypeSeed(
@@ -83,6 +96,8 @@ class _TgcgAppState extends State<TgcgApp> {
     final oldSession = sessionController;
     final oldOffline = offlinePersistenceController;
     final oldMembership = membershipOperationsController;
+    final oldDevices = managedDeviceController;
+    final oldAssignments = assignmentController;
     final oldGovernance = governanceOperationsController;
     final oldField = fieldOperationsController;
     final oldResults = resultOperationsController;
@@ -107,6 +122,8 @@ class _TgcgAppState extends State<TgcgApp> {
       oldSession.dispose();
       oldField.dispose();
       oldResults.dispose();
+      oldAssignments.dispose();
+      oldDevices.dispose();
       oldMembership.dispose();
       oldCommunications.dispose();
       oldBulkCommunications.dispose();
@@ -122,6 +139,8 @@ class _TgcgAppState extends State<TgcgApp> {
     sessionController.dispose();
     fieldOperationsController.dispose();
     resultOperationsController.dispose();
+    assignmentController.dispose();
+    managedDeviceController.dispose();
     membershipOperationsController.dispose();
     communicationsController.dispose();
     bulkCommunicationsController.dispose();
@@ -150,17 +169,23 @@ class _TgcgAppState extends State<TgcgApp> {
                     controller: bulkCommunicationsController,
                     child: MembershipOperations(
                       controller: membershipOperationsController,
-                      child: FieldOperations(
-                        controller: fieldOperationsController,
-                        child: ResultOperations(
-                          controller: resultOperationsController,
-                          child: MaterialApp(
-                            navigatorKey: tgcgNavigatorKey,
-                            debugShowCheckedModeBanner: false,
-                            title: 'USESF',
-                            theme: _theme(),
-                            home: _AuthenticationGate(
-                              onResetPresentation: _resetPresentation,
+                      child: ManagedDevices(
+                        controller: managedDeviceController,
+                        child: Assignments(
+                          controller: assignmentController,
+                          child: FieldOperations(
+                            controller: fieldOperationsController,
+                            child: ResultOperations(
+                              controller: resultOperationsController,
+                              child: MaterialApp(
+                                navigatorKey: tgcgNavigatorKey,
+                                debugShowCheckedModeBanner: false,
+                                title: 'USESF',
+                                theme: _theme(),
+                                home: _AuthenticationGate(
+                                  onResetPresentation: _resetPresentation,
+                                ),
+                              ),
                             ),
                           ),
                         ),
