@@ -731,7 +731,7 @@ class MembershipOperationsController extends ChangeNotifier {
       .toSet()
       .length;
 
-  TgcgMember createMember({
+  Future<TgcgMember> createMember({
     required String fullName,
     required String phoneNumber,
     String? email,
@@ -739,7 +739,7 @@ class MembershipOperationsController extends ChangeNotifier {
     String? homePollingUnitId,
     String? pvcPollingUnitCode,
     String? linkedBy,
-  }) {
+  }) async {
     CanonicalPollingUnit? homePollingUnit;
     if (homePollingUnitId != null && homePollingUnitId.trim().isNotEmpty) {
       homePollingUnit = _geography.pollingUnit(homePollingUnitId);
@@ -761,33 +761,41 @@ class MembershipOperationsController extends ChangeNotifier {
       status: RecordStatus.submitted,
       origin: RecordOrigin.localEntry,
     );
+    final scope = homePollingUnit?.scope ?? registrationScope;
+    final homeLink = homePollingUnit == null
+        ? null
+        : MemberPollingUnitLink(
+            memberId: member.id,
+            pollingUnitId: homePollingUnit.scope.pollingUnitId!,
+            linkedAt: DateTime.now().toUtc(),
+            source: pvcPollingUnitCode?.trim().isNotEmpty == true
+                ? MemberPollingUnitLinkSource.pvc
+                : MemberPollingUnitLinkSource.manual,
+            pvcPollingUnitCode: pvcPollingUnitCode?.trim().isEmpty == true
+                ? null
+                : pvcPollingUnitCode?.trim(),
+            linkedBy:
+                linkedBy?.trim().isEmpty == true ? null : linkedBy?.trim(),
+          );
+
+    await _persistMemberState(member, scope, homeLink);
+
     _members.insert(0, member);
-    _memberScopes[member.id] = homePollingUnit?.scope ?? registrationScope;
-    if (homePollingUnit != null) {
-      _memberPollingUnits[member.id] = MemberPollingUnitLink(
-        memberId: member.id,
-        pollingUnitId: homePollingUnit.scope.pollingUnitId!,
-        linkedAt: DateTime.now().toUtc(),
-        source: pvcPollingUnitCode?.trim().isNotEmpty == true
-            ? MemberPollingUnitLinkSource.pvc
-            : MemberPollingUnitLinkSource.manual,
-        pvcPollingUnitCode: pvcPollingUnitCode?.trim().isEmpty == true
-            ? null
-            : pvcPollingUnitCode?.trim(),
-        linkedBy: linkedBy?.trim().isEmpty == true ? null : linkedBy?.trim(),
-      );
+    _memberScopes[member.id] = scope;
+    if (homeLink != null) {
+      _memberPollingUnits[member.id] = homeLink;
     }
     notifyListeners();
     return member;
   }
 
-  MemberPollingUnitLink linkMemberToPollingUnit({
+  Future<MemberPollingUnitLink> linkMemberToPollingUnit({
     required String memberId,
     required String pollingUnitId,
     MemberPollingUnitLinkSource source = MemberPollingUnitLinkSource.manual,
     String? pvcPollingUnitCode,
     String? linkedBy,
-  }) {
+  }) async {
     if (memberById(memberId) == null) {
       throw ArgumentError('Unknown member: $memberId');
     }
@@ -807,20 +815,22 @@ class MembershipOperationsController extends ChangeNotifier {
           : pvcPollingUnitCode?.trim(),
       linkedBy: linkedBy?.trim().isEmpty == true ? null : linkedBy?.trim(),
     );
+    final member = memberById(memberId)!;
+    await _persistMemberState(member, unit.scope, link);
     _memberPollingUnits[memberId] = link;
     _memberScopes[memberId] = unit.scope;
     notifyListeners();
     return link;
   }
 
-  CanonicalPollingUnit verifyPollingUnitCoordinate({
+  Future<CanonicalPollingUnit> verifyPollingUnitCoordinate({
     required String pollingUnitId,
     required double latitude,
     required double longitude,
     required double accuracyMeters,
     required String verifiedBy,
     DateTime? verifiedAt,
-  }) {
+  }) async {
     final updated = _geography.verifyPollingUnitCoordinate(
       pollingUnitId: pollingUnitId,
       latitude: latitude,
@@ -829,17 +839,18 @@ class MembershipOperationsController extends ChangeNotifier {
       verifiedBy: verifiedBy,
       verifiedAt: verifiedAt,
     );
+    await _persistPollingUnitCoordinate(updated);
     notifyListeners();
     return updated;
   }
 
-  CanonicalPollingUnit setPollingUnitReferenceCoordinate({
+  Future<CanonicalPollingUnit> setPollingUnitReferenceCoordinate({
     required String pollingUnitId,
     required double latitude,
     required double longitude,
     required String source,
     String? officialCode,
-  }) {
+  }) async {
     final updated = _geography.setPollingUnitReferenceCoordinate(
       pollingUnitId: pollingUnitId,
       latitude: latitude,
@@ -847,6 +858,7 @@ class MembershipOperationsController extends ChangeNotifier {
       source: source,
       officialCode: officialCode,
     );
+    await _persistPollingUnitCoordinate(updated);
     notifyListeners();
     return updated;
   }
