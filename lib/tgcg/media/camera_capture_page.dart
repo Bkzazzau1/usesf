@@ -168,13 +168,22 @@ class _CameraCapturePageState extends State<CameraCapturePage> {
     final controller = _controller;
     final limit = widget.maxDuration;
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: TgcgColors.navy950,
       body: SafeArea(
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-              child: Row(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+                decoration: BoxDecoration(
+                  color: TgcgColors.navy900.withValues(alpha: .82),
+                  borderRadius: BorderRadius.circular(TgcgRadius.md),
+                  border: Border.all(
+                    color: TgcgColors.accent.withValues(alpha: .18),
+                  ),
+                ),
+                child: Row(
                 children: [
                   IconButton(
                     tooltip: 'Cancel',
@@ -212,6 +221,7 @@ class _CameraCapturePageState extends State<CameraCapturePage> {
                     ),
                 ],
               ),
+              ),
             ),
             Expanded(
               child: Center(
@@ -223,7 +233,7 @@ class _CameraCapturePageState extends State<CameraCapturePage> {
                           children: [
                             const Icon(
                               Icons.no_photography_outlined,
-                              color: Colors.white70,
+                              color: TgcgColors.gold200,
                               size: 48,
                             ),
                             const SizedBox(height: 14),
@@ -248,7 +258,7 @@ class _CameraCapturePageState extends State<CameraCapturePage> {
                         ),
                       )
                     : controller == null
-                    ? const CircularProgressIndicator(color: Colors.white)
+                    ? const CircularProgressIndicator(color: TgcgColors.accent)
                     : AspectRatio(
                         aspectRatio: controller.value.aspectRatio,
                         child: CameraPreview(controller),
@@ -271,7 +281,7 @@ class _CameraCapturePageState extends State<CameraCapturePage> {
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 4),
+                      border: Border.all(color: TgcgColors.gold400, width: 4),
                     ),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
@@ -280,7 +290,7 @@ class _CameraCapturePageState extends State<CameraCapturePage> {
                             ? Colors.white30
                             : _video
                             ? TgcgColors.danger
-                            : Colors.white,
+                            : TgcgColors.surface,
                         borderRadius: BorderRadius.circular(
                           _recording ? 8 : 40,
                         ),
