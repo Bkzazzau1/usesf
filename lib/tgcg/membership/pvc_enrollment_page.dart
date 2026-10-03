@@ -24,6 +24,7 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
   bool _reading = false;
   TgcgMember? _created;
   String? _selectedLgaId;
+  String? _selectedPollingUnitId;
 
   @override
   void dispose() {
@@ -39,6 +40,9 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
     final session = TgcgSession.of(context);
     final store = MembershipOperations.of(context);
     _selectedLgaId ??= store.geography.lgas.first.id;
+    final lgaPollingUnits = store.geography.pollingUnits
+        .where((unit) => unit.scope.lgaId == _selectedLgaId)
+        .toList(growable: false);
     final canManage = TgcgPermissionPolicy.allows(
       session.role!,
       TgcgCapability.manageMembership,
@@ -55,7 +59,7 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
           eyebrow: 'PVC IDENTITY ENROLMENT',
           title: 'Member Enrolment',
           subtitle:
-              'Scan a Permanent Voter Card, confirm the recognized identity, assign the registration LGA and continue to field accreditation.',
+              'Scan a Permanent Voter Card, match its polling-unit code to the canonical registry, confirm the member identity and create the home polling-unit relationship.',
           trailing: TgcgStatusPill(
             label: '${store.members.length} MEMBERS',
             color: TgcgColors.primary,
@@ -80,9 +84,15 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
               email: _email,
               voterId: _voterId,
               lgas: store.geography.lgas,
+              pollingUnits: lgaPollingUnits,
               selectedLgaId: _selectedLgaId!,
-              onLgaChanged: (value) =>
-                  setState(() => _selectedLgaId = value),
+              selectedPollingUnitId: _selectedPollingUnitId,
+              onLgaChanged: (value) => setState(() {
+                _selectedLgaId = value;
+                _selectedPollingUnitId = null;
+              }),
+              onPollingUnitChanged: (value) =>
+                  setState(() => _selectedPollingUnitId = value),
               scan: _scan,
               created: _created,
               enabled: canManage && _scan != null,
@@ -126,10 +136,21 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
           ? await _recognizer.captureAndRecognize()
           : await _recognizer.pickAndRecognize();
       if (!mounted || result == null) return;
+      final store = MembershipOperations.of(context, listen: false);
+      final matchedUnit = result.pollingUnitCode == null
+          ? null
+          : store.geography.pollingUnitByOfficialCode(
+                  result.pollingUnitCode!,
+                ) ??
+              store.geography.pollingUnit(result.pollingUnitCode!);
       setState(() {
         _scan = result;
         _name.text = result.fullName ?? '';
         _voterId.text = result.voterId ?? '';
+        if (matchedUnit != null) {
+          _selectedLgaId = matchedUnit.scope.lgaId;
+          _selectedPollingUnitId = matchedUnit.code;
+        }
       });
     } catch (error) {
       if (!mounted) return;
@@ -145,16 +166,21 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
     if (_scan == null ||
         _name.text.trim().isEmpty ||
         _phone.text.trim().isEmpty ||
-        _selectedLgaId == null) {
+        _selectedPollingUnitId == null) {
       return;
     }
-    final lga = store.geography.lga(_selectedLgaId!);
-    if (lga == null) return;
+    final unit = store.geography.pollingUnit(_selectedPollingUnitId!);
+    if (unit == null) return;
+    final session = TgcgSession.of(context, listen: false);
     final member = store.createMember(
       fullName: _name.text.trim(),
       phoneNumber: _phone.text.trim(),
       email: _email.text.trim(),
-      registrationScope: lga.scope,
+      registrationScope: unit.scope,
+      homePollingUnitId: unit.code,
+      pvcPollingUnitCode: _scan?.pollingUnitCode,
+      linkedBy:
+          session.accessId.isEmpty ? session.operatorName : session.accessId,
     );
     setState(() => _created = member);
   }
@@ -167,6 +193,7 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
       _phone.clear();
       _email.clear();
       _voterId.clear();
+      _selectedPollingUnitId = null;
     });
   }
 
