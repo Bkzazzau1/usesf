@@ -76,11 +76,7 @@ class PvcRecognitionService {
   }
 
   static String? _extractPollingUnitCode(String text) {
-    final lines = text
-        .split(RegExp(r'[\r\n]+'))
-        .map((line) => line.trim())
-        .where((line) => line.isNotEmpty)
-        .toList();
+    final lines = _lines(text);
 
     for (var i = 0; i < lines.length; i++) {
       final line = lines[i];
@@ -93,71 +89,7 @@ class PvcRecognitionService {
       }
 
       if (RegExp(
-            r'^(?:POLLING\s*UNIT|PU)\s*(?:CODE|NO\.?|NUMBER)?
-    final lines = text
-        .split(RegExp(r'[\r\n]+'))
-        .map((line) => line.trim())
-        .where((line) => line.isNotEmpty)
-        .toList();
-    for (var i = 0; i < lines.length; i++) {
-      final line = lines[i];
-      final direct = RegExp(
-        r'(?:VIN|VOTER\s*(?:ID|NUMBER)?)\s*[:#-]?\s*([A-Z0-9-]{8,30})',
-        caseSensitive: false,
-      ).firstMatch(line);
-      if (direct != null) return direct.group(1)?.toUpperCase();
-      if (RegExp(r'^(VIN|VOTER\s*(ID|NUMBER)?)$', caseSensitive: false)
-              .hasMatch(line) &&
-          i + 1 < lines.length) {
-        final candidate = lines[i + 1].replaceAll(RegExp(r'\s+'), '');
-        if (RegExp(r'^[A-Z0-9-]{8,30}$', caseSensitive: false)
-            .hasMatch(candidate)) {
-          return candidate.toUpperCase();
-        }
-      }
-    }
-    return null;
-  }
-
-  static String? _extractName(String text) {
-    final lines = text
-        .split(RegExp(r'[\r\n]+'))
-        .map((line) => line.trim())
-        .where((line) => line.isNotEmpty)
-        .toList();
-    for (var i = 0; i < lines.length; i++) {
-      final line = lines[i];
-      final direct = RegExp(
-        r"(?:NAME|FULL\s*NAME)\s*[:.-]?\s*([A-Z][A-Z .'-]{4,})",
-        caseSensitive: false,
-      ).firstMatch(line);
-      if (direct != null) return _titleCase(direct.group(1)!.trim());
-      if (RegExp(r'^(NAME|FULL\s*NAME)$', caseSensitive: false)
-              .hasMatch(line) &&
-          i + 1 < lines.length) {
-        final candidate = lines[i + 1];
-        if (_looksLikeName(candidate)) return _titleCase(candidate);
-      }
-    }
-    return null;
-  }
-
-  static bool _looksLikeName(String value) {
-    final words = value
-        .replaceAll(RegExp(r"[^A-Za-z .'-]"), '')
-        .trim()
-        .split(RegExp(r'\s+'));
-    return words.length >= 2 && words.every((word) => word.length >= 2);
-  }
-
-  static String _titleCase(String value) => value
-      .toLowerCase()
-      .split(RegExp(r'\s+'))
-      .where((word) => word.isNotEmpty)
-      .map((word) => '${word[0].toUpperCase()}${word.substring(1)}')
-      .join(' ');
-}
-,
+            r'^(?:POLLING\s*UNIT|PU)\s*(?:CODE|NO\.?|NUMBER)?$',
             caseSensitive: false,
           ).hasMatch(line) &&
           i + 1 < lines.length) {
@@ -181,11 +113,7 @@ class PvcRecognitionService {
   }
 
   static String? _extractVoterId(String text) {
-    final lines = text
-        .split(RegExp(r'[\r\n]+'))
-        .map((line) => line.trim())
-        .where((line) => line.isNotEmpty)
-        .toList();
+    final lines = _lines(text);
     for (var i = 0; i < lines.length; i++) {
       final line = lines[i];
       final direct = RegExp(
@@ -193,8 +121,11 @@ class PvcRecognitionService {
         caseSensitive: false,
       ).firstMatch(line);
       if (direct != null) return direct.group(1)?.toUpperCase();
-      if (RegExp(r'^(VIN|VOTER\s*(ID|NUMBER)?)$', caseSensitive: false)
-              .hasMatch(line) &&
+
+      if (RegExp(
+            r'^(VIN|VOTER\s*(ID|NUMBER)?)$',
+            caseSensitive: false,
+          ).hasMatch(line) &&
           i + 1 < lines.length) {
         final candidate = lines[i + 1].replaceAll(RegExp(r'\s+'), '');
         if (RegExp(r'^[A-Z0-9-]{8,30}$', caseSensitive: false)
@@ -207,11 +138,7 @@ class PvcRecognitionService {
   }
 
   static String? _extractName(String text) {
-    final lines = text
-        .split(RegExp(r'[\r\n]+'))
-        .map((line) => line.trim())
-        .where((line) => line.isNotEmpty)
-        .toList();
+    final lines = _lines(text);
     for (var i = 0; i < lines.length; i++) {
       final line = lines[i];
       final direct = RegExp(
@@ -219,8 +146,11 @@ class PvcRecognitionService {
         caseSensitive: false,
       ).firstMatch(line);
       if (direct != null) return _titleCase(direct.group(1)!.trim());
-      if (RegExp(r'^(NAME|FULL\s*NAME)$', caseSensitive: false)
-              .hasMatch(line) &&
+
+      if (RegExp(
+            r'^(NAME|FULL\s*NAME)$',
+            caseSensitive: false,
+          ).hasMatch(line) &&
           i + 1 < lines.length) {
         final candidate = lines[i + 1];
         if (_looksLikeName(candidate)) return _titleCase(candidate);
@@ -228,6 +158,12 @@ class PvcRecognitionService {
     }
     return null;
   }
+
+  static List<String> _lines(String text) => text
+      .split(RegExp(r'[\r\n]+'))
+      .map((line) => line.trim())
+      .where((line) => line.isNotEmpty)
+      .toList();
 
   static bool _looksLikeName(String value) {
     final words = value
