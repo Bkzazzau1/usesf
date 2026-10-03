@@ -208,32 +208,79 @@ class TgcgPageHeader extends StatelessWidget {
       );
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 720;
-          if (compact) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _copy(compact: true),
-                if (trailing != null) ...[
-                  const SizedBox(height: 14),
-                  Align(alignment: Alignment.centerLeft, child: trailing!),
-                ],
-              ],
-            );
-          }
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: _copy(compact: false)),
-              if (trailing != null) ...[
-                const SizedBox(width: 16),
-                Flexible(flex: 0, child: trailing!),
-              ],
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              TgcgColors.surface,
+              TgcgColors.navy50,
+              TgcgColors.gold100,
             ],
-          );
-        },
+            stops: [0, .78, 1],
+          ),
+          borderRadius: BorderRadius.circular(TgcgRadius.lg),
+          border: Border.all(color: TgcgColors.border),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x0906162D),
+              blurRadius: 22,
+              offset: Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              left: 0,
+              top: 1,
+              bottom: 1,
+              child: Container(
+                width: 4,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [TgcgColors.gold400, TgcgColors.gold600],
+                  ),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 14),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxWidth < 720;
+                  if (compact) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _copy(compact: true),
+                        if (trailing != null) ...[
+                          const SizedBox(height: 14),
+                          Align(alignment: Alignment.centerLeft, child: trailing!),
+                        ],
+                      ],
+                    );
+                  }
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: _copy(compact: false)),
+                      if (trailing != null) ...[
+                        const SizedBox(width: 16),
+                        Flexible(flex: 0, child: trailing!),
+                      ],
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       );
 }
 
