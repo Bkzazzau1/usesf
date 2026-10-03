@@ -53,6 +53,8 @@ Map<String, Object?> fieldIncidentToJson(FieldIncident incident) => {
       'reporterId': incident.reporterId,
       'summary': incident.summary,
       'assignedTeam': incident.assignedTeam,
+      'assignmentId': incident.assignmentId,
+      'deviceId': incident.deviceId,
       'latitude': incident.latitude,
       'longitude': incident.longitude,
       'evidence': incident.evidence.map(evidenceToJson).toList(growable: false),
