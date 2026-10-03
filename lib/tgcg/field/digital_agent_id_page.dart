@@ -71,11 +71,7 @@ class DigitalAgentIdPage extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.fromLTRB(22, 22, 22, 20),
                           decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [TgcgColors.primaryDark, TgcgColors.primary],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
+                            gradient: TgcgGradients.navigation,
                           ),
                           child: Column(
                             children: [
@@ -100,7 +96,7 @@ class DigitalAgentIdPage extends StatelessWidget {
                                         Text(
                                           'POLLING UNIT AGENT',
                                           style: TextStyle(
-                                            color: Color(0xFFBCC2D1),
+                                            color: TgcgColors.gold200,
                                             fontSize: 9.5,
                                             fontWeight: FontWeight.w800,
                                             letterSpacing: 1,
@@ -119,7 +115,7 @@ class DigitalAgentIdPage extends StatelessWidget {
                                     width: 94,
                                     height: 108,
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF1C2E57),
+                                      color: TgcgColors.navy700,
                                       borderRadius: BorderRadius.circular(20),
                                       border: Border.all(color: Colors.white.withValues(alpha: .18)),
                                     ),
@@ -235,13 +231,17 @@ class DigitalAgentIdPage extends StatelessWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.all(15),
                   decoration: BoxDecoration(
-                    color: TgcgColors.primarySoft,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: TgcgColors.border),
+                    gradient: const LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [TgcgColors.gold100, TgcgColors.navy50],
+                    ),
+                    borderRadius: BorderRadius.circular(TgcgRadius.md),
+                    border: Border.all(color: TgcgColors.gold200),
                   ),
                   child: const Row(
                     children: [
-                      Icon(Icons.shield_outlined, color: TgcgColors.primary),
+                      Icon(Icons.shield_outlined, color: TgcgColors.accentStrong),
                       SizedBox(width: 10),
                       Expanded(
                         child: Text(
