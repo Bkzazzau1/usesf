@@ -903,7 +903,7 @@ $evidence
     await Clipboard.setData(ClipboardData(text: brief.trim()));
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Incident brief copied securely for sharing.')),
+      const SnackBar(content: Text('Incident brief copied for sharing.')),
     );
   }
 }
@@ -1419,6 +1419,49 @@ class _DetailLine extends StatelessWidget {
         ),
       );
 }
+
+String _formatTimestamp(DateTime value) {
+  final local = value.toLocal();
+  final hour = local.hour.toString().padLeft(2, '0');
+  final minute = local.minute.toString().padLeft(2, '0');
+  final day = local.day.toString().padLeft(2, '0');
+  final month = local.month.toString().padLeft(2, '0');
+  return '$day/$month/${local.year} $hour:$minute';
+}
+
+String _evidenceLabel(EvidenceType type) => switch (type) {
+      EvidenceType.photo => 'Photo',
+      EvidenceType.video => 'Video',
+      EvidenceType.audio => 'Audio',
+      EvidenceType.document => 'Document',
+      EvidenceType.resultForm => 'Result form',
+      EvidenceType.location => 'Location',
+    };
+
+IconData _evidenceIcon(EvidenceType type) => switch (type) {
+      EvidenceType.photo => Icons.photo_outlined,
+      EvidenceType.video => Icons.play_circle_outline_rounded,
+      EvidenceType.audio => Icons.graphic_eq_rounded,
+      EvidenceType.document => Icons.description_outlined,
+      EvidenceType.resultForm => Icons.fact_check_outlined,
+      EvidenceType.location => Icons.location_on_outlined,
+    };
+
+String _incidentSeverityLabel(IncidentSeverity severity) => switch (severity) {
+      IncidentSeverity.info => 'Information',
+      IncidentSeverity.low => 'Low',
+      IncidentSeverity.medium => 'Medium',
+      IncidentSeverity.high => 'High',
+      IncidentSeverity.critical => 'Critical',
+    };
+
+Color _incidentSeverityColor(IncidentSeverity severity) => switch (severity) {
+      IncidentSeverity.info => TgcgColors.info,
+      IncidentSeverity.low => TgcgColors.success,
+      IncidentSeverity.medium => TgcgColors.warning,
+      IncidentSeverity.high => TgcgColors.warning,
+      IncidentSeverity.critical => TgcgColors.danger,
+    };
 
 List<EmergencyDispatchStatus> _nextActions(EmergencyDispatchStatus status) =>
     switch (status) {
