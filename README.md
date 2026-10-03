@@ -19,6 +19,8 @@ USESF is a state-level programme covering Kaduna State only. Kaduna State is the
 
 Records still carry their full INEC address (country and geopolitical zone included) so that official catalogue imports and exports stay compatible, but no screen, role or report operates above the state.
 
+LGA boundaries on the Kaduna map are from the GRID3 Nigeria administrative boundaries, distributed by [geoBoundaries](https://www.geoboundaries.org) under CC BY 4.0.
+
 ## Core hierarchy
 
 ```text

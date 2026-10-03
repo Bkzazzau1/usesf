@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app.dart';
+import 'geography/kaduna_map.dart';
 import 'membership/membership_store.dart';
 import 'session.dart';
 import 'ui/tgcg_design.dart';
@@ -610,14 +611,9 @@ class _KadunaMapBackdrop extends StatelessWidget {
   Widget build(BuildContext context) => IgnorePointer(
         child: Padding(
           padding: const EdgeInsets.all(28),
-          child: Opacity(
+          child: const Opacity(
             opacity: .13,
-            child: Image.asset(
-              'assets/brand/kaduna_map.png',
-              fit: BoxFit.contain,
-              filterQuality: FilterQuality.medium,
-              excludeFromSemantics: true,
-            ),
+            child: Center(child: KadunaMap()),
           ),
         ),
       );
