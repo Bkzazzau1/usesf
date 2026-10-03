@@ -76,6 +76,7 @@ class _TgcgAppState extends State<TgcgApp> {
     offlinePersistenceController = OfflinePersistenceController();
     membershipOperationsController = MembershipOperationsController.prototypeSeed(
       GeographyRegistry.prototypeSeed(),
+      persistence: offlinePersistenceController,
     );
     managedDeviceController = ManagedDeviceController.prototypeSeed(
       membership: membershipOperationsController,
