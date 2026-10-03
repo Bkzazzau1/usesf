@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../assignments/assignment_location_service.dart';
 import '../assignments/assignment_store.dart';
+import '../assignments/assignment_tracking_store.dart';
 import '../communications/communications_store.dart';
 import '../devices/managed_device_store.dart';
 import '../membership/membership_store.dart';
@@ -194,7 +195,7 @@ class FieldAgentDashboardPage extends StatelessWidget {
         }
 
         final fix = await const AssignmentLocationService().captureCurrentFix();
-        await assignments.checkIn(
+        final updated = await assignments.checkIn(
           assignmentId: assignment.id,
           actorId: agent.agentId,
           deviceId: managedDevice.id,
@@ -203,6 +204,12 @@ class FieldAgentDashboardPage extends StatelessWidget {
           accuracyMeters: fix.accuracyMeters,
           capturedAt: fix.capturedAt,
         );
+        if (updated.status == AssignmentStatus.checkedIn && context.mounted) {
+          await AssignmentTracking.of(context, listen: false).start(
+            assignmentId: updated.id,
+            deviceId: managedDevice.id,
+          );
+        }
       } else {
         await field.submitFieldReport(
           category: 'Agent check-in',
