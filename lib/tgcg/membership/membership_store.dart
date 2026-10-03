@@ -9,7 +9,6 @@ import '../domain/models.dart';
 import '../geography/geography_registry.dart';
 import '../offline/offline_payloads.dart';
 import '../offline/offline_persistence.dart';
-import '../sync/sync_models.dart';
 
 enum MemberPollingUnitLinkSource {
   pvc,

@@ -584,6 +584,7 @@ class _MemberAssignmentCardState extends State<_MemberAssignmentCard> {
     String actorId,
   ) async {
     setState(() => _busy = true);
+    final tracking = AssignmentTracking.of(context, listen: false);
     try {
       await Assignments.of(context, listen: false).transition(
         assignmentId: assignment.id,
@@ -593,7 +594,6 @@ class _MemberAssignmentCardState extends State<_MemberAssignmentCard> {
       if (target == AssignmentStatus.completed ||
           target == AssignmentStatus.cancelled ||
           target == AssignmentStatus.declined) {
-        final tracking = AssignmentTracking.of(context, listen: false);
         if (tracking.isTrackingAssignment(assignment.id)) {
           await tracking.stop();
         }

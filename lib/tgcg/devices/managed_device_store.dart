@@ -355,9 +355,7 @@ class ManagedDeviceController extends ChangeNotifier {
       lastLatitude: latitude,
       lastLongitude: longitude,
       lastAccuracyMeters: accuracyMeters,
-      batteryPercent: batteryPercent == null
-          ? null
-          : batteryPercent.clamp(0, 100).toInt(),
+      batteryPercent: batteryPercent?.clamp(0, 100).toInt(),
       appVersion: appVersion,
       syncState: syncState,
     );

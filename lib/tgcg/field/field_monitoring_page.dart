@@ -4,6 +4,7 @@ import '../assignments/assignment_store.dart';
 import '../devices/managed_device_store.dart';
 import '../domain/permissions.dart';
 import '../evidence/device_evidence_service.dart';
+import '../geography/geography_registry.dart';
 import '../membership/membership_store.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';

@@ -542,8 +542,7 @@ class _AssignmentStrip extends StatelessWidget {
                                   : TgcgColors.warning,
                           compact: true,
                         ),
-                        if (current != null &&
-                            tracking.isTrackingAssignment(current.id))
+                        if (tracking.isTrackingAssignment(current.id))
                           const TgcgStatusPill(
                             label: 'LIVE GPS',
                             color: TgcgColors.success,

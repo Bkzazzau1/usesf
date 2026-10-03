@@ -1,16 +1,31 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:usesf/tgcg/domain/models.dart';
 import 'package:usesf/tgcg/geography/geography_registry.dart';
 import 'package:usesf/tgcg/membership/membership_store.dart';
+import 'package:usesf/tgcg/offline/offline_database_memory.dart';
+import 'package:usesf/tgcg/offline/offline_persistence.dart';
 
 void main() {
   group('MembershipOperationsController', () {
     late GeographyRegistry geography;
     late MembershipOperationsController store;
 
+    setUpAll(() {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      // Member changes are saved through the encrypted offline store; tests
+      // use an in-memory database and the secure-storage test mode.
+      FlutterSecureStorage.setMockInitialValues({});
+    });
+
     setUp(() {
       geography = GeographyRegistry.prototypeSeed();
-      store = MembershipOperationsController.prototypeSeed(geography);
+      store = MembershipOperationsController.prototypeSeed(
+        geography,
+        persistence: OfflinePersistenceController(
+          openDatabase: () async => InMemoryOfflineDatabase(),
+        ),
+      );
     });
 
     tearDown(() => store.dispose());

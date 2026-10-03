@@ -1,4 +1,6 @@
-enum SyncMutationType { create, update, delete }
+/// `upsert` creates the record if the server does not have it yet, otherwise
+/// replaces it (used for durable local records that may already have synced).
+enum SyncMutationType { create, update, upsert, delete }
 
 enum SyncState { queued, syncing, synced, failed, conflict }
 

@@ -29,10 +29,17 @@ class DurableMutationReceipt {
 }
 
 class OfflinePersistenceController extends ChangeNotifier {
-  OfflinePersistenceController({OfflineCrypto? crypto})
-      : _crypto = crypto ?? OfflineCrypto();
+  OfflinePersistenceController({
+    OfflineCrypto? crypto,
+    Future<OfflineDatabaseBackend> Function()? openDatabase,
+  })  : _crypto = crypto ?? OfflineCrypto(),
+        _openDatabase = openDatabase ?? openOfflineDatabase;
 
   final OfflineCrypto _crypto;
+
+  /// Opens the backing store; defaults to the platform database. Tests pass
+  /// an in-memory store.
+  final Future<OfflineDatabaseBackend> Function() _openDatabase;
   OfflineDatabaseBackend? _database;
   OfflinePersistenceState _state = OfflinePersistenceState.idle;
   String? _lastError;
@@ -75,7 +82,7 @@ class OfflinePersistenceController extends ChangeNotifier {
 
     OfflineDatabaseBackend? database;
     try {
-      database = await openOfflineDatabase();
+      database = await _openDatabase();
       await database.initialize();
       await _crypto.initialize();
       _database = database;

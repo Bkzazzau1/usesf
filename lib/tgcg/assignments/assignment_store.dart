@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 
 import '../devices/managed_device_store.dart';
+import '../domain/models.dart';
 import '../geography/geography_registry.dart';
 import '../membership/membership_store.dart';
 import '../offline/offline_payloads.dart';
