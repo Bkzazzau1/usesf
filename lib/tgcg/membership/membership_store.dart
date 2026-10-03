@@ -7,6 +7,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../domain/models.dart';
 import '../geography/geography_registry.dart';
+import '../offline/offline_payloads.dart';
+import '../offline/offline_persistence.dart';
 
 enum MemberPollingUnitLinkSource {
   pvc,
@@ -49,15 +51,18 @@ class MembershipOperationsController extends ChangeNotifier {
     required List<AccreditedAgent> agents,
     required Map<String, GeographicScope> memberScopes,
     required Map<String, MemberPollingUnitLink> memberPollingUnits,
+    required OfflinePersistenceController persistence,
   })  : _geography = geography,
         _members = members,
         _agents = agents,
         _memberScopes = memberScopes,
-        _memberPollingUnits = memberPollingUnits;
+        _memberPollingUnits = memberPollingUnits,
+        _persistence = persistence;
 
   factory MembershipOperationsController.prototypeSeed(
-    GeographyRegistry geography,
-  ) {
+    GeographyRegistry geography, {
+    required OfflinePersistenceController persistence,
+  }) {
     final now = DateTime.utc(2026, 9, 27, 7, 30);
     final kdPu = geography.pollingUnit('KD-KN-W01-PU001')!.scope;
     final zaPu = geography.pollingUnit('KD-ZA-W01-PU004')!.scope;
@@ -215,6 +220,7 @@ class MembershipOperationsController extends ChangeNotifier {
         'MEM-0011': lgaScope('Lere'),
         'MEM-0012': lgaScope('Kagarko'),
       },
+      persistence: persistence,
       agents: [
         AccreditedAgent(
           id: 'ACC-0001',
@@ -345,6 +351,7 @@ class MembershipOperationsController extends ChangeNotifier {
   final List<AccreditedAgent> _agents;
   final Map<String, GeographicScope> _memberScopes;
   final Map<String, MemberPollingUnitLink> _memberPollingUnits;
+  final OfflinePersistenceController _persistence;
   final Map<String, String> _memberPvcCredentialHashes = {};
   final Map<String, _MemberPinCredential> _memberPinCredentials = {};
   final FlutterSecureStorage _credentialStorage =
