@@ -349,10 +349,15 @@ class _TopicPulseRow extends StatelessWidget {
               width: 38,
               height: 38,
               decoration: BoxDecoration(
-                color: TgcgColors.primarySoft,
-                borderRadius: BorderRadius.circular(11),
+                color: TgcgColors.accent.withValues(alpha: .10),
+                borderRadius: BorderRadius.circular(TgcgRadius.sm),
+                border: Border.all(color: TgcgColors.gold200),
               ),
-              child: Icon(topic.icon, color: TgcgColors.primary, size: 18),
+              child: Icon(
+                topic.icon,
+                color: TgcgColors.accentStrong,
+                size: 18,
+              ),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -387,9 +392,9 @@ class _TopicPulseRow extends StatelessWidget {
                     child: LinearProgressIndicator(
                       value: topic.volume / 100,
                       minHeight: 7,
-                      backgroundColor: TgcgColors.surfaceSoft,
+                      backgroundColor: TgcgColors.navy50,
                       valueColor:
-                          const AlwaysStoppedAnimation(TgcgColors.primary),
+                          const AlwaysStoppedAnimation(TgcgColors.accentStrong),
                     ),
                   ),
                 ],
@@ -616,18 +621,30 @@ class _MediaSignalTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
-        color: selected ? color.withValues(alpha: .055) : TgcgColors.surfaceSoft,
-        borderRadius: BorderRadius.circular(15),
+        color: selected ? color.withValues(alpha: .06) : TgcgColors.surfaceSoft,
+        borderRadius: BorderRadius.circular(TgcgRadius.md),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(15),
+          borderRadius: BorderRadius.circular(TgcgRadius.md),
           child: Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(15),
+              borderRadius: BorderRadius.circular(TgcgRadius.md),
               border: Border.all(
-                color: selected ? color.withValues(alpha: .28) : TgcgColors.border,
+                color: selected
+                    ? color.withValues(alpha: .40)
+                    : TgcgColors.border,
+                width: selected ? 1.4 : 1,
               ),
+              boxShadow: selected
+                  ? const [
+                      BoxShadow(
+                        color: Color(0x0A06162D),
+                        blurRadius: 16,
+                        offset: Offset(0, 5),
+                      ),
+                    ]
+                  : null,
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -722,9 +739,7 @@ class _SignalInspector extends StatelessWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [TgcgColors.primaryDark, TgcgColors.primary],
-                    ),
+                    gradient: TgcgGradients.navigation,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Column(
