@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../assignments/assignment_store.dart';
+import '../devices/managed_device_store.dart';
 import '../domain/permissions.dart';
 import '../field/field_operations_store.dart';
 import '../membership/membership_store.dart';
@@ -45,6 +46,7 @@ class _GeographyPageState extends State<GeographyPage> {
     final session = TgcgSession.of(context);
     final membership = MembershipOperations.of(context);
     final assignments = Assignments.of(context);
+    final devices = ManagedDevices.of(context);
     final field = FieldOperations.of(context);
     final results = ResultOperations.of(context);
     final registry = membership.geography;
@@ -135,6 +137,7 @@ class _GeographyPageState extends State<GeographyPage> {
           children: children,
           membership: membership,
           assignments: assignments,
+          devices: devices,
           field: field,
           results: results,
           onOpen: (child) => setState(() {
@@ -398,6 +401,7 @@ class _CoverageHero extends StatelessWidget {
     required this.children,
     required this.membership,
     required this.assignments,
+    required this.devices,
     required this.field,
     required this.results,
     required this.onOpen,
@@ -407,6 +411,7 @@ class _CoverageHero extends StatelessWidget {
   final List<GeographicScope> children;
   final MembershipOperationsController membership;
   final AssignmentController assignments;
+  final ManagedDeviceController devices;
   final FieldOperationsController field;
   final ResultOperationsController results;
   final ValueChanged<GeographicScope> onOpen;
