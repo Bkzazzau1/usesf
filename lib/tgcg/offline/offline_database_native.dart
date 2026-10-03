@@ -133,6 +133,36 @@ class _SqliteOfflineDatabase implements OfflineDatabaseBackend {
   }
 
   @override
+  Future<List<StoredEntityRecord>> listEntities({
+    required String entityType,
+  }) async {
+    final rows = _db.select(
+      '''
+        SELECT entity_type, entity_id, version, payload_cipher, nonce, mac,
+               updated_at, scope_key, owner_id, deleted
+        FROM offline_entities
+        WHERE entity_type = ?
+        ORDER BY updated_at DESC
+      ''',
+      [entityType],
+    );
+    return rows.map((row) => StoredEntityRecord(
+      entityType: row['entity_type'] as String,
+      entityId: row['entity_id'] as String,
+      version: row['version'] as int,
+      payload: EncryptedPayload(
+        cipherText: _blob(row['payload_cipher']),
+        nonce: _blob(row['nonce']),
+        mac: _blob(row['mac']),
+      ),
+      updatedAt: DateTime.parse(row['updated_at'] as String),
+      scopeKey: row['scope_key'] as String?,
+      ownerId: row['owner_id'] as String?,
+      deleted: (row['deleted'] as int) == 1,
+    )).toList(growable: false);
+  }
+
+  @override
   Future<void> writeMutation({
     required StoredEntityRecord entity,
     required SyncOutboxItem outbox,
