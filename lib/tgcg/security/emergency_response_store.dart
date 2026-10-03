@@ -315,6 +315,33 @@ class EmergencyResponseController extends ChangeNotifier {
     return dispatch;
   }
 
+  void recordDispatchAudit({
+    required String dispatchId,
+    required String actorId,
+    required String action,
+    required String detail,
+    String? actingAgencyId,
+  }) {
+    final dispatch = _dispatches
+        .where((item) => item.id == dispatchId)
+        .cast<EmergencyDispatch?>()
+        .firstWhere((item) => item != null, orElse: () => null);
+    if (dispatch == null) return;
+    if (actingAgencyId != null && dispatch.agencyId != actingAgencyId) {
+      throw StateError(
+        'This dispatch is assigned to a different response agency.',
+      );
+    }
+    _governance.recordAudit(
+      actorId: actorId,
+      action: action,
+      entityType: 'emergency_dispatch',
+      entityId: dispatch.id,
+      detail: detail,
+      scope: dispatch.scope,
+    );
+  }
+
   void updateStatus({
     required String dispatchId,
     required EmergencyDispatchStatus status,
