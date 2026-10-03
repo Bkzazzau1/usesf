@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../domain/models.dart';
 import '../geography/geography_registry.dart';
@@ -346,6 +347,8 @@ class MembershipOperationsController extends ChangeNotifier {
   final Map<String, MemberPollingUnitLink> _memberPollingUnits;
   final Map<String, String> _memberPvcCredentialHashes = {};
   final Map<String, _MemberPinCredential> _memberPinCredentials = {};
+  final FlutterSecureStorage _credentialStorage =
+      const FlutterSecureStorage();
 
   GeographyRegistry get geography => _geography;
   List<TgcgMember> get members => List.unmodifiable(_members);
@@ -392,6 +395,22 @@ class MembershipOperationsController extends ChangeNotifier {
   bool hasPvcCredential(String memberId) =>
       _memberPvcCredentialHashes.containsKey(memberId);
 
+  Future<bool> hasMemberPinCredential(String memberId) async {
+    if (_memberPinCredentials.containsKey(memberId)) return true;
+    final stored = await _credentialStorage.read(
+      key: _pinCredentialKey(memberId),
+    );
+    return stored != null && stored.trim().isNotEmpty;
+  }
+
+  Future<bool> hasPersistedPvcCredential(String memberId) async {
+    if (_memberPvcCredentialHashes.containsKey(memberId)) return true;
+    final fingerprint = await _credentialStorage.read(
+      key: _pvcMemberFingerprintKey(memberId),
+    );
+    return fingerprint != null && fingerprint.trim().isNotEmpty;
+  }
+
   Future<void> setPvcCredential({
     required String memberId,
     required String voterId,
@@ -403,7 +422,29 @@ class MembershipOperationsController extends ChangeNotifier {
     if (normalized.length < 6) {
       throw ArgumentError('PVC/Voter ID is not valid enough to register.');
     }
-    _memberPvcCredentialHashes[memberId] = await _sha256Base64(normalized);
+
+    final fingerprint = await _sha256Base64(normalized);
+    final previous = _memberPvcCredentialHashes[memberId] ??
+        await _credentialStorage.read(
+          key: _pvcMemberFingerprintKey(memberId),
+        );
+    if (previous != null &&
+        previous.isNotEmpty &&
+        !_constantTimeEquals(previous, fingerprint)) {
+      await _credentialStorage.delete(
+        key: _pvcIndexKey(previous),
+      );
+    }
+
+    _memberPvcCredentialHashes[memberId] = fingerprint;
+    await _credentialStorage.write(
+      key: _pvcMemberFingerprintKey(memberId),
+      value: fingerprint,
+    );
+    await _credentialStorage.write(
+      key: _pvcIndexKey(fingerprint),
+      value: memberId,
+    );
     notifyListeners();
   }
 
@@ -411,12 +452,22 @@ class MembershipOperationsController extends ChangeNotifier {
     final normalized = _normalizePvcCredential(voterId);
     if (normalized.length < 6) return null;
     final fingerprint = await _sha256Base64(normalized);
+
     for (final entry in _memberPvcCredentialHashes.entries) {
       if (_constantTimeEquals(entry.value, fingerprint)) {
         return memberById(entry.key);
       }
     }
-    return null;
+
+    final memberId = await _credentialStorage.read(
+      key: _pvcIndexKey(fingerprint),
+    );
+    if (memberId == null || memberId.isEmpty) return null;
+    final member = memberById(memberId);
+    if (member != null) {
+      _memberPvcCredentialHashes[member.id] = fingerprint;
+    }
+    return member;
   }
 
   Future<void> setMemberPin({
@@ -436,9 +487,17 @@ class MembershipOperationsController extends ChangeNotifier {
       growable: false,
     );
     final hash = await _derivePin(pin, saltBytes);
-    _memberPinCredentials[memberId] = _MemberPinCredential(
+    final credential = _MemberPinCredential(
       salt: base64UrlEncode(saltBytes),
       hash: base64UrlEncode(hash),
+    );
+    _memberPinCredentials[memberId] = credential;
+    await _credentialStorage.write(
+      key: _pinCredentialKey(memberId),
+      value: jsonEncode({
+        'salt': credential.salt,
+        'hash': credential.hash,
+      }),
     );
     notifyListeners();
   }
@@ -447,10 +506,32 @@ class MembershipOperationsController extends ChangeNotifier {
     required String memberId,
     required String pin,
   }) async {
-    final credential = _memberPinCredentials[memberId];
-    if (credential == null || !RegExp(r'^\d{6}$').hasMatch(pin)) {
-      return false;
+    if (!RegExp(r'^\d{6}$').hasMatch(pin)) return false;
+
+    var credential = _memberPinCredentials[memberId];
+    if (credential == null) {
+      final stored = await _credentialStorage.read(
+        key: _pinCredentialKey(memberId),
+      );
+      if (stored != null && stored.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(stored);
+          if (decoded is Map &&
+              decoded['salt'] is String &&
+              decoded['hash'] is String) {
+            credential = _MemberPinCredential(
+              salt: decoded['salt'] as String,
+              hash: decoded['hash'] as String,
+            );
+            _memberPinCredentials[memberId] = credential;
+          }
+        } catch (_) {
+          return false;
+        }
+      }
     }
+    if (credential == null) return false;
+
     final salt = base64Url.decode(credential.salt);
     final actual = base64UrlEncode(await _derivePin(pin, salt));
     return _constantTimeEquals(credential.hash, actual);
@@ -704,6 +785,15 @@ class MembershipOperationsController extends ChangeNotifier {
     );
     notifyListeners();
   }
+
+  static String _pinCredentialKey(String memberId) =>
+      'usesf.member.$memberId.pin';
+
+  static String _pvcMemberFingerprintKey(String memberId) =>
+      'usesf.member.$memberId.pvc_fingerprint';
+
+  static String _pvcIndexKey(String fingerprint) =>
+      'usesf.pvc_index.$fingerprint';
 
   static String _normalizePvcCredential(String value) =>
       value.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
