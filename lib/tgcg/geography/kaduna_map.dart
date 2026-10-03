@@ -305,3 +305,22 @@ class _KadunaMapPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _KadunaMapPainter oldDelegate) => true;
 }
+
+/// Width-to-height ratio of [KadunaMap], for laying out overlays on it.
+double get kadunaMapAspectRatio => _KadunaProjection.instance.aspectRatio;
+
+/// Where [KadunaMap] draws the given LGA's name, in a map of [size]: the
+/// LGA's interior label point, or the leader-line label for the small city
+/// LGAs. Useful for pinning overlays to an LGA.
+Offset? kadunaLgaLabelPosition(String lgaId, Size size) {
+  for (final shape in kadunaLgaShapes) {
+    if (shape.lgaId != lgaId) continue;
+    final offset = _KadunaMapPainter._labelOffsets[lgaId] ?? Offset.zero;
+    return _KadunaProjection.instance.project(
+      shape.labelLon + offset.dx,
+      shape.labelLat + offset.dy,
+      size,
+    );
+  }
+  return null;
+}

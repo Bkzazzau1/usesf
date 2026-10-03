@@ -107,7 +107,7 @@ class FieldOperationsController extends ChangeNotifier {
           reportedAt: now.subtract(const Duration(minutes: 16)),
           reporterId: 'AG-KD-001',
           summary: 'Field team reported delayed access and requested coordinator review.',
-          assignedTeam: 'North West Response Desk',
+          assignedTeam: 'Kaduna Central Response Desk',
           evidence: [photo('EVD-0001', 'AG-KD-001', now.subtract(const Duration(minutes: 15)))],
           origin: RecordOrigin.systemDerived,
         ),

@@ -79,7 +79,7 @@ class _DiscussionRoomPageState extends State<DiscussionRoomPage> {
       reactions: 18,
       comments: const [
         _SocialComment(
-          author: 'North West Desk',
+          author: 'Kaduna North Desk',
           role: 'Senatorial Zone Coordinator',
           body: 'Coverage check completed and priority support items have been routed.',
           time: '08:18',
