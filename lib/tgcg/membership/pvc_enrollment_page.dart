@@ -302,14 +302,16 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
               child: const Text('Cancel'),
             ),
             FilledButton.icon(
-              onPressed: () {
-                store.accredit(
+              onPressed: () async {
+                await store.accredit(
                   memberId: memberId,
                   role: TgcgRole.pollingUnitAgent,
                   scope: scope,
                   phoneNumber: phone.text.trim(),
                 );
-                Navigator.pop(dialogContext, true);
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext, true);
+                }
               },
               icon: const Icon(Icons.badge_outlined),
               label: const Text('Create accreditation'),
