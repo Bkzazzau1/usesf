@@ -240,7 +240,7 @@ class AssignmentController extends ChangeNotifier {
   List<MemberAssignment> assignmentsForMember(String memberId) =>
       _assignments
           .where((item) => item.memberId == memberId)
-          .toList(growable: false)
+          .toList()
         ..sort((a, b) => b.assignedAt.compareTo(a.assignedAt));
 
   List<MemberAssignment> activeAssignmentsForMember(String memberId) =>
@@ -254,13 +254,13 @@ class AssignmentController extends ChangeNotifier {
             (item) =>
                 GeographyRegistry.scopeContains(scope, item.targetScope),
           )
-          .toList(growable: false)
+          .toList()
         ..sort((a, b) => b.assignedAt.compareTo(a.assignedAt));
 
   List<AssignmentEvent> eventsForAssignment(String assignmentId) =>
       _events
           .where((item) => item.assignmentId == assignmentId)
-          .toList(growable: false)
+          .toList()
         ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
   int get activeCount =>
