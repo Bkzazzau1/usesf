@@ -12,7 +12,7 @@ void main() {
         TgcgPermissionPolicy.capabilitiesFor(TgcgRole.securityOfficer),
         {TgcgCapability.respondToDispatch},
       );
-      expect(allowedModules(TgcgRole.securityOfficer), {TgcgModule.overview});
+      expect(allowedModules(TgcgRole.securityOfficer), {TgcgModule.securityResponse});
     });
 
     test('session carries the agency and clears it on sign-out', () {

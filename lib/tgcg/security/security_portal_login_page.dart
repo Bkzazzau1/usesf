@@ -9,7 +9,7 @@ import '../ui/tgcg_design.dart';
 import 'emergency_response_store.dart';
 
 /// Restricted sign-in for accredited security and emergency agency personnel.
-/// Officers land in [SecurityAgencyShell] and only see dispatches assigned to
+/// Officers land in the agency-only Security Response workspace and only see dispatches assigned to
 /// their own agency within their command area.
 class SecurityPortalLoginPage extends StatefulWidget {
   const SecurityPortalLoginPage({super.key});

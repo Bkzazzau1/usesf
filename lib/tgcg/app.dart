@@ -12,7 +12,6 @@ import 'membership/membership_store.dart';
 import 'media/device_media.dart';
 import 'offline/offline_persistence.dart';
 import 'presentation_access_login.dart';
-import 'security/security_agency_shell.dart';
 import 'reports/report_store.dart';
 import 'results/result_operations_store.dart';
 import 'security/emergency_response_store.dart';
@@ -442,9 +441,6 @@ class _AuthenticationGate extends StatelessWidget {
     }
     if (session.role == TgcgRole.pollingUnitAgent) {
       return const FieldAgentShell(key: ValueKey('field-agent-shell'));
-    }
-    if (session.role == TgcgRole.securityOfficer) {
-      return const SecurityAgencyShell(key: ValueKey('security-agency-shell'));
     }
     return const TgcgShell(key: ValueKey('tgcg-shell'));
   }
