@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../domain/permissions.dart';
+import '../evidence/device_evidence_service.dart';
 import '../membership/membership_store.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
@@ -181,12 +182,37 @@ class _FieldMonitoringPageState extends State<FieldMonitoringPage> {
     final session = TgcgSession.of(context, listen: false);
     final membership = MembershipOperations.of(context, listen: false);
     final store = FieldOperations.of(context, listen: false);
+    final evidenceService = DeviceEvidenceService();
     final title = TextEditingController();
     final summary = TextEditingController();
+    final captured = <CapturedEvidence>[];
+    var captureBusy = false;
+    double? incidentLatitude;
+    double? incidentLongitude;
     var category = _incidentCategories.first;
     var severity = IncidentSeverity.medium;
     final units = membership.geography.pollingUnitsWithin(session.scope);
     GeographicScope scope = units.isEmpty ? session.scope : units.first.scope;
+
+    Future<void> capture(
+      StateSetter setDialogState,
+      Future<CapturedEvidence?> Function() action,
+    ) async {
+      setDialogState(() => captureBusy = true);
+      try {
+        final item = await action();
+        if (item == null) return;
+        setDialogState(() {
+          captured.add(item);
+          if (item.latitude != null && item.longitude != null) {
+            incidentLatitude = item.latitude;
+            incidentLongitude = item.longitude;
+          }
+        });
+      } finally {
+        setDialogState(() => captureBusy = false);
+      }
+    }
 
     final created = await showDialog<FieldIncident>(
       context: context,
@@ -278,7 +304,22 @@ class _FieldMonitoringPageState extends State<FieldMonitoringPage> {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  const _DeviceCaptureIntegrationPanel(),
+                  _DeviceCaptureIntegrationPanel(
+                    captured: captured,
+                    busy: captureBusy,
+                    onPhoto: () => capture(
+                      setDialogState,
+                      evidenceService.capturePhoto,
+                    ),
+                    onVideo: () => capture(
+                      setDialogState,
+                      evidenceService.captureVideo,
+                    ),
+                    onGps: () => capture(
+                      setDialogState,
+                      () async => evidenceService.captureLocation(),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -291,15 +332,37 @@ class _FieldMonitoringPageState extends State<FieldMonitoringPage> {
             FilledButton.icon(
               onPressed: () async {
                 if (title.text.trim().isEmpty) return;
+                final reporterId = session.accessId.isEmpty
+                    ? session.operatorName
+                    : session.accessId;
+                final attachments = <EvidenceAttachment>[
+                  for (var index = 0; index < captured.length; index++)
+                    EvidenceAttachment(
+                      id:
+                          'EVD-${DateTime.now().microsecondsSinceEpoch}-$index',
+                      type: captured[index].type,
+                      fileName: captured[index].fileName,
+                      createdAt: captured[index].createdAt,
+                      uploaderId: reporterId,
+                      contentHash: captured[index].contentHash,
+                      mimeType: captured[index].mimeType,
+                      latitude: captured[index].latitude,
+                      longitude: captured[index].longitude,
+                      caption:
+                          'Captured with the incident report and queued for secure media synchronization.',
+                      origin: RecordOrigin.localEntry,
+                    ),
+                ];
                 final incident = await store.createIncident(
                   title: title.text,
                   category: category,
                   severity: severity,
                   scope: scope,
-                  reporterId: session.accessId.isEmpty
-                      ? session.operatorName
-                      : session.accessId,
+                  reporterId: reporterId,
                   summary: summary.text,
+                  latitude: incidentLatitude,
+                  longitude: incidentLongitude,
+                  evidence: attachments,
                 );
                 if (dialogContext.mounted) {
                   Navigator.pop(dialogContext, incident);
@@ -314,12 +377,13 @@ class _FieldMonitoringPageState extends State<FieldMonitoringPage> {
     );
     title.dispose();
     summary.dispose();
+    await evidenceService.dispose();
     if (created != null && context.mounted) {
       setState(() => selectedIncidentId = created.id);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '${created.id} encrypted locally and queued for sync. Media/GPS capture will attach when device integrations are connected.',
+            '${created.id} encrypted locally and queued for sync with ${created.evidence.length} evidence item(s)${created.latitude != null ? ' and GPS coordinates' : ''}.',
           ),
         ),
       );
@@ -1276,63 +1340,126 @@ class _FeedEvent {
 }
 
 class _DeviceCaptureIntegrationPanel extends StatelessWidget {
-  const _DeviceCaptureIntegrationPanel();
+  const _DeviceCaptureIntegrationPanel({
+    required this.captured,
+    required this.busy,
+    required this.onPhoto,
+    required this.onVideo,
+    required this.onGps,
+  });
+
+  final List<CapturedEvidence> captured;
+  final bool busy;
+  final VoidCallback onPhoto;
+  final VoidCallback onVideo;
+  final VoidCallback onGps;
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: TgcgColors.surfaceSoft,
-          borderRadius: BorderRadius.circular(13),
-          border: Border.all(color: TgcgColors.border),
+  Widget build(BuildContext context) {
+    final photos =
+        captured.where((item) => item.type == EvidenceType.photo).length;
+    final videos =
+        captured.where((item) => item.type == EvidenceType.video).length;
+    final locations =
+        captured.where((item) => item.type == EvidenceType.location).length;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [TgcgColors.surface, TgcgColors.navy50],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Evidence capture',
-              style: TextStyle(
-                color: TgcgColors.ink,
-                fontWeight: FontWeight.w900,
+        borderRadius: BorderRadius.circular(TgcgRadius.md),
+        border: Border.all(color: TgcgColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.verified_user_outlined,
+                color: TgcgColors.accentStrong,
+                size: 19,
               ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Device services are not connected yet. These controls are intentionally disabled rather than fabricating evidence.',
-              style: TextStyle(
-                color: TgcgColors.muted,
-                fontSize: 10,
-                height: 1.4,
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Security evidence package',
+                  style: TextStyle(
+                    color: TgcgColors.ink,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
               ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Capture field media and exact GPS before saving. Attached evidence is hashed and follows the incident into the Security Response Portal.',
+            style: TextStyle(
+              color: TgcgColors.muted,
+              fontSize: 10,
+              height: 1.4,
             ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: busy ? null : onPhoto,
+                icon: const Icon(Icons.photo_camera_outlined, size: 17),
+                label: Text(photos == 0 ? 'Capture photo' : 'Photo • $photos'),
+              ),
+              OutlinedButton.icon(
+                onPressed: busy ? null : onVideo,
+                icon: const Icon(Icons.videocam_outlined, size: 17),
+                label: Text(videos == 0 ? 'Capture video' : 'Video • $videos'),
+              ),
+              OutlinedButton.icon(
+                onPressed: busy ? null : onGps,
+                icon: const Icon(Icons.my_location_rounded, size: 17),
+                label: Text(
+                  locations == 0 ? 'Capture GPS' : 'GPS • attached',
+                ),
+              ),
+            ],
+          ),
+          if (busy) ...[
+            const SizedBox(height: 10),
+            const LinearProgressIndicator(),
+          ],
+          if (captured.isNotEmpty) ...[
             const SizedBox(height: 10),
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: const [
-                _PendingCapture('Photo', Icons.photo_camera_outlined),
-                _PendingCapture('Video', Icons.videocam_outlined),
-                _PendingCapture('Audio', Icons.mic_none_rounded),
-                _PendingCapture('GPS', Icons.my_location_rounded),
-              ],
+              spacing: 6,
+              runSpacing: 6,
+              children: captured
+                  .map(
+                    (item) => TgcgStatusPill(
+                      label: item.type.name.toUpperCase(),
+                      color: item.contentHash == null
+                          ? TgcgColors.warning
+                          : TgcgColors.success,
+                      icon: item.type == EvidenceType.video
+                          ? Icons.play_circle_outline_rounded
+                          : item.type == EvidenceType.photo
+                              ? Icons.photo_outlined
+                              : Icons.gps_fixed_rounded,
+                      compact: true,
+                    ),
+                  )
+                  .toList(),
             ),
           ],
-        ),
-      );
-}
-
-class _PendingCapture extends StatelessWidget {
-  const _PendingCapture(this.label, this.icon);
-
-  final String label;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) => OutlinedButton.icon(
-        onPressed: null,
-        icon: Icon(icon, size: 17),
-        label: Text('$label • integration pending'),
-      );
+        ],
+      ),
+    );
+  }
 }
 
 class _Detail extends StatelessWidget {
