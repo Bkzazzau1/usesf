@@ -366,8 +366,12 @@ class _ControlSnapshot extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: TgcgColors.primaryDark,
-          borderRadius: BorderRadius.circular(20),
+          gradient: TgcgGradients.navigation,
+          borderRadius: BorderRadius.circular(TgcgRadius.lg),
+          border: Border.all(
+            color: TgcgColors.accent.withValues(alpha: .18),
+          ),
+          boxShadow: TgcgShadows.soft,
         ),
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -397,7 +401,7 @@ class _ControlSnapshot extends StatelessWidget {
                 Text(
                   'Queued does not mean synced. Synced does not mean verified, approved, published or legally declared.',
                   style: TextStyle(
-                    color: Color(0xFFC5CAD4),
+                    color: TgcgColors.gold200,
                     fontSize: 11,
                     height: 1.45,
                   ),
@@ -464,7 +468,7 @@ class _DarkStat extends StatelessWidget {
             Text(
               label,
               style: const TextStyle(
-                color: Color(0xFF9EA4B2),
+                color: TgcgColors.gold200,
                 fontSize: 9.5,
               ),
             ),
@@ -537,14 +541,23 @@ class _OutboxList extends StatelessWidget {
                           child: Container(
                             padding: const EdgeInsets.all(13),
                             decoration: BoxDecoration(
-                              color: selected
-                                  ? color.withValues(alpha: .055)
-                                  : TgcgColors.surfaceSoft,
-                              borderRadius: BorderRadius.circular(14),
+                              gradient: selected
+                                  ? LinearGradient(
+                                      begin: Alignment.centerLeft,
+                                      end: Alignment.centerRight,
+                                      colors: [
+                                        TgcgColors.surface,
+                                        color.withValues(alpha: .05),
+                                      ],
+                                    )
+                                  : null,
+                              color: selected ? null : TgcgColors.surfaceSoft,
+                              borderRadius: BorderRadius.circular(TgcgRadius.md),
                               border: Border.all(
                                 color: selected
-                                    ? color.withValues(alpha: .24)
+                                    ? color.withValues(alpha: .32)
                                     : TgcgColors.border,
+                                width: selected ? 1.4 : 1,
                               ),
                             ),
                             child: Row(
