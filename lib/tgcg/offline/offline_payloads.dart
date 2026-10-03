@@ -27,6 +27,88 @@ Map<String, Object?> geographicScopeToJson(GeographicScope scope) => {
       'pollingUnitName': scope.pollingUnitName,
     };
 
+GeographicScope? geographicScopeFromJson(Object? value) {
+  if (value is! Map) return null;
+  final map = value.map(
+    (key, item) => MapEntry(key.toString(), item),
+  );
+  final levelName = map['level']?.toString();
+  final country = map['country']?.toString();
+  if (levelName == null || country == null) return null;
+  final level = GeographyLevel.values
+      .where((item) => item.name == levelName)
+      .firstOrNull;
+  if (level == null) return null;
+
+  return GeographicScope(
+    level: level,
+    country: country,
+    zoneId: map['zoneId']?.toString(),
+    zoneName: map['zoneName']?.toString(),
+    stateId: map['stateId']?.toString(),
+    stateName: map['stateName']?.toString(),
+    senatorialDistrictId: map['senatorialDistrictId']?.toString(),
+    senatorialDistrictName: map['senatorialDistrictName']?.toString(),
+    lgaId: map['lgaId']?.toString(),
+    lgaName: map['lgaName']?.toString(),
+    wardId: map['wardId']?.toString(),
+    wardName: map['wardName']?.toString(),
+    pollingUnitId: map['pollingUnitId']?.toString(),
+    pollingUnitName: map['pollingUnitName']?.toString(),
+  );
+}
+
+EvidenceAttachment? evidenceFromJson(Object? value) {
+  if (value is! Map) return null;
+  final map = value.map(
+    (key, item) => MapEntry(key.toString(), item),
+  );
+  final id = map['id']?.toString();
+  final typeName = map['type']?.toString();
+  final fileName = map['fileName']?.toString();
+  final createdAt = DateTime.tryParse(map['createdAt']?.toString() ?? '');
+  final uploaderId = map['uploaderId']?.toString();
+  if (id == null ||
+      typeName == null ||
+      fileName == null ||
+      createdAt == null ||
+      uploaderId == null) {
+    return null;
+  }
+  final type =
+      EvidenceType.values.where((item) => item.name == typeName).firstOrNull;
+  if (type == null) return null;
+  final originName = map['origin']?.toString();
+  final origin = RecordOrigin.values
+          .where((item) => item.name == originName)
+          .firstOrNull ??
+      RecordOrigin.localEntry;
+
+  return EvidenceAttachment(
+    id: id,
+    type: type,
+    fileName: fileName,
+    createdAt: createdAt.toUtc(),
+    uploaderId: uploaderId,
+    contentHash: map['contentHash']?.toString(),
+    mimeType: map['mimeType']?.toString(),
+    caption: map['caption']?.toString(),
+    sourceReference: map['sourceReference']?.toString(),
+    latitude: _jsonDouble(map['latitude']),
+    longitude: _jsonDouble(map['longitude']),
+    origin: origin,
+  );
+}
+
+double? _jsonDouble(Object? value) {
+  if (value is num) return value.toDouble();
+  return value == null ? null : double.tryParse(value.toString());
+}
+
+extension _FirstOrNull<T> on Iterable<T> {
+  T? get firstOrNull => isEmpty ? null : first;
+}
+
 Map<String, Object?> evidenceToJson(EvidenceAttachment evidence) => {
       'id': evidence.id,
       'type': evidence.type.name,
