@@ -238,14 +238,16 @@ class _MembershipPageState extends State<MembershipPage> {
             child: const Text('Cancel'),
           ),
           FilledButton.icon(
-            onPressed: () {
+            onPressed: () async {
               if (name.text.trim().isEmpty || phone.text.trim().isEmpty) return;
-              store.createMember(
+              await store.createMember(
                 fullName: name.text,
                 phoneNumber: phone.text,
                 email: email.text,
               );
-              Navigator.pop(dialogContext, true);
+              if (dialogContext.mounted) {
+                Navigator.pop(dialogContext, true);
+              }
             },
             icon: const Icon(Icons.person_add_alt_1_rounded),
             label: const Text('Register member'),
