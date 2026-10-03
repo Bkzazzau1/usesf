@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'assignments/assignment_store.dart';
+import 'assignments/assignment_tracking_store.dart';
 import 'communications/bulk_communications_store.dart';
 import 'communications/communications_store.dart';
 import 'devices/managed_device_store.dart';
@@ -41,6 +42,7 @@ class _TgcgAppState extends State<TgcgApp> {
   late MembershipOperationsController membershipOperationsController;
   late ManagedDeviceController managedDeviceController;
   late AssignmentController assignmentController;
+  late AssignmentTrackingController assignmentTrackingController;
   late GovernanceOperationsController governanceOperationsController;
   late FieldOperationsController fieldOperationsController;
   late ResultOperationsController resultOperationsController;
@@ -71,6 +73,9 @@ class _TgcgAppState extends State<TgcgApp> {
       devices: managedDeviceController,
       persistence: offlinePersistenceController,
     );
+    assignmentTrackingController = AssignmentTrackingController(
+      assignments: assignmentController,
+    );
     governanceOperationsController = GovernanceOperationsController.prototypeSeed();
     fieldOperationsController = FieldOperationsController.prototypeSeed(
       persistence: offlinePersistenceController,
@@ -98,6 +103,7 @@ class _TgcgAppState extends State<TgcgApp> {
     final oldMembership = membershipOperationsController;
     final oldDevices = managedDeviceController;
     final oldAssignments = assignmentController;
+    final oldAssignmentTracking = assignmentTrackingController;
     final oldGovernance = governanceOperationsController;
     final oldField = fieldOperationsController;
     final oldResults = resultOperationsController;
@@ -122,6 +128,7 @@ class _TgcgAppState extends State<TgcgApp> {
       oldSession.dispose();
       oldField.dispose();
       oldResults.dispose();
+      oldAssignmentTracking.dispose();
       oldAssignments.dispose();
       oldDevices.dispose();
       oldMembership.dispose();
@@ -139,6 +146,7 @@ class _TgcgAppState extends State<TgcgApp> {
     sessionController.dispose();
     fieldOperationsController.dispose();
     resultOperationsController.dispose();
+    assignmentTrackingController.dispose();
     assignmentController.dispose();
     managedDeviceController.dispose();
     membershipOperationsController.dispose();
@@ -173,17 +181,20 @@ class _TgcgAppState extends State<TgcgApp> {
                         controller: managedDeviceController,
                         child: Assignments(
                           controller: assignmentController,
-                          child: FieldOperations(
-                            controller: fieldOperationsController,
-                            child: ResultOperations(
-                              controller: resultOperationsController,
-                              child: MaterialApp(
-                                navigatorKey: tgcgNavigatorKey,
-                                debugShowCheckedModeBanner: false,
-                                title: 'USESF',
-                                theme: _theme(),
-                                home: _AuthenticationGate(
-                                  onResetPresentation: _resetPresentation,
+                          child: AssignmentTracking(
+                            controller: assignmentTrackingController,
+                            child: FieldOperations(
+                              controller: fieldOperationsController,
+                              child: ResultOperations(
+                                controller: resultOperationsController,
+                                child: MaterialApp(
+                                  navigatorKey: tgcgNavigatorKey,
+                                  debugShowCheckedModeBanner: false,
+                                  title: 'USESF',
+                                  theme: _theme(),
+                                  home: _AuthenticationGate(
+                                    onResetPresentation: _resetPresentation,
+                                  ),
                                 ),
                               ),
                             ),
