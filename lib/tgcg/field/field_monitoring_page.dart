@@ -708,7 +708,7 @@ class _CaptureReadinessBanner extends StatelessWidget {
                 ),
                 SizedBox(height: 7),
                 Text(
-                  'Structured records are live; native media and GPS services are next integrations.',
+                  'Native photo, video and GPS capture are connected to incident and assignment workflows.',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 16,
@@ -718,7 +718,7 @@ class _CaptureReadinessBanner extends StatelessWidget {
                 ),
                 SizedBox(height: 6),
                 Text(
-                  'Photo, video, audio and coordinates are never fabricated. A record explicitly shows when capture data is unavailable.',
+                  'Captured media keeps its hash, source reference and assignment/device context; missing data remains explicit.',
                   style: TextStyle(
                     color: TgcgColors.gold200,
                     fontSize: 10.5,
@@ -732,10 +732,10 @@ class _CaptureReadinessBanner extends StatelessWidget {
               runSpacing: 8,
               children: const [
                 _DarkPill('TEXT RECORDS', Icons.check_circle_outline_rounded),
-                _DarkPill('PHOTO PENDING', Icons.photo_camera_outlined),
-                _DarkPill('VIDEO PENDING', Icons.videocam_outlined),
-                _DarkPill('AUDIO PENDING', Icons.mic_none_rounded),
-                _DarkPill('GPS PENDING', Icons.my_location_rounded),
+                _DarkPill('PHOTO READY', Icons.photo_camera_outlined),
+                _DarkPill('VIDEO READY', Icons.videocam_outlined),
+                _DarkPill('AUDIO READY', Icons.mic_none_rounded),
+                _DarkPill('GPS READY', Icons.my_location_rounded),
               ],
             );
             if (constraints.maxWidth < 820) {
@@ -1060,6 +1060,10 @@ class _IncidentInspector extends StatelessWidget {
           _Detail('Severity', _label(current.severity.name)),
           _Detail('Scope', current.scope.label),
           _Detail('Reporter', current.reporterId),
+          if (current.assignmentId != null)
+            _Detail('Assignment', current.assignmentId!),
+          if (current.deviceId != null)
+            _Detail('Managed device', current.deviceId!),
           _Detail('Reported', _fullTime(current.reportedAt)),
           _Detail('Response owner', current.assignedTeam ?? 'Unassigned'),
           _Detail(
