@@ -356,6 +356,7 @@ class AssignmentController extends ChangeNotifier {
     required String memberId,
     required String pollingUnitId,
     required String assignedBy,
+    GeographicScope? authorizedScope,
     AssignmentPriority priority = AssignmentPriority.normal,
     String? instructions,
     DateTime? dueAt,
@@ -369,6 +370,21 @@ class AssignmentController extends ChangeNotifier {
     if (unit == null) {
       throw ArgumentError(
         'Assignments must target a canonical polling unit.',
+      );
+    }
+    if (authorizedScope != null &&
+        !GeographyRegistry.scopeContains(authorizedScope, unit.scope)) {
+      throw StateError(
+        'The selected polling unit is outside the coordinator authorization scope.',
+      );
+    }
+    final memberScope =
+        _membership.registrationScopeForMember(memberId);
+    if (authorizedScope != null &&
+        memberScope != null &&
+        !GeographyRegistry.scopeContains(authorizedScope, memberScope)) {
+      throw StateError(
+        'The selected member is outside the coordinator authorization scope.',
       );
     }
     final existing = activeAssignmentsForMember(memberId);
