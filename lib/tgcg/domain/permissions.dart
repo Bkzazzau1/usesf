@@ -71,6 +71,7 @@ class TgcgPermissionPolicy {
       TgcgCapability.viewStateDashboard,
       TgcgCapability.viewSituationRoom,
       TgcgCapability.viewGeography,
+      TgcgCapability.manageAgentAssignments,
       TgcgCapability.viewIncidents,
       TgcgCapability.createIncident,
       TgcgCapability.acknowledgeIncident,
@@ -98,6 +99,7 @@ class TgcgPermissionPolicy {
     TgcgRole.senatorialCoordinator: {
       TgcgCapability.viewSituationRoom,
       TgcgCapability.viewGeography,
+      TgcgCapability.manageAgentAssignments,
       TgcgCapability.viewIncidents,
       TgcgCapability.createIncident,
       TgcgCapability.acknowledgeIncident,
@@ -173,6 +175,7 @@ class TgcgPermissionPolicy {
     TgcgRole.wardCoordinator: {
       TgcgCapability.viewSituationRoom,
       TgcgCapability.viewGeography,
+      TgcgCapability.manageAgentAssignments,
       TgcgCapability.viewIncidents,
       TgcgCapability.createIncident,
       TgcgCapability.acknowledgeIncident,
