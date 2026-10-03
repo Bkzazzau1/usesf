@@ -432,6 +432,7 @@ class AssignmentController extends ChangeNotifier {
     required String assignmentId,
     required AssignmentStatus status,
     required String actorId,
+    GeographicScope? authorizedScope,
   }) async {
     final index =
         _assignments.indexWhere((item) => item.id == assignmentId);
@@ -439,6 +440,15 @@ class AssignmentController extends ChangeNotifier {
       throw ArgumentError('Unknown assignment: $assignmentId');
     }
     final current = _assignments[index];
+    if (authorizedScope != null &&
+        !GeographyRegistry.scopeContains(
+          authorizedScope,
+          current.targetScope,
+        )) {
+      throw StateError(
+        'This assignment is outside the coordinator authorization scope.',
+      );
+    }
     if (!_canTransition(current.status, status)) {
       throw StateError(
         'Invalid assignment transition from ${current.status.name} to ${status.name}.',
