@@ -430,6 +430,17 @@ class _ScannerPanel extends StatelessWidget {
                                 fontSize: 11,
                               ),
                             ),
+                            if (scan!.pollingUnitCode != null) ...[
+                              const SizedBox(height: 5),
+                              Text(
+                                'PU CODE • ${scan!.pollingUnitCode}',
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
                           ],
                         ],
                       ),
@@ -665,6 +676,7 @@ class _RecentMembers extends StatelessWidget {
         child: Column(
           children: store.members.take(6).map((member) {
             final scope = store.registrationScopeForMember(member.id);
+            final homePu = store.homePollingUnitForMember(member.id);
             return ListTile(
               contentPadding: EdgeInsets.zero,
               leading: CircleAvatar(
@@ -679,8 +691,12 @@ class _RecentMembers extends StatelessWidget {
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
               subtitle: Text(
-                '${member.membershipNumber ?? member.id} • ${scope?.label ?? 'Kaduna State'} • ${member.phoneNumber}',
+                homePu == null
+                    ? '${member.membershipNumber ?? member.id} • ${scope?.label ?? 'Kaduna State'} • ${member.phoneNumber}'
+                    : '${member.membershipNumber ?? member.id} • HOME PU: ${homePu.displayCode}\n'
+                        '${homePu.scope.label} • ${member.phoneNumber}',
               ),
+              isThreeLine: homePu != null,
               trailing: TgcgStatusPill(
                 label: member.status.name.toUpperCase(),
                 color: member.status == RecordStatus.verified
