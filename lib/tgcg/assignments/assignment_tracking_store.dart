@@ -8,7 +8,9 @@ import 'assignment_store.dart';
 class AssignmentTrackingController extends ChangeNotifier {
   AssignmentTrackingController({
     required AssignmentController assignments,
-  }) : _assignments = assignments;
+  }) : _assignments = assignments {
+    _assignments.addListener(_handleAssignmentChange);
+  }
 
   final AssignmentController _assignments;
 
@@ -140,8 +142,18 @@ class AssignmentTrackingController extends ChangeNotifier {
     }
   }
 
+  void _handleAssignmentChange() {
+    final id = _assignmentId;
+    if (id == null) return;
+    final assignment = _assignments.assignmentById(id);
+    if (assignment == null || assignment.isTerminal) {
+      unawaited(stop());
+    }
+  }
+
   @override
   void dispose() {
+    _assignments.removeListener(_handleAssignmentChange);
     unawaited(_subscription?.cancel());
     super.dispose();
   }
