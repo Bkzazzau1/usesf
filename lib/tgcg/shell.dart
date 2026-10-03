@@ -69,8 +69,16 @@ class _TgcgShellState extends State<TgcgShell> {
               ? null
               : AppBar(
                   elevation: 0,
-                  backgroundColor: TgcgColors.surface,
+                  backgroundColor: Colors.transparent,
                   surfaceTintColor: Colors.transparent,
+                  flexibleSpace: Container(
+                    decoration: const BoxDecoration(
+                      gradient: TgcgGradients.commandBar,
+                      border: Border(
+                        bottom: BorderSide(color: TgcgColors.gold200),
+                      ),
+                    ),
+                  ),
                   title: const _CompactBrand(),
                   actions: [
                     const _CompactSync(),
