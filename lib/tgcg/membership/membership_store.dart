@@ -636,6 +636,28 @@ class MembershipOperationsController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> clearLocalCredentials() async {
+    for (final member in _members) {
+      final fingerprint = _memberPvcCredentialHashes[member.id] ??
+          await _credentialStorage.read(
+            key: _pvcMemberFingerprintKey(member.id),
+          );
+      if (fingerprint != null && fingerprint.isNotEmpty) {
+        await _credentialStorage.delete(
+          key: _pvcIndexKey(fingerprint),
+        );
+      }
+      await _credentialStorage.delete(
+        key: _pvcMemberFingerprintKey(member.id),
+      );
+      await _credentialStorage.delete(
+        key: _pinCredentialKey(member.id),
+      );
+    }
+    _memberPvcCredentialHashes.clear();
+    _memberPinCredentials.clear();
+  }
+
   Future<bool> verifyMemberPin({
     required String memberId,
     required String pin,
