@@ -83,7 +83,7 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
                       const KadunaMapBackdrop(),
                       AnimatedSwitcher(
                         duration: const Duration(milliseconds: 250),
-                        child: showSignIn ? _formPanel() : _governorPanel(),
+                        child: showSignIn ? _formPanel() : _mapPanel(),
                       ),
                     ],
                   ),
@@ -99,7 +99,7 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
               if (showSignIn)
                 _formPanel(compact: true)
               else
-                SizedBox(height: 540, child: _governorPanel(compact: true)),
+                SizedBox(height: 540, child: _mapPanel(compact: true)),
             ],
           );
         },
@@ -199,8 +199,8 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
     ),
   );
 
-  Widget _governorPanel({bool compact = false}) => Container(
-    key: const ValueKey('governor'),
+  Widget _mapPanel({bool compact = false}) => Container(
+    key: const ValueKey('kaduna-map'),
     margin: compact
         ? EdgeInsets.zero
         : const EdgeInsets.fromLTRB(18, 18, 18, 84),
@@ -219,16 +219,15 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
     child: Stack(
       fit: StackFit.expand,
       children: [
+        // Display-only map: no tap handler, so LGAs are not selectable here.
         Padding(
-          padding: EdgeInsets.only(top: compact ? 24 : 40),
-          child: Image.asset(
-            'assets/brand/governor.png',
-            fit: BoxFit.contain,
-            alignment: Alignment.bottomCenter,
-            filterQuality: FilterQuality.high,
-            semanticLabel:
-                'Senator Uba Sani, Executive Governor of Kaduna State',
+          padding: EdgeInsets.fromLTRB(
+            compact ? 16 : 32,
+            compact ? 16 : 28,
+            compact ? 16 : 32,
+            compact ? 110 : 130,
           ),
+          child: const Center(child: KadunaMap()),
         ),
         Align(
           alignment: Alignment.bottomCenter,
@@ -260,7 +259,7 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'Senator Uba Sani',
+                        'Kaduna State',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: compact ? 20 : 26,
@@ -269,12 +268,22 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
                       ),
                       const SizedBox(height: 4),
                       const Text(
-                        'Executive Governor, Kaduna State',
+                        '23 LGAs across 3 senatorial zones',
                         style: TextStyle(
                           color: TgcgColors.accent,
                           fontWeight: FontWeight.w800,
                           letterSpacing: .3,
                         ),
+                      ),
+                      const SizedBox(height: 10),
+                      const Wrap(
+                        spacing: 14,
+                        runSpacing: 6,
+                        children: [
+                          _ZoneKey('SD/052/KD', 'Kaduna North'),
+                          _ZoneKey('SD/053/KD', 'Kaduna Central'),
+                          _ZoneKey('SD/054/KD', 'Kaduna South'),
+                        ],
                       ),
                     ],
                   ),
@@ -662,4 +671,36 @@ class _Stat extends StatelessWidget {
       ],
     ),
   );
+}
+
+/// Colour key for a senatorial zone on the login map.
+class _ZoneKey extends StatelessWidget {
+  const _ZoneKey(this.districtCode, this.label);
+
+  final String districtCode;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 11,
+            height: 11,
+            decoration: BoxDecoration(
+              color: kadunaZoneColors[districtCode],
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      );
 }
