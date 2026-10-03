@@ -322,11 +322,9 @@ class EmergencyResponseController extends ChangeNotifier {
     required String detail,
     String? actingAgencyId,
   }) {
-    final dispatch = _dispatches
-        .where((item) => item.id == dispatchId)
-        .cast<EmergencyDispatch?>()
-        .firstWhere((item) => item != null, orElse: () => null);
-    if (dispatch == null) return;
+    final index = _dispatches.indexWhere((item) => item.id == dispatchId);
+    if (index < 0) return;
+    final dispatch = _dispatches[index];
     if (actingAgencyId != null && dispatch.agencyId != actingAgencyId) {
       throw StateError(
         'This dispatch is assigned to a different response agency.',
