@@ -235,6 +235,170 @@ class AssignmentController extends ChangeNotifier {
 
   List<MemberAssignment> get assignments =>
       List.unmodifiable(_assignments);
+  Future<void> hydrateFromOffline() async {
+    final assignmentRows = await _persistence.readEntities(
+      entityType: 'member_assignment',
+    );
+    final eventRows = await _persistence.readEntities(
+      entityType: 'assignment_event',
+    );
+    final staffingRows = await _persistence.readEntities(
+      entityType: 'polling_unit_staffing_requirement',
+    );
+
+    var changed = false;
+
+    for (final row in assignmentRows) {
+      final id = row['id']?.toString();
+      final title = row['title']?.toString();
+      final memberId = row['memberId']?.toString();
+      final pollingUnitId = row['targetPollingUnitId']?.toString();
+      final scope = geographicScopeFromJson(row['targetScope']);
+      final assignedBy = row['assignedBy']?.toString();
+      final assignedAt = _date(row['assignedAt']);
+      final status = _assignmentStatus(row['status']);
+      final priority = _assignmentPriority(row['priority']);
+      if (id == null ||
+          title == null ||
+          memberId == null ||
+          pollingUnitId == null ||
+          scope == null ||
+          assignedBy == null ||
+          assignedAt == null ||
+          status == null ||
+          priority == null) {
+        continue;
+      }
+
+      final requiredEvidence = <EvidenceType>[];
+      final requiredRaw = row['requiredEvidence'];
+      if (requiredRaw is List) {
+        for (final value in requiredRaw) {
+          final type = _evidenceType(value);
+          if (type != null) requiredEvidence.add(type);
+        }
+      }
+
+      final evidence = <EvidenceAttachment>[];
+      final evidenceRaw = row['evidence'];
+      if (evidenceRaw is List) {
+        for (final value in evidenceRaw) {
+          final item = evidenceFromJson(value);
+          if (item != null) evidence.add(item);
+        }
+      }
+
+      AssignmentLocationPing? lastLocation;
+      final locationRaw = row['lastLocation'];
+      if (locationRaw is Map) {
+        final location = locationRaw.map(
+          (key, value) => MapEntry(key.toString(), value),
+        );
+        final latitude = _double(location['latitude']);
+        final longitude = _double(location['longitude']);
+        final accuracy = _double(location['accuracyMeters']);
+        final capturedAt = _date(location['capturedAt']);
+        final deviceId = location['deviceId']?.toString();
+        if (latitude != null &&
+            longitude != null &&
+            accuracy != null &&
+            capturedAt != null &&
+            deviceId != null) {
+          lastLocation = AssignmentLocationPing(
+            latitude: latitude,
+            longitude: longitude,
+            accuracyMeters: accuracy,
+            capturedAt: capturedAt,
+            deviceId: deviceId,
+            distanceFromTargetMeters:
+                _double(location['distanceFromTargetMeters']),
+          );
+        }
+      }
+
+      final restored = MemberAssignment(
+        id: id,
+        title: title,
+        memberId: memberId,
+        targetPollingUnitId: pollingUnitId,
+        targetScope: scope,
+        assignedBy: assignedBy,
+        assignedAt: assignedAt,
+        status: status,
+        priority: priority,
+        instructions: row['instructions']?.toString(),
+        deviceId: row['deviceId']?.toString(),
+        acceptedAt: _date(row['acceptedAt']),
+        enRouteAt: _date(row['enRouteAt']),
+        checkedInAt: _date(row['checkedInAt']),
+        activatedAt: _date(row['activatedAt']),
+        completedAt: _date(row['completedAt']),
+        cancelledAt: _date(row['cancelledAt']),
+        dueAt: _date(row['dueAt']),
+        lastLocation: lastLocation,
+        requiredEvidence: List.unmodifiable(requiredEvidence),
+        evidence: List.unmodifiable(evidence),
+      );
+
+      final index = _assignments.indexWhere((item) => item.id == id);
+      if (index < 0) {
+        _assignments.add(restored);
+      } else {
+        _assignments[index] = restored;
+      }
+      changed = true;
+    }
+
+    for (final row in eventRows) {
+      final id = row['id']?.toString();
+      final assignmentId = row['assignmentId']?.toString();
+      final action = row['action']?.toString();
+      final actorId = row['actorId']?.toString();
+      final createdAt = _date(row['createdAt']);
+      if (id == null ||
+          assignmentId == null ||
+          action == null ||
+          actorId == null ||
+          createdAt == null) {
+        continue;
+      }
+      final restored = AssignmentEvent(
+        id: id,
+        assignmentId: assignmentId,
+        action: action,
+        actorId: actorId,
+        createdAt: createdAt,
+        detail: row['detail']?.toString(),
+      );
+      final index = _events.indexWhere((item) => item.id == id);
+      if (index < 0) {
+        _events.add(restored);
+      } else {
+        _events[index] = restored;
+      }
+      changed = true;
+    }
+
+    for (final row in staffingRows) {
+      final pollingUnitId = row['pollingUnitId']?.toString();
+      final minimum = _int(row['minimumStaffing']);
+      if (pollingUnitId == null || minimum == null) continue;
+      _minimumStaffingByPollingUnit[pollingUnitId] =
+          minimum.clamp(0, 100).toInt();
+      changed = true;
+    }
+
+    if (changed) {
+      _assignments.sort(
+        (a, b) => b.assignedAt.compareTo(a.assignedAt),
+      );
+      _events.sort(
+        (a, b) => a.createdAt.compareTo(b.createdAt),
+      );
+      notifyListeners();
+    }
+  }
+
 
   List<AssignmentEvent> get events => List.unmodifiable(_events);
 
@@ -883,6 +1047,45 @@ class AssignmentController extends ChangeNotifier {
                 },
         },
       );
+
+  static DateTime? _date(Object? value) {
+    if (value == null) return null;
+    return DateTime.tryParse(value.toString())?.toUtc();
+  }
+
+  static double? _double(Object? value) {
+    if (value is num) return value.toDouble();
+    return value == null ? null : double.tryParse(value.toString());
+  }
+
+  static int? _int(Object? value) {
+    if (value is num) return value.toInt();
+    return value == null ? null : int.tryParse(value.toString());
+  }
+
+  static AssignmentStatus? _assignmentStatus(Object? value) {
+    final name = value?.toString();
+    for (final item in AssignmentStatus.values) {
+      if (item.name == name) return item;
+    }
+    return null;
+  }
+
+  static AssignmentPriority? _assignmentPriority(Object? value) {
+    final name = value?.toString();
+    for (final item in AssignmentPriority.values) {
+      if (item.name == name) return item;
+    }
+    return null;
+  }
+
+  static EvidenceType? _evidenceType(Object? value) {
+    final name = value?.toString();
+    for (final item in EvidenceType.values) {
+      if (item.name == name) return item;
+    }
+    return null;
+  }
 
   static bool _canTransition(
     AssignmentStatus current,
