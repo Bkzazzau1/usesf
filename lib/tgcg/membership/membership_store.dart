@@ -345,6 +345,35 @@ class MembershipOperationsController extends ChangeNotifier {
   GeographicScope? registrationScopeForMember(String memberId) =>
       _memberScopes[memberId];
 
+  MemberPollingUnitLink? pollingUnitLinkForMember(String memberId) =>
+      _memberPollingUnits[memberId];
+
+  CanonicalPollingUnit? homePollingUnitForMember(String memberId) {
+    final link = pollingUnitLinkForMember(memberId);
+    if (link == null) return null;
+    return _geography.pollingUnit(link.pollingUnitId);
+  }
+
+  List<TgcgMember> membersForPollingUnit(String pollingUnitId) {
+    final unit = _geography.pollingUnit(pollingUnitId);
+    if (unit == null) return const [];
+    return _members
+        .where(
+          (member) =>
+              _memberPollingUnits[member.id]?.pollingUnitId ==
+              unit.scope.pollingUnitId,
+        )
+        .toList(growable: false);
+  }
+
+  int memberCountForPollingUnit(String pollingUnitId) =>
+      membersForPollingUnit(pollingUnitId).length;
+
+  int get membersWithHomePollingUnit => _memberPollingUnits.length;
+
+  int get membersWithoutHomePollingUnit =>
+      _members.length - membersWithHomePollingUnit;
+
   List<TgcgMember> membersForScope(GeographicScope scope) => _members
       .where((member) {
         final memberScope = _memberScopes[member.id];
@@ -378,7 +407,20 @@ class MembershipOperationsController extends ChangeNotifier {
     required String phoneNumber,
     String? email,
     GeographicScope registrationScope = GeographicScope.kaduna,
+    String? homePollingUnitId,
+    String? pvcPollingUnitCode,
+    String? linkedBy,
   }) {
+    CanonicalPollingUnit? homePollingUnit;
+    if (homePollingUnitId != null && homePollingUnitId.trim().isNotEmpty) {
+      homePollingUnit = _geography.pollingUnit(homePollingUnitId);
+      if (homePollingUnit == null) {
+        throw ArgumentError(
+          'Home polling unit must exist in the canonical registry.',
+        );
+      }
+    }
+
     final member = TgcgMember(
       id: 'MEM-${(_members.length + 1).toString().padLeft(4, '0')}',
       fullName: fullName.trim(),
@@ -391,9 +433,94 @@ class MembershipOperationsController extends ChangeNotifier {
       origin: RecordOrigin.localEntry,
     );
     _members.insert(0, member);
-    _memberScopes[member.id] = registrationScope;
+    _memberScopes[member.id] =
+        homePollingUnit?.scope ?? registrationScope;
+    if (homePollingUnit != null) {
+      _memberPollingUnits[member.id] = MemberPollingUnitLink(
+        memberId: member.id,
+        pollingUnitId: homePollingUnit.scope.pollingUnitId!,
+        linkedAt: DateTime.now().toUtc(),
+        source: pvcPollingUnitCode?.trim().isNotEmpty == true
+            ? MemberPollingUnitLinkSource.pvc
+            : MemberPollingUnitLinkSource.manual,
+        pvcPollingUnitCode: pvcPollingUnitCode?.trim().isEmpty == true
+            ? null
+            : pvcPollingUnitCode?.trim(),
+        linkedBy: linkedBy?.trim().isEmpty == true ? null : linkedBy?.trim(),
+      );
+    }
     notifyListeners();
     return member;
+  }
+
+  MemberPollingUnitLink linkMemberToPollingUnit({
+    required String memberId,
+    required String pollingUnitId,
+    MemberPollingUnitLinkSource source = MemberPollingUnitLinkSource.manual,
+    String? pvcPollingUnitCode,
+    String? linkedBy,
+  }) {
+    if (memberById(memberId) == null) {
+      throw ArgumentError('Unknown member: $memberId');
+    }
+    final unit = _geography.pollingUnit(pollingUnitId);
+    if (unit == null) {
+      throw ArgumentError(
+        'Polling-unit link must use canonical geography.',
+      );
+    }
+    final link = MemberPollingUnitLink(
+      memberId: memberId,
+      pollingUnitId: unit.scope.pollingUnitId!,
+      linkedAt: DateTime.now().toUtc(),
+      source: source,
+      pvcPollingUnitCode: pvcPollingUnitCode?.trim().isEmpty == true
+          ? null
+          : pvcPollingUnitCode?.trim(),
+      linkedBy: linkedBy?.trim().isEmpty == true ? null : linkedBy?.trim(),
+    );
+    _memberPollingUnits[memberId] = link;
+    _memberScopes[memberId] = unit.scope;
+    notifyListeners();
+    return link;
+  }
+
+  CanonicalPollingUnit verifyPollingUnitCoordinate({
+    required String pollingUnitId,
+    required double latitude,
+    required double longitude,
+    required double accuracyMeters,
+    required String verifiedBy,
+    DateTime? verifiedAt,
+  }) {
+    final updated = _geography.verifyPollingUnitCoordinate(
+      pollingUnitId: pollingUnitId,
+      latitude: latitude,
+      longitude: longitude,
+      accuracyMeters: accuracyMeters,
+      verifiedBy: verifiedBy,
+      verifiedAt: verifiedAt,
+    );
+    notifyListeners();
+    return updated;
+  }
+
+  CanonicalPollingUnit setPollingUnitReferenceCoordinate({
+    required String pollingUnitId,
+    required double latitude,
+    required double longitude,
+    required String source,
+    String? officialCode,
+  }) {
+    final updated = _geography.setPollingUnitReferenceCoordinate(
+      pollingUnitId: pollingUnitId,
+      latitude: latitude,
+      longitude: longitude,
+      source: source,
+      officialCode: officialCode,
+    );
+    notifyListeners();
+    return updated;
   }
 
   AccreditedAgent accredit({
