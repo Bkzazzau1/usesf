@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../geography/geography_registry.dart';
+import '../geography/kaduna_map.dart';
 import '../governance/governance_store.dart';
 import '../membership/membership_store.dart';
 import '../session.dart';
@@ -36,6 +37,16 @@ class _SecurityPortalLoginPageState extends State<SecurityPortalLoginPage> {
     _serviceNumber.dispose();
     _accessCode.dispose();
     super.dispose();
+  }
+
+  void _useDemo(_DemoOfficer officer) {
+    setState(() {
+      _agencyId = officer.agencyId;
+      _commandId = officer.commandId;
+      _name.text = officer.name;
+      _serviceNumber.text = officer.serviceNumber;
+      _accessCode.text = demoSecurityAccessCode;
+    });
   }
 
   void _signIn() {
@@ -99,20 +110,26 @@ class _SecurityPortalLoginPageState extends State<SecurityPortalLoginPage> {
             }
             return Row(
               children: [
-                const Expanded(flex: 9, child: _PortalBrandPanel()),
+                const Expanded(flex: 10, child: _PortalBrandPanel()),
                 Expanded(
                   flex: 13,
-                  child: Center(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 48,
-                        vertical: 30,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      const KadunaMapBackdrop(),
+                      Center(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 48,
+                            vertical: 30,
+                          ),
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 720),
+                            child: form,
+                          ),
+                        ),
                       ),
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 720),
-                        child: form,
-                      ),
-                    ),
+                    ],
                   ),
                 ),
               ],
@@ -177,6 +194,8 @@ class _SecurityPortalLoginPageState extends State<SecurityPortalLoginPage> {
         ),
         const SizedBox(height: 18),
         DropdownButtonFormField<String>(
+          // Keyed so a demo profile can change the selection.
+          key: ValueKey(_commandId),
           initialValue: _commandId,
           isExpanded: true,
           decoration: const InputDecoration(
@@ -286,6 +305,8 @@ class _SecurityPortalLoginPageState extends State<SecurityPortalLoginPage> {
             ),
           ],
         ),
+        const SizedBox(height: 18),
+        _DemoAccess(onUse: _useDemo),
       ],
     ),
   );
@@ -531,3 +552,109 @@ IconData agencyIcon(EmergencyAgencyType type) => switch (type) {
   EmergencyAgencyType.medical => Icons.medical_services_rounded,
   EmergencyAgencyType.other => Icons.support_rounded,
 };
+
+/// Access code shared by the demonstration officer profiles.
+const demoSecurityAccessCode = 'USESF-DEMO';
+
+class _DemoOfficer {
+  const _DemoOfficer({
+    required this.agencyId,
+    required this.agencyName,
+    required this.commandId,
+    required this.commandLabel,
+    required this.name,
+    required this.serviceNumber,
+  });
+
+  final String agencyId;
+  final String agencyName;
+  final String commandId;
+  final String commandLabel;
+  final String name;
+  final String serviceNumber;
+}
+
+const _demoOfficers = <_DemoOfficer>[
+  _DemoOfficer(
+    agencyId: 'AGENCY-POLICE',
+    agencyName: 'Police',
+    commandId: 'KD',
+    commandLabel: 'Kaduna State Command',
+    name: 'Insp. Musa Bello',
+    serviceNumber: 'AP/12345',
+  ),
+  _DemoOfficer(
+    agencyId: 'AGENCY-NSCDC',
+    agencyName: 'Civil Defence',
+    commandId: 'KD-JEMAA',
+    commandLabel: "Jema'a LGA",
+    name: 'ASC Grace Danjuma',
+    serviceNumber: 'NSCDC/45821',
+  ),
+  _DemoOfficer(
+    agencyId: 'AGENCY-FIRE',
+    agencyName: 'Fire & Rescue',
+    commandId: 'KD',
+    commandLabel: 'Kaduna State Command',
+    name: 'ACFO Ibrahim Yusuf',
+    serviceNumber: 'FFS/30917',
+  ),
+];
+
+/// Demonstration profiles: one tap fills the form with working details.
+class _DemoAccess extends StatelessWidget {
+  const _DemoAccess({required this.onUse});
+
+  final ValueChanged<_DemoOfficer> onUse;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: TgcgColors.accentSoft,
+      borderRadius: BorderRadius.circular(TgcgRadius.md),
+      border: Border.all(color: TgcgColors.gold200),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(Icons.science_outlined, size: 17, color: TgcgColors.gold700),
+            SizedBox(width: 7),
+            Text(
+              'Demo access',
+              style: TextStyle(
+                color: TgcgColors.ink,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Choose a demo officer to fill the form, then select Enter Security Portal. Access code: $demoSecurityAccessCode',
+          style: TextStyle(color: TgcgColors.muted, fontSize: 11, height: 1.4),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _demoOfficers
+              .map(
+                (officer) => ActionChip(
+                  avatar: const Icon(Icons.badge_outlined, size: 16),
+                  label: Text(
+                    '${officer.agencyName} • ${officer.commandLabel}',
+                  ),
+                  tooltip: '${officer.name} • ${officer.serviceNumber}',
+                  onPressed: () => onUse(officer),
+                ),
+              )
+              .toList(),
+        ),
+      ],
+    ),
+  );
+}

@@ -77,4 +77,44 @@ void main() {
       expect(find.text('Acknowledge dispatch'), findsNothing);
     });
   }
+
+  testWidgets('demo officer profile signs in to the Security Portal', (tester) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final session = TgcgSessionController();
+    await tester.pumpWidget(
+      _harness(
+        session,
+        Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const SecurityPortalLoginPage()),
+              ),
+              child: const Text('open portal'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open portal'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Police • Kaduna State Command'));
+    await tester.pump();
+    await tester.tap(find.text('Police • Kaduna State Command'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Enter Security Portal'));
+    await tester.pump();
+    await tester.tap(find.text('Enter Security Portal'));
+    await tester.pumpAndSettle();
+
+    expect(session.isAuthenticated, isTrue);
+    expect(session.role, TgcgRole.securityOfficer);
+    expect(session.agencyId, 'AGENCY-POLICE');
+    expect(session.accessId, 'AP/12345');
+    expect(session.scope.level, GeographyLevel.state);
+  });
 }

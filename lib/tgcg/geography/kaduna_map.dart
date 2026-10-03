@@ -324,3 +324,16 @@ Offset? kadunaLgaLabelPosition(String lgaId, Size size) {
   }
   return null;
 }
+
+/// Faded Kaduna State map used behind the sign-in forms.
+class KadunaMapBackdrop extends StatelessWidget {
+  const KadunaMapBackdrop({super.key});
+
+  @override
+  Widget build(BuildContext context) => const IgnorePointer(
+    child: Padding(
+      padding: EdgeInsets.all(28),
+      child: Opacity(opacity: .13, child: Center(child: KadunaMap())),
+    ),
+  );
+}
