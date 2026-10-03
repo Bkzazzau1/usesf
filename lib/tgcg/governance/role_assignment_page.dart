@@ -355,14 +355,18 @@ class _AssignmentForm extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(13),
               decoration: BoxDecoration(
-                color: TgcgColors.primarySoft,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: TgcgColors.border),
+                gradient: const LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [TgcgColors.gold100, TgcgColors.navy50],
+                ),
+                borderRadius: BorderRadius.circular(TgcgRadius.md),
+                border: Border.all(color: TgcgColors.gold200),
               ),
               child: const Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.security_rounded, color: TgcgColors.primary, size: 20),
+                  Icon(Icons.security_rounded, color: TgcgColors.accentStrong, size: 20),
                   SizedBox(width: 9),
                   Expanded(
                     child: Text(
@@ -514,8 +518,12 @@ class _AssignmentRow extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 9),
         padding: const EdgeInsets.all(13),
         decoration: BoxDecoration(
-          color: TgcgColors.surfaceSoft,
-          borderRadius: BorderRadius.circular(15),
+          gradient: const LinearGradient(
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+            colors: [TgcgColors.surface, TgcgColors.navy50],
+          ),
+          borderRadius: BorderRadius.circular(TgcgRadius.md),
           border: Border.all(color: TgcgColors.border),
         ),
         child: Row(
@@ -524,10 +532,11 @@ class _AssignmentRow extends StatelessWidget {
               width: 42,
               height: 42,
               decoration: BoxDecoration(
-                color: TgcgColors.primarySoft,
-                borderRadius: BorderRadius.circular(13),
+                color: TgcgColors.accentSoft,
+                borderRadius: BorderRadius.circular(TgcgRadius.sm),
+                border: Border.all(color: TgcgColors.gold200),
               ),
-              child: Icon(roleIcon(item.role), color: TgcgColors.primary, size: 21),
+              child: Icon(roleIcon(item.role), color: TgcgColors.accentStrong, size: 21),
             ),
             const SizedBox(width: 11),
             Expanded(
