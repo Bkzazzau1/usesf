@@ -537,6 +537,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                     assignedBy: session.accessId.isEmpty
                         ? session.operatorName
                         : session.accessId,
+                    authorizedScope: session.scope,
                   );
                   if (dialogContext.mounted) {
                     Navigator.pop(dialogContext, true);
