@@ -27,6 +27,10 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
       TgcgCapability.manageAgentAssignments,
     );
     final visible = assignments.assignmentsForScope(session.scope);
+    final coverage = assignments.coverageForScope(session.scope);
+    final gaps = coverage.where((item) => item.needsAttention).toList();
+    final staffed =
+        coverage.where((item) => !item.isBelowMinimum).length;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 36),
@@ -110,6 +114,12 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
               ],
             );
           },
+        ),
+        const SizedBox(height: 16),
+        _CoverageGapPanel(
+          snapshots: gaps,
+          totalPollingUnits: coverage.length,
+          staffedPollingUnits: staffed,
         ),
         const SizedBox(height: 16),
         _AssignmentList(
@@ -510,6 +520,164 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
         const SnackBar(content: Text('Managed phone assigned to member.')),
       );
     }
+  }
+}
+
+class _CoverageGapPanel extends StatelessWidget {
+  const _CoverageGapPanel({
+    required this.snapshots,
+    required this.totalPollingUnits,
+    required this.staffedPollingUnits,
+  });
+
+  final List<PollingUnitCoverageSnapshot> snapshots;
+  final int totalPollingUnits;
+  final int staffedPollingUnits;
+
+  @override
+  Widget build(BuildContext context) {
+    final unstaffed = snapshots.where((item) => item.isUnstaffed).length;
+    final presenceGaps =
+        snapshots.where((item) => item.hasPresenceGap).length;
+    final gpsAlerts = snapshots.where((item) => item.hasGpsAlert).length;
+
+    return TgcgSectionCard(
+      title: 'Coverage Gap Engine',
+      subtitle:
+          'Rule-based staffing and presence checks across the polling units currently loaded in this scope.',
+      trailing: TgcgStatusPill(
+        label: '${snapshots.length} NEED ATTENTION',
+        color: snapshots.isEmpty ? TgcgColors.success : TgcgColors.warning,
+        icon: snapshots.isEmpty
+            ? Icons.check_circle_outline_rounded
+            : Icons.warning_amber_rounded,
+        compact: true,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              TgcgStatusPill(
+                label: '$staffedPollingUnits / $totalPollingUnits STAFFED',
+                color: TgcgColors.success,
+                compact: true,
+              ),
+              TgcgStatusPill(
+                label: '$unstaffed UNSTAFFED',
+                color: unstaffed == 0
+                    ? TgcgColors.success
+                    : TgcgColors.warning,
+                compact: true,
+              ),
+              TgcgStatusPill(
+                label: '$presenceGaps PRESENCE GAPS',
+                color: presenceGaps == 0
+                    ? TgcgColors.success
+                    : TgcgColors.warning,
+                compact: true,
+              ),
+              TgcgStatusPill(
+                label: '$gpsAlerts GPS ALERTS',
+                color: gpsAlerts == 0
+                    ? TgcgColors.success
+                    : TgcgColors.warning,
+                compact: true,
+              ),
+            ],
+          ),
+          if (snapshots.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ...snapshots.take(12).map(
+                  (snapshot) => Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(11),
+                    decoration: BoxDecoration(
+                      color: TgcgColors.surfaceRaised,
+                      borderRadius:
+                          BorderRadius.circular(TgcgRadius.sm),
+                      border: Border.all(color: TgcgColors.border),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on_outlined,
+                          color: TgcgColors.accentStrong,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                snapshot.unit.displayCode,
+                                style: const TextStyle(
+                                  color: TgcgColors.ink,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 11,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                snapshot.unit.scope.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: TgcgColors.muted,
+                                  fontSize: 9.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        TgcgStatusPill(
+                          label:
+                              '${snapshot.activeAssignments} ASSIGNED',
+                          color: snapshot.isBelowMinimum
+                              ? TgcgColors.warning
+                              : TgcgColors.info,
+                          compact: true,
+                        ),
+                        const SizedBox(width: 5),
+                        TgcgStatusPill(
+                          label: '${snapshot.atLocation} PRESENT',
+                          color: snapshot.atLocation ==
+                                      snapshot.activeAssignments &&
+                                  snapshot.activeAssignments > 0
+                              ? TgcgColors.success
+                              : TgcgColors.warning,
+                          compact: true,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            if (snapshots.length > 12)
+              Text(
+                '+${snapshots.length - 12} additional polling units require attention.',
+                style: const TextStyle(
+                  color: TgcgColors.muted,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+          ] else
+            const Padding(
+              padding: EdgeInsets.only(top: 12),
+              child: TgcgEmptyState(
+                icon: Icons.task_alt_rounded,
+                title: 'No coverage gaps',
+                message:
+                    'Every loaded polling unit in this scope satisfies the current minimum staffing and GPS rules.',
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }
 
