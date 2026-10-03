@@ -178,15 +178,25 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     MembershipOperationsController membership,
     AssignmentController assignments,
     TgcgSessionController session,
+    List<TgcgMember> authorizedMembers,
+    List<CanonicalPollingUnit> authorizedUnits,
   ) async {
-    if (membership.members.isEmpty ||
-        membership.geography.pollingUnits.isEmpty) {
+    if (authorizedMembers.isEmpty || authorizedUnits.isEmpty) {
       return;
     }
 
-    var memberId = membership.members.first.id;
-    var lgaId = membership.geography.lgas.first.id;
-    var units = membership.geography.pollingUnits
+    var memberId = authorizedMembers.first.id;
+    final authorizedLgaIds = authorizedUnits
+        .map((unit) => unit.scope.lgaId)
+        .whereType<String>()
+        .toSet();
+    final authorizedLgas = membership.geography.lgas
+        .where((lga) => authorizedLgaIds.contains(lga.id))
+        .toList(growable: false);
+    if (authorizedLgas.isEmpty) return;
+
+    var lgaId = authorizedLgas.first.id;
+    var units = authorizedUnits
         .where((unit) => unit.scope.lgaId == lgaId)
         .toList(growable: false);
     String? pollingUnitId = units.isEmpty ? null : units.first.code;
@@ -212,7 +222,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                       labelText: 'Member',
                       prefixIcon: Icon(Icons.person_outline_rounded),
                     ),
-                    items: membership.members
+                    items: authorizedMembers
                         .map(
                           (member) => DropdownMenuItem(
                             value: member.id,
@@ -237,7 +247,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                       labelText: 'Target LGA',
                       prefixIcon: Icon(Icons.location_city_outlined),
                     ),
-                    items: membership.geography.lgas
+                    items: authorizedLgas
                         .map(
                           (lga) => DropdownMenuItem(
                             value: lga.id,
@@ -249,7 +259,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                       if (value == null) return;
                       setDialogState(() {
                         lgaId = value;
-                        units = membership.geography.pollingUnits
+                        units = authorizedUnits
                             .where((unit) => unit.scope.lgaId == lgaId)
                             .toList(growable: false);
                         pollingUnitId =
@@ -333,6 +343,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                           assignedBy: session.accessId.isEmpty
                               ? session.operatorName
                               : session.accessId,
+                          authorizedScope: session.scope,
                           priority: priority,
                           instructions: instructions.text,
                         );
@@ -443,11 +454,12 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     ManagedDeviceController devices,
     MembershipOperationsController membership,
     TgcgSessionController session,
+    List<TgcgMember> authorizedMembers,
   ) async {
     final available = devices.devices
         .where((item) => item.status == ManagedDeviceStatus.available)
         .toList(growable: false);
-    if (available.isEmpty || membership.members.isEmpty) {
+    if (available.isEmpty || authorizedMembers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Register an available phone before assigning it.'),
@@ -457,7 +469,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     }
 
     var deviceId = available.first.id;
-    var memberId = membership.members.first.id;
+    var memberId = authorizedMembers.first.id;
     final assigned = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
@@ -491,7 +503,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                   initialValue: memberId,
                   isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Member'),
-                  items: membership.members
+                  items: authorizedMembers
                       .map(
                         (member) => DropdownMenuItem(
                           value: member.id,
@@ -824,6 +836,7 @@ class _AssignmentList extends StatelessWidget {
 class _DeviceRegistry extends StatelessWidget {
   const _DeviceRegistry({
     required this.devices,
+    required this.visibleDevices,
     required this.membership,
     required this.canManage,
     required this.onRegister,
@@ -831,6 +844,7 @@ class _DeviceRegistry extends StatelessWidget {
   });
 
   final ManagedDeviceController devices;
+  final List<ManagedDevice> visibleDevices;
   final MembershipOperationsController membership;
   final bool canManage;
   final VoidCallback onRegister;
@@ -859,7 +873,7 @@ class _DeviceRegistry extends StatelessWidget {
                 ],
               )
             : null,
-        child: devices.devices.isEmpty
+        child: visibleDevices.isEmpty
             ? const TgcgEmptyState(
                 icon: Icons.phone_android_outlined,
                 title: 'No managed phones registered',
@@ -867,7 +881,7 @@ class _DeviceRegistry extends StatelessWidget {
                     'Register organization-issued phones before binding them to field members.',
               )
             : Column(
-                children: devices.devices.map((device) {
+                children: visibleDevices.map((device) {
                   final member = device.assignedMemberId == null
                       ? null
                       : membership.memberById(device.assignedMemberId!);
