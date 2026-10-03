@@ -710,6 +710,7 @@ class _DirectoryPanel extends StatelessWidget {
                 );
                 return ListTile(
                   contentPadding: EdgeInsets.zero,
+                  onTap: () => _showPollingUnitRoster(context, unit),
                   leading: Container(
                     width: 38,
                     height: 38,
@@ -816,7 +817,387 @@ class _DirectoryPanel extends StatelessWidget {
           ],
         ),
       );
+
+  Future<void> _showPollingUnitRoster(
+    BuildContext context,
+    CanonicalPollingUnit unit,
+  ) async {
+    final homeMembers = membership.membersForPollingUnit(unit.code);
+    final activeAssignments = assignments
+        .assignmentsForScope(unit.scope)
+        .where(
+          (item) =>
+              !item.isTerminal && item.targetPollingUnitId == unit.code,
+        )
+        .toList(growable: false);
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        insetPadding: const EdgeInsets.all(20),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: 880,
+            maxHeight: 760,
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(20, 18, 14, 16),
+                decoration: const BoxDecoration(
+                  gradient: TgcgGradients.navigation,
+                  borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(20),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.how_to_vote_outlined,
+                      color: TgcgColors.gold400,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            unit.displayCode,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            unit.scope.label,
+                            style: const TextStyle(
+                              color: TgcgColors.gold200,
+                              fontSize: 10.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Close',
+                      onPressed: () => Navigator.pop(dialogContext),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.all(18),
+                  children: [
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        TgcgStatusPill(
+                          label: '${homeMembers.length} HOME MEMBERS',
+                          color: TgcgColors.primary,
+                          compact: true,
+                        ),
+                        TgcgStatusPill(
+                          label: '${activeAssignments.length} ASSIGNED',
+                          color: TgcgColors.info,
+                          compact: true,
+                        ),
+                        TgcgStatusPill(
+                          label:
+                              '${activeAssignments.where((item) => assignments.presenceFor(item) == AssignmentPresence.insideGeofence).length} AT LOCATION',
+                          color: TgcgColors.success,
+                          compact: true,
+                        ),
+                        TgcgStatusPill(
+                          label: _coordinateStatusLabel(
+                            unit.coordinateStatus,
+                          ),
+                          color: _coordinateStatusColor(
+                            unit.coordinateStatus,
+                          ),
+                          compact: true,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _PollingUnitCoordinateCard(unit: unit),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'DEPLOYED MEMBERS',
+                      style: TextStyle(
+                        color: TgcgColors.primaryMid,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: .9,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (activeAssignments.isEmpty)
+                      const TgcgEmptyState(
+                        icon: Icons.person_off_outlined,
+                        title: 'No active deployment',
+                        message:
+                            'No member currently has an active assignment to this polling unit.',
+                      )
+                    else
+                      ...activeAssignments.map((assignment) {
+                        final member =
+                            membership.memberById(assignment.memberId);
+                        final device =
+                            devices.deviceForMember(assignment.memberId);
+                        final presence =
+                            assignments.presenceFor(assignment);
+                        final ping = assignment.lastLocation;
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 9),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: TgcgColors.surfaceRaised,
+                            borderRadius:
+                                BorderRadius.circular(TgcgRadius.md),
+                            border: Border.all(color: TgcgColors.border),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              CircleAvatar(
+                                backgroundColor: TgcgColors.primarySoft,
+                                child: Text(
+                                  (member?.fullName ??
+                                          assignment.memberId)
+                                      .substring(0, 1)
+                                      .toUpperCase(),
+                                  style: const TextStyle(
+                                    color: TgcgColors.primary,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 11),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      member?.fullName ??
+                                          assignment.memberId,
+                                      style: const TextStyle(
+                                        color: TgcgColors.ink,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      assignment.title,
+                                      style: const TextStyle(
+                                        color: TgcgColors.muted,
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                    if (ping != null) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'GPS ${ping.latitude.toStringAsFixed(6)}, '
+                                        '${ping.longitude.toStringAsFixed(6)} • '
+                                        '±${ping.accuracyMeters.toStringAsFixed(1)} m'
+                                        '${ping.distanceFromTargetMeters == null ? '' : ' • ${ping.distanceFromTargetMeters!.toStringAsFixed(0)} m from PU'}',
+                                        style: const TextStyle(
+                                          color: TgcgColors.muted,
+                                          fontSize: 9.3,
+                                        ),
+                                      ),
+                                    ],
+                                    const SizedBox(height: 7),
+                                    Wrap(
+                                      spacing: 6,
+                                      runSpacing: 6,
+                                      children: [
+                                        TgcgStatusPill(
+                                          label: assignment.status.name
+                                              .toUpperCase(),
+                                          color: presence ==
+                                                  AssignmentPresence
+                                                      .insideGeofence
+                                              ? TgcgColors.success
+                                              : TgcgColors.info,
+                                          compact: true,
+                                        ),
+                                        TgcgStatusPill(
+                                          label: _presenceLabelForRoster(
+                                            presence,
+                                          ),
+                                          color: _presenceColorForRoster(
+                                            presence,
+                                          ),
+                                          compact: true,
+                                        ),
+                                        TgcgStatusPill(
+                                          label: device == null
+                                              ? 'NO MANAGED PHONE'
+                                              : device.id,
+                                          color: device == null
+                                              ? TgcgColors.warning
+                                              : TgcgColors.info,
+                                          icon:
+                                              Icons.phone_android_outlined,
+                                          compact: true,
+                                        ),
+                                        if (assignment.evidence.isNotEmpty)
+                                          TgcgStatusPill(
+                                            label:
+                                                '${assignment.evidence.length} EVIDENCE',
+                                            color: TgcgColors.success,
+                                            icon: Icons.attachment_rounded,
+                                            compact: true,
+                                          ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'HOME MEMBERS',
+                      style: TextStyle(
+                        color: TgcgColors.primaryMid,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: .9,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (homeMembers.isEmpty)
+                      const Text(
+                        'No member currently has this polling unit as their home polling unit.',
+                        style: TextStyle(
+                          color: TgcgColors.muted,
+                          fontSize: 10.5,
+                        ),
+                      )
+                    else
+                      ...homeMembers.take(30).map(
+                            (member) => ListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              leading: const Icon(
+                                Icons.person_outline_rounded,
+                                color: TgcgColors.primary,
+                              ),
+                              title: Text(
+                                member.fullName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              subtitle: Text(
+                                member.membershipNumber ?? member.id,
+                              ),
+                            ),
+                          ),
+                    if (homeMembers.length > 30)
+                      Text(
+                        '+${homeMembers.length - 30} additional home members',
+                        style: const TextStyle(
+                          color: TgcgColors.muted,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
+
+class _PollingUnitCoordinateCard extends StatelessWidget {
+  const _PollingUnitCoordinateCard({required this.unit});
+
+  final CanonicalPollingUnit unit;
+
+  @override
+  Widget build(BuildContext context) {
+    final latitude = unit.operationalLatitude;
+    final longitude = unit.operationalLongitude;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [TgcgColors.navy50, TgcgColors.gold100],
+        ),
+        borderRadius: BorderRadius.circular(TgcgRadius.md),
+        border: Border.all(color: TgcgColors.gold200),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.gps_fixed_rounded,
+            color: TgcgColors.accentStrong,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              latitude == null || longitude == null
+                  ? 'Operational coordinate pending'
+                  : '${latitude.toStringAsFixed(6)}, '
+                      '${longitude.toStringAsFixed(6)}'
+                      '${unit.verificationAccuracyMeters == null ? '' : ' • ±${unit.verificationAccuracyMeters!.toStringAsFixed(1)} m'}',
+              style: const TextStyle(
+                color: TgcgColors.ink,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          Text(
+            '${unit.geofenceRadiusMeters.toStringAsFixed(0)} m geofence',
+            style: const TextStyle(
+              color: TgcgColors.muted,
+              fontSize: 9.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _presenceLabelForRoster(AssignmentPresence presence) =>
+    switch (presence) {
+      AssignmentPresence.unknown => 'GPS UNKNOWN',
+      AssignmentPresence.insideGeofence => 'AT LOCATION',
+      AssignmentPresence.outsideGeofence => 'OUTSIDE GEOFENCE',
+      AssignmentPresence.stale => 'GPS STALE',
+    };
+
+Color _presenceColorForRoster(AssignmentPresence presence) =>
+    switch (presence) {
+      AssignmentPresence.unknown => TgcgColors.muted,
+      AssignmentPresence.insideGeofence => TgcgColors.success,
+      AssignmentPresence.outsideGeofence => TgcgColors.warning,
+      AssignmentPresence.stale => TgcgColors.warning,
+    };
 
 class _AreaRow extends StatelessWidget {
   const _AreaRow({
