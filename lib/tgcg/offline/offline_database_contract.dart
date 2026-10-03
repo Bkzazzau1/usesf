@@ -61,6 +61,10 @@ abstract interface class OfflineDatabaseBackend {
     required String entityId,
   });
 
+  Future<List<StoredEntityRecord>> listEntities({
+    required String entityType,
+  });
+
   Future<void> writeMutation({
     required StoredEntityRecord entity,
     required SyncOutboxItem outbox,
