@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../devices/managed_device_store.dart';
 import '../domain/permissions.dart';
+import '../geography/kaduna_map.dart';
 import '../membership/membership_store.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
@@ -157,6 +158,11 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
               ],
             );
           },
+        ),
+        const SizedBox(height: 16),
+        _AssignmentCoverageMap(
+          snapshots: coverage,
+          authorizedUnits: authorizedUnits,
         ),
         const SizedBox(height: 16),
         _CoverageGapPanel(
@@ -777,6 +783,92 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
         const SnackBar(content: Text('Managed phone assigned to member.')),
       );
     }
+  }
+}
+
+class _AssignmentCoverageMap extends StatelessWidget {
+  const _AssignmentCoverageMap({
+    required this.snapshots,
+    required this.authorizedUnits,
+  });
+
+  final List<PollingUnitCoverageSnapshot> snapshots;
+  final List<CanonicalPollingUnit> authorizedUnits;
+
+  @override
+  Widget build(BuildContext context) {
+    final authorizedLgas = authorizedUnits
+        .map((unit) => unit.scope.lgaId)
+        .whereType<String>()
+        .toSet();
+    final byLga = <String, List<PollingUnitCoverageSnapshot>>{};
+    for (final snapshot in snapshots) {
+      final lgaId = snapshot.unit.scope.lgaId;
+      if (lgaId == null) continue;
+      byLga.putIfAbsent(lgaId, () => []).add(snapshot);
+    }
+
+    Color fill(String lgaId) {
+      if (!authorizedLgas.contains(lgaId)) {
+        return TgcgColors.navy100;
+      }
+      final items = byLga[lgaId] ?? const <PollingUnitCoverageSnapshot>[];
+      if (items.isEmpty) return TgcgColors.navy700;
+      final critical = items.any(
+        (item) => item.isUnstaffed || item.hasGpsAlert,
+      );
+      if (critical) return TgcgColors.danger;
+      final gaps = items.any((item) => item.needsAttention);
+      if (gaps) return TgcgColors.warning;
+      return TgcgColors.success;
+    }
+
+    String? badge(String lgaId) {
+      final items = byLga[lgaId];
+      if (items == null || items.isEmpty) return null;
+      final present =
+          items.fold<int>(0, (total, item) => total + item.atLocation);
+      final required =
+          items.fold<int>(0, (total, item) => total + item.minimumStaffing);
+      return '$present/$required present';
+    }
+
+    return TgcgSectionCard(
+      title: 'Kaduna Assignment Readiness Map',
+      subtitle:
+          'LGA-level view of polling-unit staffing requirements and fresh GPS presence.',
+      trailing: const Wrap(
+        spacing: 7,
+        runSpacing: 7,
+        children: [
+          TgcgStatusPill(
+            label: 'READY',
+            color: TgcgColors.success,
+            compact: true,
+          ),
+          TgcgStatusPill(
+            label: 'GAP',
+            color: TgcgColors.warning,
+            compact: true,
+          ),
+          TgcgStatusPill(
+            label: 'CRITICAL / GPS',
+            color: TgcgColors.danger,
+            compact: true,
+          ),
+        ],
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 560),
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: KadunaMap(
+            fillColor: fill,
+            badge: badge,
+          ),
+        ),
+      ),
+    );
   }
 }
 
