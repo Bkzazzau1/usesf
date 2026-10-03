@@ -144,6 +144,7 @@ class _SecurityResponsePortalPageState extends State<SecurityResponsePortalPage>
               dispatches: dispatches,
               emergency: emergency,
               selectedId: selectedDispatchId,
+              agencyRestricted: isAgencyOfficer,
               onSelected: (id) {
                 if (id != selectedDispatchId) {
                   emergency.recordDispatchAudit(
@@ -463,12 +464,14 @@ class _DispatchBoard extends StatelessWidget {
     required this.dispatches,
     required this.emergency,
     required this.selectedId,
+    required this.agencyRestricted,
     required this.onSelected,
   });
 
   final List<EmergencyDispatch> dispatches;
   final EmergencyResponseController emergency;
   final String? selectedId;
+  final bool agencyRestricted;
   final ValueChanged<String> onSelected;
 
   @override
@@ -476,10 +479,12 @@ class _DispatchBoard extends StatelessWidget {
         title: 'Live response assignments',
         subtitle: 'Agency assignments and current response stage.',
         child: dispatches.isEmpty
-            ? const TgcgEmptyState(
+            ? TgcgEmptyState(
                 icon: Icons.shield_outlined,
                 title: 'No response assignments',
-                message: 'Assign an open incident to an authorized response agency.',
+                message: agencyRestricted
+                    ? 'There is currently no incident assigned to your response agency.'
+                    : 'Assign an open incident to an authorized response agency.',
               )
             : Column(
                 children: [
@@ -658,6 +663,10 @@ class _DispatchDetail extends StatelessWidget {
               _DetailLine(
                 label: 'Command desk',
                 value: agency?.commandDesk ?? '—',
+              ),
+              _DetailLine(
+                label: 'Agency contact',
+                value: agency?.contactPhone ?? '—',
               ),
               _DetailLine(
                 label: 'Assigned',
@@ -904,7 +913,8 @@ class _DispatchDetail extends StatelessWidget {
         : incident.evidence
             .map(
               (item) =>
-                  '${_evidenceLabel(item.type)}: ${item.fileName} (${item.id})',
+                  '${_evidenceLabel(item.type)}: ${item.fileName} (${item.id})'
+                  '${item.sourceReference == null ? '' : ' • ${item.sourceReference}'}',
             )
             .join('\n');
 
@@ -1197,7 +1207,7 @@ class _EvidenceIntelligence extends StatelessWidget {
                                       TgcgStatusPill(
                                         label: item.sourceReference == null
                                             ? 'UPLOAD PENDING'
-                                            : 'MEDIA READY',
+                                            : 'MEDIA REFERENCE',
                                         color: item.sourceReference == null
                                             ? TgcgColors.warning
                                             : TgcgColors.info,
