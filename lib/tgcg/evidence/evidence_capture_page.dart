@@ -150,6 +150,7 @@ class _EvidenceCapturePageState extends State<EvidenceCapturePage> {
         'fileName': evidence.fileName,
         'mimeType': evidence.mimeType,
         'contentHash': evidence.contentHash,
+        'sourceReference': evidence.path,
         'latitude': evidence.latitude,
         'longitude': evidence.longitude,
         'reference': _reference.text.trim().isEmpty ? null : _reference.text.trim(),

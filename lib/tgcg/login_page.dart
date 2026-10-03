@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'app.dart';
 import 'geography/kaduna_map.dart';
 import 'membership/membership_store.dart';
+import 'security/emergency_response_store.dart';
 import 'session.dart';
 import 'ui/tgcg_design.dart';
 
@@ -20,6 +21,7 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
 
   TgcgRole selectedRole = TgcgRole.situationRoomDirector;
   String? selectedDistrictId;
+  String? selectedAgencyId;
   bool obscurePassword = true;
   bool rememberDevice = true;
   bool showSignIn = false;
@@ -35,6 +37,7 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
   void _signIn() {
     final membership = MembershipOperations.of(context, listen: false);
     var scope = GeographicScope.kaduna;
+    String? agencyId;
 
     if (selectedRole == TgcgRole.senatorialCoordinator) {
       final districts = membership.geography.senatorialDistricts;
@@ -43,11 +46,21 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
           membership.geography.senatorialDistrict(districtId)?.scope ?? scope;
     }
 
+    if (selectedRole == TgcgRole.securityOfficer) {
+      final emergency = EmergencyResponse.of(context, listen: false);
+      final agencies = emergency.agenciesForScope(GeographicScope.kaduna);
+      if (agencies.isEmpty) return;
+      agencyId = selectedAgencyId ?? agencies.first.id;
+      final agency = emergency.agencyById(agencyId);
+      if (agency != null) scope = agency.coverage;
+    }
+
     TgcgSession.of(context, listen: false).signIn(
       role: selectedRole,
       operatorName: nameController.text,
       accessId: accessIdController.text,
       scope: scope,
+      agencyId: agencyId,
     );
   }
 
@@ -332,6 +345,10 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
               const SizedBox(height: 14),
               _roleScopeSelector(),
             ],
+            if (selectedRole == TgcgRole.securityOfficer) ...[
+              const SizedBox(height: 14),
+              _agencySelector(),
+            ],
             const SizedBox(height: 22),
             LayoutBuilder(
               builder: (context, constraints) {
@@ -431,6 +448,41 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
     ),
   );
 
+  Widget _agencySelector() {
+    final emergency = EmergencyResponse.of(context, listen: false);
+    final agencies = emergency.agenciesForScope(GeographicScope.kaduna);
+    if (agencies.isEmpty) {
+      return const TgcgEmptyState(
+        icon: Icons.shield_outlined,
+        title: 'No response agency configured',
+        message:
+            'A response agency must be configured before Security Officer access can be used.',
+      );
+    }
+    final value = selectedAgencyId ?? agencies.first.id;
+    selectedAgencyId ??= value;
+    return DropdownButtonFormField<String>(
+      initialValue: value,
+      isExpanded: true,
+      decoration: const InputDecoration(
+        labelText: 'Authorized response agency',
+        prefixIcon: Icon(Icons.local_police_outlined),
+      ),
+      items: agencies
+          .map(
+            (agency) => DropdownMenuItem(
+              value: agency.id,
+              child: Text(
+                '${agency.shortName} • ${agency.commandDesk}',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          )
+          .toList(),
+      onChanged: (next) => setState(() => selectedAgencyId = next),
+    );
+  }
+
   Widget _roleScopeSelector() {
     final districts = MembershipOperations.of(
       context,
@@ -472,9 +524,7 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
       return Wrap(
         spacing: gap,
         runSpacing: gap,
-        children: TgcgRole.values
-            .where((role) => role != TgcgRole.securityOfficer)
-            .map((role) {
+        children: TgcgRole.values.map((role) {
               final active = role == selectedRole;
               return InkWell(
                 borderRadius: BorderRadius.circular(14),
@@ -482,6 +532,9 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
                   selectedRole = role;
                   if (role != TgcgRole.senatorialCoordinator) {
                     selectedDistrictId = null;
+                  }
+                  if (role != TgcgRole.securityOfficer) {
+                    selectedAgencyId = null;
                   }
                 }),
                 child: AnimatedContainer(

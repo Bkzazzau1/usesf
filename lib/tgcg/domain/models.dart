@@ -204,6 +204,7 @@ class EvidenceAttachment {
     this.contentHash,
     this.mimeType,
     this.caption,
+    this.sourceReference,
     this.latitude,
     this.longitude,
     this.origin = RecordOrigin.localEntry,
@@ -217,6 +218,11 @@ class EvidenceAttachment {
   final String? contentHash;
   final String? mimeType;
   final String? caption;
+
+  /// Local media path, object-storage key, or other retrievable media
+  /// reference. Production sync may replace a local path with a durable
+  /// storage reference without changing the incident model.
+  final String? sourceReference;
   final double? latitude;
   final double? longitude;
   final RecordOrigin origin;

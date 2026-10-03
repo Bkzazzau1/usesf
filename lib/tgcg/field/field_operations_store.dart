@@ -94,6 +94,29 @@ class FieldOperationsController extends ChangeNotifier {
           origin: RecordOrigin.systemDerived,
         );
 
+    EvidenceAttachment video(
+      String id,
+      String uploader,
+      DateTime at, {
+      double? latitude,
+      double? longitude,
+    }) =>
+        EvidenceAttachment(
+          id: id,
+          type: EvidenceType.video,
+          fileName: '$id.mp4',
+          createdAt: at,
+          uploaderId: uploader,
+          contentHash: 'sha256:prototype-$id',
+          mimeType: 'video/mp4',
+          caption:
+              'Prototype security video evidence. Replace with verified field media.',
+          sourceReference: 'prototype://$id.mp4',
+          latitude: latitude,
+          longitude: longitude,
+          origin: RecordOrigin.systemDerived,
+        );
+
     return FieldOperationsController._(
       persistence: persistence,
       incidents: [
@@ -147,7 +170,25 @@ class FieldOperationsController extends ChangeNotifier {
           scope: jemaa,
           reportedAt: now.subtract(const Duration(minutes: 9)),
           reporterId: 'AG-JM-032',
-          summary: 'A large crowd has gathered at the collation centre gate; officials request security presence before collation resumes.',
+          summary:
+              'A large crowd has gathered at the collation centre gate; officials request security presence before collation resumes.',
+          latitude: 9.580000,
+          longitude: 8.290000,
+          evidence: [
+            video(
+              'EVD-0005-VIDEO',
+              'AG-JM-032',
+              now.subtract(const Duration(minutes: 8)),
+              latitude: 9.580000,
+              longitude: 8.290000,
+            ),
+            photo(
+              'EVD-0005-PHOTO',
+              'AG-JM-032',
+              now.subtract(const Duration(minutes: 8)),
+            ),
+          ],
+          origin: RecordOrigin.systemDerived,
         ),
         FieldIncident(
           id: 'INC-0004',
