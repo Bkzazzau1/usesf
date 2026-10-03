@@ -11,6 +11,7 @@ enum TgcgModule {
   membershipNetwork,
   roleAssignment,
   geography,
+  assignmentControl,
   liveOperations,
   aiVerification,
   aiAnalytics,
@@ -206,6 +207,13 @@ Set<TgcgModule> allowedModules(TgcgRole role) {
       modules.add(TgcgModule.alertCenter);
     }
   }
+  if (TgcgPermissionPolicy.allows(
+    role,
+    TgcgCapability.manageAgentAssignments,
+  )) {
+    modules.add(TgcgModule.assignmentControl);
+  }
+
   if (TgcgPermissionPolicy.allows(role, TgcgCapability.viewIncidents) ||
       TgcgPermissionPolicy.allows(role, TgcgCapability.createIncident) ||
       TgcgPermissionPolicy.allows(role, TgcgCapability.submitFieldReport)) {
