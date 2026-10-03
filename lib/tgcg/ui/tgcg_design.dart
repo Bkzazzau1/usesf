@@ -3,23 +3,103 @@ import 'package:flutter/material.dart';
 class TgcgColors {
   const TgcgColors._();
 
-  static const primary = Color(0xFF0B1F4B);
-  static const primaryDark = Color(0xFF061433);
-  static const primarySoft = Color(0xFFE8EDF8);
-  static const primaryMid = Color(0xFF1D3A7A);
-  static const accent = Color(0xFFD4A537);
-  static const accentSoft = Color(0xFFFFF6DC);
-  static const canvas = Color(0xFFF5F7FB);
+  // Midnight Gold brand system.
+  static const navy950 = Color(0xFF06162D);
+  static const navy900 = Color(0xFF081F3D);
+  static const navy800 = Color(0xFF0D2D55);
+  static const navy700 = Color(0xFF164578);
+  static const navy100 = Color(0xFFEAF0F8);
+  static const navy50 = Color(0xFFF4F7FB);
+
+  static const gold700 = Color(0xFFA97812);
+  static const gold600 = Color(0xFFC69022);
+  static const gold500 = Color(0xFFD8AD42);
+  static const gold400 = Color(0xFFE6C15F);
+  static const gold200 = Color(0xFFF2DFA7);
+  static const gold100 = Color(0xFFFBF4DF);
+
+  static const primary = navy900;
+  static const primaryDark = navy950;
+  static const primaryMid = navy700;
+  static const primarySoft = navy100;
+  static const accent = gold500;
+  static const accentStrong = gold600;
+  static const accentSoft = gold100;
+
+  static const canvas = Color(0xFFF6F8FC);
   static const surface = Colors.white;
-  static const surfaceSoft = Color(0xFFF8FAFD);
-  static const ink = Color(0xFF0F172A);
-  static const muted = Color(0xFF64748B);
-  static const border = Color(0xFFE2E8F0);
+  static const surfaceSoft = Color(0xFFFAFBFD);
+  static const surfaceRaised = Color(0xFFFCFDFE);
+  static const ink = Color(0xFF101828);
+  static const muted = Color(0xFF667085);
+  static const border = Color(0xFFE4E9F0);
+  static const borderStrong = Color(0xFFD2D9E4);
+
   static const success = Color(0xFF087A55);
   static const info = Color(0xFF2563EB);
   static const warning = Color(0xFFB7791F);
   static const danger = Color(0xFFB42318);
   static const ai = Color(0xFF6550B5);
+}
+
+class TgcgGradients {
+  const TgcgGradients._();
+
+  static const navigation = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [TgcgColors.navy950, TgcgColors.navy900, TgcgColors.navy800],
+    stops: [0, .56, 1],
+  );
+
+  static const brand = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [TgcgColors.navy950, TgcgColors.navy800, TgcgColors.navy700],
+    stops: [0, .65, 1],
+  );
+
+  static const commandBar = LinearGradient(
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+    colors: [Colors.white, TgcgColors.navy50],
+  );
+
+  static const goldWash = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [TgcgColors.gold100, Colors.white],
+  );
+}
+
+class TgcgRadius {
+  const TgcgRadius._();
+
+  static const double sm = 12;
+  static const double md = 16;
+  static const double lg = 20;
+  static const double xl = 24;
+  static const double hero = 30;
+}
+
+class TgcgShadows {
+  const TgcgShadows._();
+
+  static const soft = <BoxShadow>[
+    BoxShadow(
+      color: Color(0x0D06162D),
+      blurRadius: 26,
+      offset: Offset(0, 10),
+    ),
+  ];
+
+  static const elevated = <BoxShadow>[
+    BoxShadow(
+      color: Color(0x1406162D),
+      blurRadius: 34,
+      offset: Offset(0, 14),
+    ),
+  ];
 }
 
 class TgcgSpacing {
@@ -97,7 +177,7 @@ class TgcgPageHeader extends StatelessWidget {
             Text(
               eyebrow!.toUpperCase(),
               style: const TextStyle(
-                color: TgcgColors.primaryMid,
+                color: TgcgColors.accentStrong,
                 fontSize: 10,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 1.15,
@@ -112,7 +192,7 @@ class TgcgPageHeader extends StatelessWidget {
               height: 1.05,
               fontWeight: FontWeight.w900,
               letterSpacing: -.7,
-              color: TgcgColors.ink,
+              color: TgcgColors.primaryDark,
             ),
           ),
           const SizedBox(height: 8),
@@ -205,15 +285,9 @@ class TgcgSectionCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         decoration: BoxDecoration(
           color: backgroundColor,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(TgcgRadius.lg),
           border: Border.all(color: TgcgColors.border),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x08000000),
-              blurRadius: 18,
-              offset: Offset(0, 5),
-            ),
-          ],
+          boxShadow: TgcgShadows.soft,
         ),
         child: Padding(
           padding: padding,
@@ -278,9 +352,23 @@ class TgcgMetricCard extends StatelessWidget {
       width: width,
       padding: const EdgeInsets.all(17),
       decoration: BoxDecoration(
-        color: TgcgColors.surface,
-        borderRadius: BorderRadius.circular(18),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            TgcgColors.surface,
+            color.withValues(alpha: .025),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(TgcgRadius.lg),
         border: Border.all(color: TgcgColors.border),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A06162D),
+            blurRadius: 20,
+            offset: Offset(0, 7),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -291,8 +379,9 @@ class TgcgMetricCard extends StatelessWidget {
                 width: 39,
                 height: 39,
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: .09),
-                  borderRadius: BorderRadius.circular(12),
+                  color: color.withValues(alpha: .10),
+                  borderRadius: BorderRadius.circular(TgcgRadius.sm),
+                  border: Border.all(color: color.withValues(alpha: .10)),
                 ),
                 child: Icon(icon, color: color, size: 20),
               ),
@@ -343,7 +432,7 @@ class TgcgMetricCard extends StatelessWidget {
 
     if (onTap == null) return body;
     return InkWell(
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(TgcgRadius.lg),
       onTap: onTap,
       child: body,
     );
