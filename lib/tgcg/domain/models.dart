@@ -18,6 +18,7 @@ enum TgcgRole {
   stateCoordinator,
   lgaCoordinator,
   wardCoordinator,
+  member,
   pollingUnitAgent,
   observer,
   legalOfficer,
