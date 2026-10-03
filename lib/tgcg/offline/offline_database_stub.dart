@@ -30,6 +30,15 @@ class _VolatileOfflineDatabase implements OfflineDatabaseBackend {
       _entities['$entityType::$entityId'];
 
   @override
+  Future<List<StoredEntityRecord>> listEntities({
+    required String entityType,
+  }) async =>
+      _entities.values
+          .where((item) => item.entityType == entityType)
+          .toList(growable: false)
+        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
+  @override
   Future<void> writeMutation({
     required StoredEntityRecord entity,
     required SyncOutboxItem outbox,
