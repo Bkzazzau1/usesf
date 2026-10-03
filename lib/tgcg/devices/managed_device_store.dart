@@ -1,5 +1,7 @@
 import 'package:flutter/widgets.dart';
 
+import '../domain/models.dart';
+import '../geography/geography_registry.dart';
 import '../membership/membership_store.dart';
 import '../offline/offline_persistence.dart';
 
@@ -194,6 +196,7 @@ class ManagedDeviceController extends ChangeNotifier {
     required String deviceId,
     required String memberId,
     String? assignedBy,
+    GeographicScope? authorizedScope,
   }) async {
     final deviceIndex = _devices.indexWhere((item) => item.id == deviceId);
     if (deviceIndex < 0) {
@@ -201,6 +204,14 @@ class ManagedDeviceController extends ChangeNotifier {
     }
     if (_membership.memberById(memberId) == null) {
       throw ArgumentError('Unknown USESF member: $memberId');
+    }
+    final memberScope = _membership.registrationScopeForMember(memberId);
+    if (authorizedScope != null &&
+        memberScope != null &&
+        !GeographyRegistry.scopeContains(authorizedScope, memberScope)) {
+      throw StateError(
+        'The selected member is outside the coordinator authorization scope.',
+      );
     }
     if (_devices.any(
       (item) =>
