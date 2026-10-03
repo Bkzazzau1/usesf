@@ -151,7 +151,7 @@ String roleDescription(TgcgRole role) => switch (role) {
       TgcgRole.readOnlyExecutive =>
         'Read-only state command, incident, collation and audit visibility.',
       TgcgRole.securityOfficer =>
-        'Agency response to incidents dispatched by the Situation Room.',
+        'Agency-only response desk for assigned incidents, evidence, coordinates and responder status updates.',
     };
 
 IconData roleIcon(TgcgRole role) => switch (role) {
@@ -171,6 +171,12 @@ IconData roleIcon(TgcgRole role) => switch (role) {
     };
 
 Set<TgcgModule> allowedModules(TgcgRole role) {
+  // Accredited security personnel get a dedicated agency-response workspace
+  // rather than the wider USESF command environment.
+  if (role == TgcgRole.securityOfficer) {
+    return const {TgcgModule.securityResponse};
+  }
+
   final modules = <TgcgModule>{TgcgModule.overview};
 
   if (TgcgPermissionPolicy.allows(role, TgcgCapability.manageMembership) ||
