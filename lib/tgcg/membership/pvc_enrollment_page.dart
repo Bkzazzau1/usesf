@@ -185,7 +185,7 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
     final unit = store.geography.pollingUnit(_selectedPollingUnitId!);
     if (unit == null) return;
     final session = TgcgSession.of(context, listen: false);
-    final member = store.createMember(
+    final member = await store.createMember(
       fullName: _name.text.trim(),
       phoneNumber: _phone.text.trim(),
       email: _email.text.trim(),
