@@ -87,6 +87,9 @@ class _SecurityResponsePortalPageState extends State<SecurityResponsePortalPage>
       session.scope,
       TgcgCapability.respondToDispatch,
     );
+    final actorId = session.accessId.isEmpty
+        ? session.operatorName
+        : session.accessId;
 
     return ListView(
       padding: const EdgeInsets.all(24),
@@ -141,7 +144,20 @@ class _SecurityResponsePortalPageState extends State<SecurityResponsePortalPage>
               dispatches: dispatches,
               emergency: emergency,
               selectedId: selectedDispatchId,
-              onSelected: (id) => setState(() => selectedDispatchId = id),
+              onSelected: (id) {
+                if (id != selectedDispatchId) {
+                  emergency.recordDispatchAudit(
+                    dispatchId: id,
+                    actorId: actorId,
+                    action: 'security_dispatch_viewed',
+                    detail: isAgencyOfficer
+                        ? 'Assigned incident intelligence package opened by agency responder.'
+                        : 'Security dispatch opened from the response portal.',
+                    actingAgencyId: isAgencyOfficer ? agencyId : null,
+                  );
+                }
+                setState(() => selectedDispatchId = id);
+              },
             );
             final detail = _DispatchDetail(
               dispatch: selected,
@@ -149,9 +165,7 @@ class _SecurityResponsePortalPageState extends State<SecurityResponsePortalPage>
               incident: selected == null
                   ? null
                   : _incidentById(incidents, selected.incidentId),
-              actorId: session.accessId.isEmpty
-                  ? session.operatorName
-                  : session.accessId,
+              actorId: actorId,
               canRespond: canRespond,
               actingAgencyId: agencyId,
               agencyRestricted: isAgencyOfficer,
@@ -727,12 +741,23 @@ class _DispatchDetail extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 OutlinedButton.icon(
-                  onPressed: () => _copyIncidentBrief(
-                    context,
-                    dispatch: item,
-                    agency: agency,
-                    incident: incidentItem,
-                  ),
+                  onPressed: () {
+                    emergency.recordDispatchAudit(
+                      dispatchId: item.id,
+                      actorId: actorId,
+                      action: 'security_incident_brief_shared',
+                      detail:
+                          'Incident brief copied for authorized operational sharing.',
+                      actingAgencyId:
+                          agencyRestricted ? actingAgencyId : null,
+                    );
+                    _copyIncidentBrief(
+                      context,
+                      dispatch: item,
+                      agency: agency,
+                      incident: incidentItem,
+                    );
+                  },
                   icon: const Icon(Icons.copy_all_outlined, size: 17),
                   label: const Text('Copy incident brief'),
                 ),
