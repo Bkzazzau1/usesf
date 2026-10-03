@@ -36,6 +36,7 @@ Map<String, Object?> evidenceToJson(EvidenceAttachment evidence) => {
       'contentHash': evidence.contentHash,
       'mimeType': evidence.mimeType,
       'caption': evidence.caption,
+      'sourceReference': evidence.sourceReference,
       'latitude': evidence.latitude,
       'longitude': evidence.longitude,
       'origin': evidence.origin.name,
