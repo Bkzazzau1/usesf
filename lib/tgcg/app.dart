@@ -339,6 +339,80 @@ class _TgcgAppState extends State<TgcgApp> {
         foregroundColor: TgcgColors.primaryDark,
         elevation: 2,
       ),
+      chipTheme: ChipThemeData(
+        backgroundColor: TgcgColors.navy50,
+        selectedColor: TgcgColors.accentSoft,
+        disabledColor: TgcgColors.surfaceSoft,
+        side: const BorderSide(color: TgcgColors.border),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(999),
+        ),
+        labelStyle: const TextStyle(
+          color: TgcgColors.primaryDark,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w800,
+        ),
+        secondaryLabelStyle: const TextStyle(
+          color: TgcgColors.primaryDark,
+          fontWeight: FontWeight.w900,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      ),
+      tabBarTheme: const TabBarThemeData(
+        labelColor: TgcgColors.primaryDark,
+        unselectedLabelColor: TgcgColors.muted,
+        indicatorColor: TgcgColors.accent,
+        dividerColor: TgcgColors.border,
+        labelStyle: TextStyle(fontWeight: FontWeight.w900),
+        unselectedLabelStyle: TextStyle(fontWeight: FontWeight.w700),
+      ),
+      dataTableTheme: DataTableThemeData(
+        headingRowColor: const WidgetStatePropertyAll(TgcgColors.navy50),
+        dataRowColor: const WidgetStatePropertyAll(TgcgColors.surface),
+        dividerThickness: 1,
+        headingTextStyle: const TextStyle(
+          color: TgcgColors.primaryDark,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w900,
+          letterSpacing: .2,
+        ),
+        dataTextStyle: const TextStyle(
+          color: TgcgColors.ink,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w600,
+        ),
+        decoration: BoxDecoration(
+          border: Border.all(color: TgcgColors.border),
+          borderRadius: BorderRadius.circular(TgcgRadius.md),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: TgcgColors.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(TgcgRadius.xl),
+          side: const BorderSide(color: TgcgColors.border),
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: TgcgColors.surface,
+        surfaceTintColor: Colors.transparent,
+        modalBackgroundColor: Colors.transparent,
+        showDragHandle: true,
+        dragHandleColor: TgcgColors.gold400,
+      ),
+      tooltipTheme: TooltipThemeData(
+        decoration: BoxDecoration(
+          color: TgcgColors.primaryDark,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: TgcgColors.accent.withValues(alpha: .18)),
+        ),
+        textStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: TgcgColors.primaryDark,
