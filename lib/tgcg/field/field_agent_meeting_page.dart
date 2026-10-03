@@ -176,12 +176,12 @@ class _MeetingHero extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF06112A), Color(0xFF0A1C45)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+          gradient: TgcgGradients.navigation,
+          borderRadius: BorderRadius.circular(TgcgRadius.xl),
+          border: Border.all(
+            color: TgcgColors.accent.withValues(alpha: .18),
           ),
-          borderRadius: BorderRadius.circular(24),
+          boxShadow: TgcgShadows.soft,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -192,8 +192,11 @@ class _MeetingHero extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: .10),
-                    borderRadius: BorderRadius.circular(15),
+                    color: TgcgColors.accent.withValues(alpha: .12),
+                    borderRadius: BorderRadius.circular(TgcgRadius.md),
+                    border: Border.all(
+                      color: TgcgColors.accent.withValues(alpha: .18),
+                    ),
                   ),
                   child: const Icon(Icons.video_call_rounded,
                       color: Colors.white, size: 27),
@@ -215,7 +218,7 @@ class _MeetingHero extends StatelessWidget {
                       Text(
                         'Local voice and video coordination',
                         style: TextStyle(
-                          color: Color(0xFFC5CBD8),
+                          color: TgcgColors.gold200,
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
                         ),
@@ -229,7 +232,7 @@ class _MeetingHero extends StatelessWidget {
             Text(
               '$ward • $lga',
               style: const TextStyle(
-                color: Color(0xFFD6DAE4),
+                color: TgcgColors.gold200,
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
               ),
@@ -306,20 +309,32 @@ class _QuickCallButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-        color: TgcgColors.surface,
-        borderRadius: BorderRadius.circular(16),
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(TgcgRadius.md),
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(TgcgRadius.md),
           onTap: onTap,
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 14),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [TgcgColors.surface, TgcgColors.navy50],
+              ),
+              borderRadius: BorderRadius.circular(TgcgRadius.md),
               border: Border.all(color: TgcgColors.border),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x0706162D),
+                  blurRadius: 14,
+                  offset: Offset(0, 5),
+                ),
+              ],
             ),
             child: Column(
               children: [
-                Icon(icon, color: TgcgColors.primary, size: 22),
+                Icon(icon, color: TgcgColors.accentStrong, size: 22),
                 const SizedBox(height: 6),
                 Text(
                   label,
@@ -354,11 +369,11 @@ class _ContactRow extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 20,
-              backgroundColor: TgcgColors.primarySoft,
+              backgroundColor: TgcgColors.accentSoft,
               child: Text(
                 contact.initials,
                 style: const TextStyle(
-                  color: TgcgColors.primary,
+                  color: TgcgColors.primaryDark,
                   fontSize: 10,
                   fontWeight: FontWeight.w900,
                 ),
@@ -423,8 +438,12 @@ class _MeetingRow extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 9),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: TgcgColors.surfaceSoft,
-          borderRadius: BorderRadius.circular(15),
+          gradient: const LinearGradient(
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+            colors: [TgcgColors.surface, TgcgColors.navy50],
+          ),
+          borderRadius: BorderRadius.circular(TgcgRadius.md),
           border: Border.all(color: TgcgColors.border),
         ),
         child: Row(
@@ -433,13 +452,18 @@ class _MeetingRow extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: (live ? TgcgColors.danger : TgcgColors.primary)
-                    .withValues(alpha: .09),
-                borderRadius: BorderRadius.circular(12),
+                color: (live ? TgcgColors.danger : TgcgColors.accent)
+                    .withValues(alpha: .10),
+                borderRadius: BorderRadius.circular(TgcgRadius.sm),
+                border: Border.all(
+                  color: live
+                      ? TgcgColors.danger.withValues(alpha: .10)
+                      : TgcgColors.gold200,
+                ),
               ),
               child: Icon(
                 live ? Icons.fiber_manual_record_rounded : Icons.event_outlined,
-                color: live ? TgcgColors.danger : TgcgColors.primary,
+                color: live ? TgcgColors.danger : TgcgColors.accentStrong,
                 size: 20,
               ),
             ),
@@ -503,7 +527,7 @@ class _CallStage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        color: const Color(0xFF050A16),
+        color: TgcgColors.navy950,
         child: SafeArea(
           child: Column(
             children: [
@@ -535,15 +559,18 @@ class _CallStage extends StatelessWidget {
                           Text(
                             '${participants.length + 1} participants',
                             style: const TextStyle(
-                              color: Color(0xFF9AA2B4),
+                              color: TgcgColors.gold200,
                               fontSize: 9,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const Icon(Icons.lock_outline_rounded,
-                        color: Color(0xFF9AA2B4), size: 18),
+                    const Icon(
+                      Icons.lock_outline_rounded,
+                      color: TgcgColors.gold200,
+                      size: 18,
+                    ),
                   ],
                 ),
               ),
@@ -650,12 +677,12 @@ class _VideoTile extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             Container(
-              color: const Color(0xFF0C152B),
+              color: TgcgColors.navy800,
               child: child ??
                   Center(
                     child: CircleAvatar(
                       radius: 31,
-                      backgroundColor: const Color(0xFF232E49),
+                      backgroundColor: TgcgColors.navy700,
                       child: Text(
                         _initials(label),
                         style: const TextStyle(
@@ -695,7 +722,7 @@ class _VideoTile extends StatelessWidget {
                           Text(
                             subtitle,
                             style: const TextStyle(
-                              color: Color(0xFFC1C6D1),
+                              color: TgcgColors.gold200,
                               fontSize: 8,
                             ),
                           ),
@@ -740,8 +767,8 @@ class _CallControl extends StatelessWidget {
             color: danger
                 ? TgcgColors.danger
                 : active
-                    ? const Color(0xFF1D2B4C)
-                    : const Color(0xFF3A2525),
+                    ? TgcgColors.navy700
+                    : TgcgColors.navy800,
             shape: BoxShape.circle,
           ),
           child: Icon(icon, color: Colors.white, size: 21),
