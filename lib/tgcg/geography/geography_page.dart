@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../domain/permissions.dart';
 import '../field/field_operations_store.dart';
 import '../membership/membership_store.dart';
 import '../results/result_operations_store.dart';
@@ -7,6 +8,7 @@ import '../session.dart';
 import '../ui/tgcg_design.dart';
 import 'geography_registry.dart';
 import 'kaduna_geography.dart';
+import 'polling_unit_verification_service.dart';
 
 class GeographyPage extends StatefulWidget {
   const GeographyPage({super.key});
@@ -18,7 +20,10 @@ class GeographyPage extends StatefulWidget {
 class _GeographyPageState extends State<GeographyPage> {
   final List<GeographicScope> path = [];
   final TextEditingController searchController = TextEditingController();
+  final PollingUnitVerificationService verificationService =
+      const PollingUnitVerificationService();
   String query = '';
+  String? verifyingPollingUnitId;
 
   @override
   void didChangeDependencies() {
@@ -36,10 +41,20 @@ class _GeographyPageState extends State<GeographyPage> {
 
   @override
   Widget build(BuildContext context) {
+    final session = TgcgSession.of(context);
     final membership = MembershipOperations.of(context);
     final field = FieldOperations.of(context);
     final results = ResultOperations.of(context);
     final registry = membership.geography;
+    final canVerifyPollingUnit =
+        TgcgPermissionPolicy.allows(
+          session.role!,
+          TgcgCapability.manageMembership,
+        ) ||
+        TgcgPermissionPolicy.allows(
+          session.role!,
+          TgcgCapability.manageAgentAssignments,
+        );
     final scope = path.last;
     final children = registry.childScopes(scope);
     final units = registry.pollingUnitsWithin(scope);
@@ -134,6 +149,13 @@ class _GeographyPageState extends State<GeographyPage> {
           membership: membership,
           field: field,
           results: results,
+          canVerifyCoordinates: canVerifyPollingUnit,
+          verifyingPollingUnitId: verifyingPollingUnitId,
+          onVerifyPollingUnit: (unit) => _verifyPollingUnit(
+            membership,
+            session,
+            unit,
+          ),
           onQueryChanged: (value) => setState(() => query = value),
           onOpenChild: (child) => setState(() {
             path.add(child);
@@ -148,6 +170,51 @@ class _GeographyPageState extends State<GeographyPage> {
         ),
       ],
     );
+  }
+
+  Future<void> _verifyPollingUnit(
+    MembershipOperationsController membership,
+    TgcgSessionController session,
+    CanonicalPollingUnit unit,
+  ) async {
+    if (verifyingPollingUnitId != null) return;
+    setState(() => verifyingPollingUnitId = unit.code);
+    try {
+      final fix = await verificationService.captureCurrentFix();
+      final actorId =
+          session.accessId.isEmpty ? session.operatorName : session.accessId;
+      final updated = membership.verifyPollingUnitCoordinate(
+        pollingUnitId: unit.code,
+        latitude: fix.latitude,
+        longitude: fix.longitude,
+        accuracyMeters: fix.accuracyMeters,
+        verifiedBy: actorId,
+        verifiedAt: fix.capturedAt,
+      );
+      if (!mounted) return;
+
+      final distance = updated.referenceToVerifiedDistanceMeters;
+      final message = updated.coordinateStatus ==
+              PollingUnitCoordinateStatus.needsReview
+          ? 'GPS captured at ±${fix.accuracyMeters.toStringAsFixed(1)} m. '
+              'Reference difference ${distance?.toStringAsFixed(0) ?? '—'} m; review required.'
+          : 'Polling unit GPS verified at ±${fix.accuracyMeters.toStringAsFixed(1)} m accuracy.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } on StateError catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('GPS verification failed: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => verifyingPollingUnitId = null);
+    }
   }
 }
 
@@ -547,6 +614,9 @@ class _DirectoryPanel extends StatelessWidget {
     required this.membership,
     required this.field,
     required this.results,
+    required this.canVerifyCoordinates,
+    required this.verifyingPollingUnitId,
+    required this.onVerifyPollingUnit,
     required this.onQueryChanged,
     required this.onOpenChild,
   });
@@ -558,6 +628,9 @@ class _DirectoryPanel extends StatelessWidget {
   final MembershipOperationsController membership;
   final FieldOperationsController field;
   final ResultOperationsController results;
+  final bool canVerifyCoordinates;
+  final String? verifyingPollingUnitId;
+  final ValueChanged<CanonicalPollingUnit> onVerifyPollingUnit;
   final ValueChanged<String> onQueryChanged;
   final ValueChanged<GeographicScope> onOpenChild;
 
@@ -618,16 +691,46 @@ class _DirectoryPanel extends StatelessWidget {
                       size: 19,
                     ),
                   ),
-                  title: Text(
-                    unit.displayCode,
-                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  title: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          unit.displayCode,
+                          style: const TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                      if (canVerifyCoordinates)
+                        IconButton(
+                          tooltip: unit.hasVerifiedCoordinate
+                              ? 'Re-verify polling-unit GPS'
+                              : 'Verify polling-unit GPS',
+                          onPressed: verifyingPollingUnitId == null
+                              ? () => onVerifyPollingUnit(unit)
+                              : null,
+                          icon: verifyingPollingUnitId == unit.code
+                              ? const SizedBox(
+                                  width: 17,
+                                  height: 17,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Icon(
+                                  unit.hasVerifiedCoordinate
+                                      ? Icons.gps_fixed_rounded
+                                      : Icons.add_location_alt_outlined,
+                                  size: 19,
+                                ),
+                        ),
+                    ],
                   ),
                   subtitle: Text(
                     unit.operationalLatitude == null
                         ? unit.scope.label
                         : '${unit.scope.label}\n'
                             '${unit.operationalLatitude!.toStringAsFixed(6)}, '
-                            '${unit.operationalLongitude!.toStringAsFixed(6)}',
+                            '${unit.operationalLongitude!.toStringAsFixed(6)}'
+                            '${unit.verificationAccuracyMeters == null ? '' : ' • ±${unit.verificationAccuracyMeters!.toStringAsFixed(1)} m'}',
                   ),
                   isThreeLine: unit.operationalLatitude != null,
                   trailing: Wrap(
