@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../assignments/assignment_location_service.dart';
 import '../assignments/assignment_store.dart';
 import '../devices/managed_device_store.dart';
 import '../geography/geography_registry.dart';
@@ -132,93 +133,15 @@ class MemberShell extends StatelessWidget {
                         'An authorized coordinator can assign a duty without changing your home polling unit.',
                   )
                 : Column(
-                    children: activeAssignments.map((assignment) {
-                      final presence = assignments.presenceFor(assignment);
-                      return Container(
-                        width: double.infinity,
-                        margin: const EdgeInsets.only(bottom: 9),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: TgcgColors.surfaceRaised,
-                          borderRadius:
-                              BorderRadius.circular(TgcgRadius.md),
-                          border: Border.all(color: TgcgColors.border),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: 42,
-                              height: 42,
-                              decoration: BoxDecoration(
-                                color: TgcgColors.primarySoft,
-                                borderRadius:
-                                    BorderRadius.circular(TgcgRadius.sm),
-                              ),
-                              child: const Icon(
-                                Icons.assignment_turned_in_outlined,
-                                color: TgcgColors.primary,
-                              ),
-                            ),
-                            const SizedBox(width: 11),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    assignment.title,
-                                    style: const TextStyle(
-                                      color: TgcgColors.ink,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    assignment.targetScope.label,
-                                    style: const TextStyle(
-                                      color: TgcgColors.muted,
-                                      fontSize: 10.5,
-                                    ),
-                                  ),
-                                  if (assignment.instructions != null) ...[
-                                    const SizedBox(height: 5),
-                                    Text(
-                                      assignment.instructions!,
-                                      style: const TextStyle(
-                                        color: TgcgColors.muted,
-                                        fontSize: 10,
-                                        height: 1.35,
-                                      ),
-                                    ),
-                                  ],
-                                  const SizedBox(height: 8),
-                                  Wrap(
-                                    spacing: 6,
-                                    runSpacing: 6,
-                                    children: [
-                                      TgcgStatusPill(
-                                        label: _assignmentStatusLabel(
-                                          assignment.status,
-                                        ),
-                                        color: _assignmentStatusColor(
-                                          assignment.status,
-                                        ),
-                                        compact: true,
-                                      ),
-                                      TgcgStatusPill(
-                                        label: _presenceLabel(presence),
-                                        color: _presenceColor(presence),
-                                        compact: true,
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
+                    children: activeAssignments
+                        .map(
+                          (assignment) => _MemberAssignmentCard(
+                            assignment: assignment,
+                            memberId: member.id,
+                            managedDevice: managedDevice,
+                          ),
+                        )
+                        .toList(),
                   ),
           ),
           const SizedBox(height: 14),
@@ -301,6 +224,363 @@ class MemberShell extends StatelessWidget {
     );
   }
 }
+
+class _MemberAssignmentCard extends StatefulWidget {
+  const _MemberAssignmentCard({
+    required this.assignment,
+    required this.memberId,
+    required this.managedDevice,
+  });
+
+  final MemberAssignment assignment;
+  final String memberId;
+  final ManagedDevice? managedDevice;
+
+  @override
+  State<_MemberAssignmentCard> createState() =>
+      _MemberAssignmentCardState();
+}
+
+class _MemberAssignmentCardState extends State<_MemberAssignmentCard> {
+  final AssignmentLocationService _location =
+      const AssignmentLocationService();
+  bool _busy = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final assignments = Assignments.of(context);
+    final session = TgcgSession.of(context, listen: false);
+    final current =
+        assignments.assignmentById(widget.assignment.id) ?? widget.assignment;
+    final presence = assignments.presenceFor(current);
+    final device = widget.managedDevice;
+    final actions = _actionsFor(current.status);
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 9),
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: TgcgColors.surfaceRaised,
+        borderRadius: BorderRadius.circular(TgcgRadius.md),
+        border: Border.all(color: TgcgColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: TgcgColors.primarySoft,
+                  borderRadius: BorderRadius.circular(TgcgRadius.sm),
+                ),
+                child: const Icon(
+                  Icons.assignment_turned_in_outlined,
+                  color: TgcgColors.primary,
+                ),
+              ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      current.title,
+                      style: const TextStyle(
+                        color: TgcgColors.ink,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      current.targetScope.label,
+                      style: const TextStyle(
+                        color: TgcgColors.muted,
+                        fontSize: 10.5,
+                      ),
+                    ),
+                    if (current.instructions != null) ...[
+                      const SizedBox(height: 5),
+                      Text(
+                        current.instructions!,
+                        style: const TextStyle(
+                          color: TgcgColors.muted,
+                          fontSize: 10,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        TgcgStatusPill(
+                          label: _assignmentStatusLabel(current.status),
+                          color: _assignmentStatusColor(current.status),
+                          compact: true,
+                        ),
+                        TgcgStatusPill(
+                          label: _presenceLabel(presence),
+                          color: _presenceColor(presence),
+                          compact: true,
+                        ),
+                        if (device != null)
+                          TgcgStatusPill(
+                            label: device.id,
+                            color: TgcgColors.info,
+                            icon: Icons.phone_android_outlined,
+                            compact: true,
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (current.lastLocation != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              'Last GPS: ${current.lastLocation!.latitude.toStringAsFixed(6)}, '
+              '${current.lastLocation!.longitude.toStringAsFixed(6)} • '
+              '±${current.lastLocation!.accuracyMeters.toStringAsFixed(1)} m'
+              '${current.lastLocation!.distanceFromTargetMeters == null ? '' : ' • ${current.lastLocation!.distanceFromTargetMeters!.toStringAsFixed(0)} m from target'}',
+              style: const TextStyle(
+                color: TgcgColors.muted,
+                fontSize: 9.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+          if (actions.isNotEmpty) ...[
+            const SizedBox(height: 11),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: actions.map((action) {
+                if (action == _MemberAssignmentAction.checkIn) {
+                  return FilledButton.tonalIcon(
+                    onPressed:
+                        _busy || device == null ? null : () => _checkIn(current),
+                    icon: _busy
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.my_location_rounded, size: 17),
+                    label: Text(
+                      device == null ? 'Managed phone required' : 'Check in',
+                    ),
+                  );
+                }
+                if (action == _MemberAssignmentAction.refreshGps) {
+                  return OutlinedButton.icon(
+                    onPressed:
+                        _busy || device == null ? null : () => _refreshGps(current),
+                    icon: const Icon(Icons.gps_fixed_rounded, size: 17),
+                    label: const Text('Refresh GPS'),
+                  );
+                }
+                final target = _statusForAction(action);
+                return FilledButton.tonalIcon(
+                  onPressed: _busy || target == null
+                      ? null
+                      : () => _transition(
+                            current,
+                            target,
+                            session.accessId.isEmpty
+                                ? widget.memberId
+                                : session.accessId,
+                          ),
+                  icon: Icon(_actionIcon(action), size: 17),
+                  label: Text(_actionLabel(action)),
+                );
+              }).toList(),
+            ),
+          ],
+          if (device == null &&
+              (current.status == AssignmentStatus.enRoute ||
+                  current.status == AssignmentStatus.gpsMismatch ||
+                  current.status == AssignmentStatus.active)) ...[
+            const SizedBox(height: 9),
+            const Text(
+              'GPS check-in is disabled until an organization-managed phone is assigned to this member.',
+              style: TextStyle(
+                color: TgcgColors.warning,
+                fontSize: 9.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _transition(
+    MemberAssignment assignment,
+    AssignmentStatus target,
+    String actorId,
+  ) async {
+    setState(() => _busy = true);
+    try {
+      await Assignments.of(context, listen: false).transition(
+        assignmentId: assignment.id,
+        status: target,
+        actorId: actorId,
+      );
+    } on StateError catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _checkIn(MemberAssignment assignment) async {
+    final device = widget.managedDevice;
+    if (device == null) return;
+    setState(() => _busy = true);
+    try {
+      final fix = await _location.captureCurrentFix();
+      if (!mounted) return;
+      final updated = await Assignments.of(context, listen: false).checkIn(
+        assignmentId: assignment.id,
+        actorId: widget.memberId,
+        deviceId: device.id,
+        latitude: fix.latitude,
+        longitude: fix.longitude,
+        accuracyMeters: fix.accuracyMeters,
+        capturedAt: fix.capturedAt,
+      );
+      if (!mounted) return;
+      final message = updated.status == AssignmentStatus.checkedIn
+          ? 'Presence confirmed inside the assigned polling-unit geofence.'
+          : 'GPS captured, but the device is outside the assigned polling-unit geofence.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } on StateError catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Location capture failed: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _refreshGps(MemberAssignment assignment) async {
+    final device = widget.managedDevice;
+    if (device == null) return;
+    setState(() => _busy = true);
+    try {
+      final fix = await _location.captureCurrentFix();
+      if (!mounted) return;
+      Assignments.of(context, listen: false).recordLocationHeartbeat(
+        assignmentId: assignment.id,
+        deviceId: device.id,
+        latitude: fix.latitude,
+        longitude: fix.longitude,
+        accuracyMeters: fix.accuracyMeters,
+        capturedAt: fix.capturedAt,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Assignment GPS heartbeat refreshed.')),
+      );
+    } on StateError catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Location capture failed: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+}
+
+enum _MemberAssignmentAction {
+  accept,
+  decline,
+  enRoute,
+  checkIn,
+  start,
+  refreshGps,
+  complete,
+}
+
+List<_MemberAssignmentAction> _actionsFor(AssignmentStatus status) =>
+    switch (status) {
+      AssignmentStatus.assigned => const [
+          _MemberAssignmentAction.accept,
+          _MemberAssignmentAction.decline,
+        ],
+      AssignmentStatus.accepted => const [
+          _MemberAssignmentAction.enRoute,
+        ],
+      AssignmentStatus.enRoute || AssignmentStatus.gpsMismatch => const [
+          _MemberAssignmentAction.checkIn,
+        ],
+      AssignmentStatus.checkedIn => const [
+          _MemberAssignmentAction.start,
+          _MemberAssignmentAction.refreshGps,
+        ],
+      AssignmentStatus.active => const [
+          _MemberAssignmentAction.refreshGps,
+          _MemberAssignmentAction.complete,
+        ],
+      _ => const [],
+    };
+
+AssignmentStatus? _statusForAction(_MemberAssignmentAction action) =>
+    switch (action) {
+      _MemberAssignmentAction.accept => AssignmentStatus.accepted,
+      _MemberAssignmentAction.decline => AssignmentStatus.declined,
+      _MemberAssignmentAction.enRoute => AssignmentStatus.enRoute,
+      _MemberAssignmentAction.start => AssignmentStatus.active,
+      _MemberAssignmentAction.complete => AssignmentStatus.completed,
+      _MemberAssignmentAction.checkIn ||
+      _MemberAssignmentAction.refreshGps => null,
+    };
+
+String _actionLabel(_MemberAssignmentAction action) => switch (action) {
+      _MemberAssignmentAction.accept => 'Accept',
+      _MemberAssignmentAction.decline => 'Decline',
+      _MemberAssignmentAction.enRoute => 'En route',
+      _MemberAssignmentAction.checkIn => 'Check in',
+      _MemberAssignmentAction.start => 'Start assignment',
+      _MemberAssignmentAction.refreshGps => 'Refresh GPS',
+      _MemberAssignmentAction.complete => 'Complete',
+    };
+
+IconData _actionIcon(_MemberAssignmentAction action) => switch (action) {
+      _MemberAssignmentAction.accept => Icons.check_circle_outline_rounded,
+      _MemberAssignmentAction.decline => Icons.close_rounded,
+      _MemberAssignmentAction.enRoute => Icons.directions_car_outlined,
+      _MemberAssignmentAction.checkIn => Icons.my_location_rounded,
+      _MemberAssignmentAction.start => Icons.play_arrow_rounded,
+      _MemberAssignmentAction.refreshGps => Icons.gps_fixed_rounded,
+      _MemberAssignmentAction.complete => Icons.task_alt_rounded,
+    };
 
 class _ProfileCard extends StatelessWidget {
   const _ProfileCard({
