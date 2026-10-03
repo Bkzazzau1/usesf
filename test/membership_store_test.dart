@@ -15,9 +15,9 @@ void main() {
 
     tearDown(() => store.dispose());
 
-    test('creates a member in submitted state', () {
+    test('creates a member in submitted state', () async {
       final before = store.members.length;
-      final member = store.createMember(
+      final member = await store.createMember(
         fullName: 'Test Member',
         phoneNumber: '+2348000000099',
       );
@@ -27,11 +27,11 @@ void main() {
       expect(member.membershipNumber, isNotNull);
     });
 
-    test('creates a pending accreditation against canonical polling unit', () {
+    test('creates a pending accreditation against canonical polling unit', () async {
       final member = store.members.first;
       final pu = geography.pollingUnit('KD-KN-W01-PU002')!.scope;
 
-      final agent = store.accredit(
+      final agent = await store.accredit(
         memberId: member.id,
         role: TgcgRole.pollingUnitAgent,
         scope: pu,
@@ -62,12 +62,12 @@ void main() {
       );
     });
 
-    test('status changes update accreditation record', () {
+    test('status changes update accreditation record', () async {
       final pending = store.agents.firstWhere(
         (agent) => agent.status == AccreditationStatus.pending,
       );
 
-      store.updateAccreditationStatus(
+      await store.updateAccreditationStatus(
         pending.id,
         AccreditationStatus.approved,
       );
@@ -76,10 +76,10 @@ void main() {
       expect(updated.status, AccreditationStatus.approved);
     });
 
-    test('readiness update preserves identity while changing readiness', () {
+    test('readiness update preserves identity while changing readiness', () async {
       final agent = store.agents.first;
 
-      store.updateReadiness(
+      await store.updateReadiness(
         agent.id,
         trainingCompleted: false,
         biometricEnrolled: false,
