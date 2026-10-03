@@ -190,7 +190,7 @@ class _GeographyPageState extends State<GeographyPage> {
       final fix = await verificationService.captureCurrentFix();
       final actorId =
           session.accessId.isEmpty ? session.operatorName : session.accessId;
-      final updated = membership.verifyPollingUnitCoordinate(
+      final updated = await membership.verifyPollingUnitCoordinate(
         pollingUnitId: unit.code,
         latitude: fix.latitude,
         longitude: fix.longitude,
