@@ -35,7 +35,7 @@ class TgcgSessionController extends ChangeNotifier {
   TgcgRole? _role;
   String _operatorName = '';
   String _accessId = '';
-  GeographicScope _scope = GeographicScope.nigeria;
+  GeographicScope _scope = GeographicScope.kaduna;
 
   TgcgRole? get role => _role;
   String get operatorName => _operatorName;
@@ -47,7 +47,7 @@ class TgcgSessionController extends ChangeNotifier {
     required TgcgRole role,
     required String operatorName,
     required String accessId,
-    GeographicScope scope = GeographicScope.nigeria,
+    GeographicScope scope = GeographicScope.kaduna,
   }) {
     _role = role;
     _operatorName =
@@ -75,7 +75,7 @@ class TgcgSessionController extends ChangeNotifier {
     _role = null;
     _operatorName = '';
     _accessId = '';
-    _scope = GeographicScope.nigeria;
+    _scope = GeographicScope.kaduna;
     notifyListeners();
   }
 }
@@ -103,10 +103,10 @@ class TgcgSession extends InheritedNotifier<TgcgSessionController> {
 }
 
 String roleLabel(TgcgRole role) => switch (role) {
-      TgcgRole.nationalAdministrator => 'National Administrator',
-      TgcgRole.nationalCollationOfficer => 'National Collation Officer',
+      TgcgRole.stateAdministrator => 'State Administrator',
+      TgcgRole.stateCollationOfficer => 'State Collation Officer',
       TgcgRole.situationRoomDirector => 'Situation Room Director',
-      TgcgRole.zonalCoordinator => 'Zonal Coordinator',
+      TgcgRole.senatorialCoordinator => 'Senatorial Zone Coordinator',
       TgcgRole.stateCoordinator => 'State Coordinator',
       TgcgRole.lgaCoordinator => 'LGA Coordinator',
       TgcgRole.wardCoordinator => 'Ward Coordinator',
@@ -118,16 +118,16 @@ String roleLabel(TgcgRole role) => switch (role) {
     };
 
 String roleDescription(TgcgRole role) => switch (role) {
-      TgcgRole.nationalAdministrator =>
-        'National system administration, access control and operational oversight.',
-      TgcgRole.nationalCollationOfficer =>
-        'National result verification, collation, reconciliation and reporting.',
+      TgcgRole.stateAdministrator =>
+        'Kaduna State system administration, access control and operational oversight.',
+      TgcgRole.stateCollationOfficer =>
+        'State-wide result verification, collation, reconciliation and reporting.',
       TgcgRole.situationRoomDirector =>
         'Live incidents, field reporting, verification and response coordination.',
-      TgcgRole.zonalCoordinator =>
-        'Cross-state coordination and operational monitoring within an assigned zone.',
+      TgcgRole.senatorialCoordinator =>
+        'Coordination and operational monitoring across the LGAs of an assigned senatorial zone.',
       TgcgRole.stateCoordinator =>
-        'State-level field network, accreditation, incidents and result verification.',
+        'Kaduna State field network, accreditation, incidents and result verification.',
       TgcgRole.lgaCoordinator =>
         'LGA field coordination, reporting, agent assignments and election-day operations.',
       TgcgRole.wardCoordinator =>
@@ -141,14 +141,14 @@ String roleDescription(TgcgRole role) => switch (role) {
       TgcgRole.technicalSupport =>
         'Technical operations, user support, system monitoring and troubleshooting.',
       TgcgRole.readOnlyExecutive =>
-        'Read-only national command, incident, collation and audit visibility.',
+        'Read-only state command, incident, collation and audit visibility.',
     };
 
 IconData roleIcon(TgcgRole role) => switch (role) {
-      TgcgRole.nationalAdministrator => Icons.admin_panel_settings_rounded,
-      TgcgRole.nationalCollationOfficer => Icons.account_tree_rounded,
+      TgcgRole.stateAdministrator => Icons.admin_panel_settings_rounded,
+      TgcgRole.stateCollationOfficer => Icons.account_tree_rounded,
       TgcgRole.situationRoomDirector => Icons.radar_rounded,
-      TgcgRole.zonalCoordinator => Icons.public_rounded,
+      TgcgRole.senatorialCoordinator => Icons.hub_rounded,
       TgcgRole.stateCoordinator => Icons.map_rounded,
       TgcgRole.lgaCoordinator => Icons.location_city_rounded,
       TgcgRole.wardCoordinator => Icons.grid_view_rounded,
@@ -167,7 +167,7 @@ Set<TgcgModule> allowedModules(TgcgRole role) {
       TgcgPermissionPolicy.allows(role, TgcgCapability.manageAgentAssignments)) {
     modules.add(TgcgModule.accreditation);
   }
-  if (role == TgcgRole.nationalAdministrator) {
+  if (role == TgcgRole.stateAdministrator) {
     modules.add(TgcgModule.membershipNetwork);
     modules.add(TgcgModule.roleAssignment);
   }

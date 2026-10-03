@@ -19,10 +19,10 @@ class MembershipOperationsController extends ChangeNotifier {
   ) {
     final now = DateTime.utc(2026, 9, 27, 7, 30);
     final kdPu = geography.pollingUnit('KD-KN-W01-PU001')!.scope;
-    final bnPu = geography.pollingUnit('BN-MK-W01-PU004')!.scope;
-    final laPu = geography.pollingUnit('LA-IK-W03-PU012')!.scope;
+    final zaPu = geography.pollingUnit('KD-ZA-W01-PU004')!.scope;
+    final jmPu = geography.pollingUnit('KD-JM-W03-PU012')!.scope;
 
-    GeographicScope stateScope(String name) => geography.states
+    GeographicScope lgaScope(String name) => geography.lgas
         .firstWhere((item) => item.name == name)
         .scope;
 
@@ -141,18 +141,18 @@ class MembershipOperationsController extends ChangeNotifier {
       geography: geography,
       members: members,
       memberScopes: {
-        'MEM-0001': stateScope('Kaduna'),
-        'MEM-0002': stateScope('Benue'),
-        'MEM-0003': stateScope('Enugu'),
-        'MEM-0004': stateScope('Lagos'),
-        'MEM-0005': stateScope('Adamawa'),
-        'MEM-0006': stateScope('Kano'),
-        'MEM-0007': stateScope('Anambra'),
-        'MEM-0008': stateScope('Rivers'),
-        'MEM-0009': stateScope('Oyo'),
-        'MEM-0010': stateScope('Federal Capital Territory'),
-        'MEM-0011': stateScope('Bauchi'),
-        'MEM-0012': stateScope('Akwa Ibom'),
+        'MEM-0001': lgaScope('Kaduna North'),
+        'MEM-0002': lgaScope('Zaria'),
+        'MEM-0003': lgaScope('Chikun'),
+        'MEM-0004': lgaScope("Jema'a"),
+        'MEM-0005': lgaScope('Igabi'),
+        'MEM-0006': lgaScope('Kaduna South'),
+        'MEM-0007': lgaScope('Sabon Gari'),
+        'MEM-0008': lgaScope('Kachia'),
+        'MEM-0009': lgaScope('Zangon Kataf'),
+        'MEM-0010': lgaScope('Giwa'),
+        'MEM-0011': lgaScope('Lere'),
+        'MEM-0012': lgaScope('Kagarko'),
       },
       agents: [
         AccreditedAgent(
@@ -173,13 +173,13 @@ class MembershipOperationsController extends ChangeNotifier {
         AccreditedAgent(
           id: 'ACC-0002',
           memberId: 'MEM-0002',
-          agentId: 'AG-BN-014',
+          agentId: 'AG-ZA-014',
           role: TgcgRole.pollingUnitAgent,
-          scope: bnPu,
+          scope: zaPu,
           status: AccreditationStatus.approved,
           createdAt: now.subtract(const Duration(days: 18)),
           registeredPhoneNumber: '+2348000000002',
-          deviceId: 'DEV-BN-014',
+          deviceId: 'DEV-ZA-014',
           biometricEnrolled: true,
           trainingCompleted: true,
           origin: RecordOrigin.systemDerived,
@@ -187,9 +187,9 @@ class MembershipOperationsController extends ChangeNotifier {
         AccreditedAgent(
           id: 'ACC-0003',
           memberId: 'MEM-0004',
-          agentId: 'AG-LA-032',
+          agentId: 'AG-JM-032',
           role: TgcgRole.pollingUnitAgent,
-          scope: laPu,
+          scope: jmPu,
           status: AccreditationStatus.pending,
           createdAt: now.subtract(const Duration(days: 9)),
           registeredPhoneNumber: '+2348000000004',
@@ -200,9 +200,9 @@ class MembershipOperationsController extends ChangeNotifier {
         AccreditedAgent(
           id: 'ACC-0004',
           memberId: 'MEM-0005',
-          agentId: 'AG-AD-021',
-          role: TgcgRole.stateCoordinator,
-          scope: stateScope('Adamawa'),
+          agentId: 'AG-IG-021',
+          role: TgcgRole.lgaCoordinator,
+          scope: lgaScope('Igabi'),
           status: AccreditationStatus.approved,
           createdAt: now.subtract(const Duration(days: 8)),
           registeredPhoneNumber: '+2348000000005',
@@ -213,9 +213,9 @@ class MembershipOperationsController extends ChangeNotifier {
         AccreditedAgent(
           id: 'ACC-0005',
           memberId: 'MEM-0006',
-          agentId: 'AG-KN-015',
-          role: TgcgRole.stateCoordinator,
-          scope: stateScope('Kano'),
+          agentId: 'AG-KS-015',
+          role: TgcgRole.lgaCoordinator,
+          scope: lgaScope('Kaduna South'),
           status: AccreditationStatus.approved,
           createdAt: now.subtract(const Duration(days: 8)),
           registeredPhoneNumber: '+2348000000006',
@@ -226,9 +226,9 @@ class MembershipOperationsController extends ChangeNotifier {
         AccreditedAgent(
           id: 'ACC-0006',
           memberId: 'MEM-0007',
-          agentId: 'AG-AN-018',
-          role: TgcgRole.stateCoordinator,
-          scope: stateScope('Anambra'),
+          agentId: 'AG-SG-018',
+          role: TgcgRole.lgaCoordinator,
+          scope: lgaScope('Sabon Gari'),
           status: AccreditationStatus.approved,
           createdAt: now.subtract(const Duration(days: 7)),
           registeredPhoneNumber: '+2348000000007',
@@ -239,9 +239,9 @@ class MembershipOperationsController extends ChangeNotifier {
         AccreditedAgent(
           id: 'ACC-0007',
           memberId: 'MEM-0008',
-          agentId: 'AG-RI-011',
-          role: TgcgRole.stateCoordinator,
-          scope: stateScope('Rivers'),
+          agentId: 'AG-KC-011',
+          role: TgcgRole.lgaCoordinator,
+          scope: lgaScope('Kachia'),
           status: AccreditationStatus.approved,
           createdAt: now.subtract(const Duration(days: 6)),
           registeredPhoneNumber: '+2348000000008',
@@ -252,9 +252,9 @@ class MembershipOperationsController extends ChangeNotifier {
         AccreditedAgent(
           id: 'ACC-0008',
           memberId: 'MEM-0009',
-          agentId: 'AG-OY-008',
-          role: TgcgRole.stateCoordinator,
-          scope: stateScope('Oyo'),
+          agentId: 'AG-ZK-008',
+          role: TgcgRole.lgaCoordinator,
+          scope: lgaScope('Zangon Kataf'),
           status: AccreditationStatus.pending,
           createdAt: now.subtract(const Duration(days: 5)),
           registeredPhoneNumber: '+2348000000009',
@@ -265,9 +265,9 @@ class MembershipOperationsController extends ChangeNotifier {
         AccreditedAgent(
           id: 'ACC-0009',
           memberId: 'MEM-0010',
-          agentId: 'AG-FCT-006',
-          role: TgcgRole.stateCoordinator,
-          scope: stateScope('Federal Capital Territory'),
+          agentId: 'AG-GW-006',
+          role: TgcgRole.lgaCoordinator,
+          scope: lgaScope('Giwa'),
           status: AccreditationStatus.approved,
           createdAt: now.subtract(const Duration(days: 4)),
           registeredPhoneNumber: '+2348000000010',
@@ -330,7 +330,7 @@ class MembershipOperationsController extends ChangeNotifier {
     required String fullName,
     required String phoneNumber,
     String? email,
-    GeographicScope registrationScope = GeographicScope.nigeria,
+    GeographicScope registrationScope = GeographicScope.kaduna,
   }) {
     final member = TgcgMember(
       id: 'MEM-${(_members.length + 1).toString().padLeft(4, '0')}',

@@ -13,7 +13,9 @@ void main() {
       stateId: 'KD',
       stateName: 'Kaduna',
     );
-    final district = engine.childScopes(state).single;
+    final district = engine
+        .childScopes(state)
+        .singleWhere((scope) => scope.senatorialDistrictId == 'SD/053/KD');
 
     const legacySubmissionScope = GeographicScope(
       level: GeographyLevel.pollingUnit,

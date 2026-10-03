@@ -1366,7 +1366,7 @@ Color _broadcastDeliveryColor(BroadcastDeliveryState state) => switch (state) {
     };
 
 IconData _roomIcon(CommunicationRoomType type) => switch (type) {
-      CommunicationRoomType.nationalCommand => Icons.public_rounded,
+      CommunicationRoomType.stateCommand => Icons.public_rounded,
       CommunicationRoomType.situationRoom => Icons.radar_rounded,
       CommunicationRoomType.zone => Icons.language_rounded,
       CommunicationRoomType.state => Icons.map_rounded,

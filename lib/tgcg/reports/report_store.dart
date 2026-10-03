@@ -67,7 +67,7 @@ class ReportOperationsController extends ChangeNotifier {
           id: 'EXP-0001',
           kind: ReportKind.incidentSummary,
           format: ExportFormat.pdf,
-          scope: GeographicScope.nigeria,
+          scope: GeographicScope.kaduna,
           requestedBy: 'SITUATION-ROOM',
           requestedAt: now.subtract(const Duration(hours: 2)),
           status: ExportJobStatus.completed,
@@ -80,7 +80,7 @@ class ReportOperationsController extends ChangeNotifier {
           id: 'EXP-0002',
           kind: ReportKind.auditTrail,
           format: ExportFormat.csv,
-          scope: GeographicScope.nigeria,
+          scope: GeographicScope.kaduna,
           requestedBy: 'SYSTEM-ADMIN',
           requestedAt: now.subtract(const Duration(minutes: 54)),
           status: ExportJobStatus.completed,
@@ -93,7 +93,7 @@ class ReportOperationsController extends ChangeNotifier {
           id: 'EXP-0003',
           kind: ReportKind.evidencePackage,
           format: ExportFormat.zip,
-          scope: GeographicScope.nigeria,
+          scope: GeographicScope.kaduna,
           requestedBy: 'LEGAL-DESK',
           requestedAt: now.subtract(const Duration(minutes: 19)),
           status: ExportJobStatus.queued,
@@ -156,7 +156,7 @@ class ReportOperationsController extends ChangeNotifier {
       ReportKind.evidencePackage => allows(TgcgCapability.viewEvidence),
       ReportKind.auditTrail => allows(TgcgCapability.viewAudit),
       ReportKind.syncOutbox =>
-        targetScope.level == GeographyLevel.country &&
+        targetScope.level == GeographyLevel.state &&
             allows(TgcgCapability.viewAudit),
     };
   }

@@ -94,7 +94,7 @@ class EmergencyResponseController extends ChangeNotifier {
     GovernanceOperationsController governance,
   ) {
     final now = DateTime.utc(2026, 9, 28, 2, 0);
-    const nigeria = GeographicScope.nigeria;
+    const nigeria = GeographicScope.kaduna;
     return EmergencyResponseController._(
       governance: governance,
       agencies: const [
@@ -104,7 +104,7 @@ class EmergencyResponseController extends ChangeNotifier {
           shortName: 'Police',
           type: EmergencyAgencyType.police,
           coverage: nigeria,
-          commandDesk: 'National Operations Desk',
+          commandDesk: 'State Operations Desk',
           contactPhone: '+234 000 000 0101',
         ),
         EmergencyAgency(
@@ -113,7 +113,7 @@ class EmergencyResponseController extends ChangeNotifier {
           shortName: 'Civil Defence',
           type: EmergencyAgencyType.civilDefence,
           coverage: nigeria,
-          commandDesk: 'National Operations Desk',
+          commandDesk: 'State Operations Desk',
           contactPhone: '+234 000 000 0102',
         ),
         EmergencyAgency(
@@ -122,7 +122,7 @@ class EmergencyResponseController extends ChangeNotifier {
           shortName: 'Road Safety',
           type: EmergencyAgencyType.roadSafety,
           coverage: nigeria,
-          commandDesk: 'National Operations Desk',
+          commandDesk: 'State Operations Desk',
           contactPhone: '+234 000 000 0103',
         ),
         EmergencyAgency(

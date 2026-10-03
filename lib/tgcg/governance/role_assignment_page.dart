@@ -20,10 +20,10 @@ class _RoleAssignmentPageState extends State<RoleAssignmentPage> {
   String search = '';
 
   static const assignableRoles = <TgcgRole>[
-    TgcgRole.nationalAdministrator,
-    TgcgRole.nationalCollationOfficer,
+    TgcgRole.stateAdministrator,
+    TgcgRole.stateCollationOfficer,
     TgcgRole.situationRoomDirector,
-    TgcgRole.zonalCoordinator,
+    TgcgRole.senatorialCoordinator,
     TgcgRole.stateCoordinator,
     TgcgRole.lgaCoordinator,
     TgcgRole.wardCoordinator,
@@ -40,12 +40,12 @@ class _RoleAssignmentPageState extends State<RoleAssignmentPage> {
     final membership = MembershipOperations.of(context);
     final governance = GovernanceOperations.of(context);
 
-    if (session.role != TgcgRole.nationalAdministrator) {
+    if (session.role != TgcgRole.stateAdministrator) {
       return const Center(
         child: TgcgEmptyState(
           icon: Icons.admin_panel_settings_outlined,
-          title: 'National Administrator access required',
-          message: 'Role assignment is restricted to national administration.',
+          title: 'State Administrator access required',
+          message: 'Role assignment is restricted to state administration.',
         ),
       );
     }
@@ -69,8 +69,8 @@ class _RoleAssignmentPageState extends State<RoleAssignmentPage> {
         .toList(growable: false);
 
     final active = governance.roleAssignments.where((item) => item.active).length;
-    final national = governance.roleAssignments
-        .where((item) => item.active && item.scope.level == GeographyLevel.country)
+    final stateWide = governance.roleAssignments
+        .where((item) => item.active && item.scope.level == GeographyLevel.state)
         .length;
     final field = governance.roleAssignments
         .where((item) =>
@@ -87,15 +87,15 @@ class _RoleAssignmentPageState extends State<RoleAssignmentPage> {
           eyebrow: 'ACCESS CONTROL',
           title: 'Role Assignment',
           subtitle:
-              'Assign operational roles and geographic responsibility from one national administration workspace.',
+              'Assign operational roles and geographic responsibility across Kaduna State from one administration workspace.',
           trailing: TgcgStatusPill(
-            label: 'NATIONAL ADMIN ONLY',
+            label: 'STATE ADMIN ONLY',
             color: TgcgColors.primary,
             icon: Icons.admin_panel_settings_rounded,
           ),
         ),
         const SizedBox(height: 18),
-        _Metrics(active: active, national: national, field: field),
+        _Metrics(active: active, stateWide: stateWide, field: field),
         const SizedBox(height: 16),
         LayoutBuilder(
           builder: (context, constraints) {
@@ -210,13 +210,8 @@ class _RoleAssignmentPageState extends State<RoleAssignmentPage> {
   ) {
     final geography = membership.geography;
     switch (role) {
-      case TgcgRole.zonalCoordinator:
-        return geography.zones
-            .map((item) => _ScopeOption(item.id, item.name, item.scope))
-            .toList(growable: false);
-      case TgcgRole.stateCoordinator:
-      case TgcgRole.observer:
-        return geography.states
+      case TgcgRole.senatorialCoordinator:
+        return geography.senatorialDistricts
             .map((item) => _ScopeOption(item.id, item.name, item.scope))
             .toList(growable: false);
       case TgcgRole.lgaCoordinator:
@@ -224,7 +219,7 @@ class _RoleAssignmentPageState extends State<RoleAssignmentPage> {
             .map(
               (item) => _ScopeOption(
                 item.id,
-                '${item.name}, ${item.stateName}',
+                '${item.name} • ${item.senatorialDistrictName}',
                 item.scope,
               ),
             )
@@ -237,7 +232,7 @@ class _RoleAssignmentPageState extends State<RoleAssignmentPage> {
             .map(
               (scope) => _ScopeOption(
                 scope.wardId!,
-                '${scope.wardName ?? 'Ward'} • ${scope.lgaName ?? ''}, ${scope.stateName ?? ''}',
+                '${scope.wardName ?? 'Ward'} • ${scope.lgaName ?? ''} LGA',
                 GeographicScope(
                   level: GeographyLevel.ward,
                   country: scope.country,
@@ -260,14 +255,14 @@ class _RoleAssignmentPageState extends State<RoleAssignmentPage> {
             .map(
               (item) => _ScopeOption(
                 item.code,
-                '${item.scope.pollingUnitName ?? item.code} • ${item.scope.lgaName ?? ''}, ${item.scope.stateName ?? ''}',
+                '${item.scope.pollingUnitName ?? item.code} • ${item.scope.wardName ?? ''} • ${item.scope.lgaName ?? ''}',
                 item.scope,
               ),
             )
             .toList(growable: false);
       default:
         return const [
-          _ScopeOption('NG', 'Nigeria', GeographicScope.nigeria),
+          _ScopeOption('KD', 'Kaduna State', GeographicScope.kaduna),
         ];
     }
   }
@@ -464,9 +459,9 @@ class _PermissionPreview extends StatelessWidget {
 }
 
 class _Metrics extends StatelessWidget {
-  const _Metrics({required this.active, required this.national, required this.field});
+  const _Metrics({required this.active, required this.stateWide, required this.field});
   final int active;
-  final int national;
+  final int stateWide;
   final int field;
 
   @override
@@ -489,9 +484,9 @@ class _Metrics extends StatelessWidget {
               ),
               TgcgMetricCard(
                 width: width,
-                label: 'National roles',
-                value: '$national',
-                detail: 'Assignments with Nigeria-wide scope',
+                label: 'State-wide roles',
+                value: '$stateWide',
+                detail: 'Assignments covering all of Kaduna State',
                 icon: Icons.public_rounded,
                 tone: TgcgMetricTone.info,
               ),

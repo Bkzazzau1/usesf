@@ -17,7 +17,7 @@ class LiveOperationsPage extends StatefulWidget {
 }
 
 class _LiveOperationsPageState extends State<LiveOperationsPage> {
-  String? selectedStateId;
+  String? selectedLgaId;
 
   @override
   Widget build(BuildContext context) {
@@ -28,11 +28,11 @@ class _LiveOperationsPageState extends State<LiveOperationsPage> {
     final emergency = EmergencyResponse.of(context);
     final geography = membership.geography;
 
-    final snapshots = geography.states
-        .where((state) => _stateVisibleToScope(session.scope, state))
+    final snapshots = geography.lgas
+        .where((lga) => _lgaVisibleToScope(session.scope, lga))
         .map(
-          (state) => _StateSnapshot.build(
-            state: state,
+          (lga) => _LgaSnapshot.build(
+            lga: lga,
             field: field,
             membership: membership,
             results: results,
@@ -42,12 +42,12 @@ class _LiveOperationsPageState extends State<LiveOperationsPage> {
         .toList(growable: false);
 
     if (snapshots.isNotEmpty &&
-        (selectedStateId == null ||
-            !snapshots.any((item) => item.state.id == selectedStateId))) {
-      selectedStateId = _preferredState(snapshots).state.id;
+        (selectedLgaId == null ||
+            !snapshots.any((item) => item.lga.id == selectedLgaId))) {
+      selectedLgaId = _preferredLga(snapshots).lga.id;
     }
 
-    final selected = _snapshotById(snapshots, selectedStateId);
+    final selected = _snapshotById(snapshots, selectedLgaId);
     final openIncidents = snapshots.fold<int>(
       0,
       (total, item) => total + item.openIncidents.length,
@@ -64,7 +64,7 @@ class _LiveOperationsPageState extends State<LiveOperationsPage> {
       0,
       (total, item) => total + item.approvedAgents,
     );
-    final attentionStates = snapshots
+    final attentionLgas = snapshots
         .where((item) => item.condition.index >= _SituationCondition.elevated.index)
         .length;
 
@@ -72,10 +72,10 @@ class _LiveOperationsPageState extends State<LiveOperationsPage> {
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 36),
       children: [
         TgcgPageHeader(
-          eyebrow: 'NATIONAL OPERATIONAL PICTURE',
-          title: 'Nigeria Situation Map',
+          eyebrow: 'KADUNA STATE OPERATIONAL PICTURE',
+          title: 'Kaduna Situation Map',
           subtitle:
-              '${session.scope.label}: state-by-state incidents, emergency response, field activity and submission status.',
+              '${session.scope.label}: LGA-by-LGA incidents, emergency response, field activity and submission status.',
           trailing: const TgcgStatusPill(
             label: 'CURRENT VIEW',
             color: TgcgColors.success,
@@ -84,8 +84,8 @@ class _LiveOperationsPageState extends State<LiveOperationsPage> {
         ),
         const SizedBox(height: 18),
         _TopMetrics(
-          states: snapshots.length,
-          attentionStates: attentionStates,
+          lgas: snapshots.length,
+          attentionLgas: attentionLgas,
           openIncidents: openIncidents,
           activeResponses: activeResponses,
           resultSubmissions: resultSubmissions,
@@ -94,13 +94,13 @@ class _LiveOperationsPageState extends State<LiveOperationsPage> {
         const SizedBox(height: 16),
         LayoutBuilder(
           builder: (context, constraints) {
-            final map = _NigeriaStateMap(
-              allStates: geography.states,
+            final map = _KadunaLgaMap(
+              allLgas: geography.lgas,
               snapshots: snapshots,
-              selectedStateId: selectedStateId,
-              onSelect: (value) => setState(() => selectedStateId = value),
+              selectedLgaId: selectedLgaId,
+              onSelect: (value) => setState(() => selectedLgaId = value),
             );
-            final detail = _StateInspector(
+            final detail = _LgaInspector(
               snapshot: selected,
               emergency: emergency,
             );
@@ -128,8 +128,8 @@ class _LiveOperationsPageState extends State<LiveOperationsPage> {
         _ZoneOverview(
           geography: geography,
           snapshots: snapshots,
-          selectedStateId: selectedStateId,
-          onSelectState: (stateId) => setState(() => selectedStateId = stateId),
+          selectedLgaId: selectedLgaId,
+          onSelectLga: (lgaId) => setState(() => selectedLgaId = lgaId),
         ),
         const SizedBox(height: 16),
         _OperationalActivity(
@@ -141,26 +141,21 @@ class _LiveOperationsPageState extends State<LiveOperationsPage> {
   }
 }
 
-bool _stateVisibleToScope(GeographicScope scope, CanonicalState state) {
-  if (scope.level == GeographyLevel.country) return true;
-  if (scope.level == GeographyLevel.geopoliticalZone) {
-    return scope.zoneId == state.zoneId;
-  }
-  return scope.stateId == state.id;
-}
+bool _lgaVisibleToScope(GeographicScope scope, CanonicalLga lga) =>
+    GeographyRegistry.scopeContains(scope, lga.scope) || scope.lgaId == lga.id;
 
-_StateSnapshot? _snapshotById(
-  List<_StateSnapshot> snapshots,
-  String? stateId,
+_LgaSnapshot? _snapshotById(
+  List<_LgaSnapshot> snapshots,
+  String? lgaId,
 ) {
-  if (stateId == null) return null;
+  if (lgaId == null) return null;
   for (final item in snapshots) {
-    if (item.state.id == stateId) return item;
+    if (item.lga.id == lgaId) return item;
   }
   return null;
 }
 
-_StateSnapshot _preferredState(List<_StateSnapshot> snapshots) {
+_LgaSnapshot _preferredLga(List<_LgaSnapshot> snapshots) {
   var selected = snapshots.first;
   for (final item in snapshots.skip(1)) {
     if (item.condition.index > selected.condition.index) {
@@ -177,9 +172,9 @@ _StateSnapshot _preferredState(List<_StateSnapshot> snapshots) {
 
 enum _SituationCondition { noData, normal, elevated, serious, critical }
 
-class _StateSnapshot {
-  const _StateSnapshot({
-    required this.state,
+class _LgaSnapshot {
+  const _LgaSnapshot({
+    required this.lga,
     required this.members,
     required this.agents,
     required this.approvedAgents,
@@ -190,7 +185,7 @@ class _StateSnapshot {
     required this.condition,
   });
 
-  final CanonicalState state;
+  final CanonicalLga lga;
   final int members;
   final int agents;
   final int approvedAgents;
@@ -228,19 +223,19 @@ class _StateSnapshot {
       .where((item) => item.status == EmergencyDispatchStatus.assigned)
       .length;
 
-  factory _StateSnapshot.build({
-    required CanonicalState state,
+  factory _LgaSnapshot.build({
+    required CanonicalLga lga,
     required FieldOperationsController field,
     required MembershipOperationsController membership,
     required ResultOperationsController results,
     required EmergencyResponseController emergency,
   }) {
-    final incidents = field.incidentsForScope(state.scope);
-    final reports = field.reportsForScope(state.scope);
-    final submissions = results.submissionsForScope(state.scope);
-    final dispatches = emergency.dispatchesForScope(state.scope);
-    final agents = membership.agentsForScope(state.scope);
-    final members = membership.memberCountForScope(state.scope);
+    final incidents = field.incidentsForScope(lga.scope);
+    final reports = field.reportsForScope(lga.scope);
+    final submissions = results.submissionsForScope(lga.scope);
+    final dispatches = emergency.dispatchesForScope(lga.scope);
+    final agents = membership.agentsForScope(lga.scope);
+    final members = membership.memberCountForScope(lga.scope);
     final open = incidents
         .where(
           (item) =>
@@ -281,8 +276,8 @@ class _StateSnapshot {
       condition = _SituationCondition.normal;
     }
 
-    return _StateSnapshot(
-      state: state,
+    return _LgaSnapshot(
+      lga: lga,
       members: members,
       agents: agents.length,
       approvedAgents: agents
@@ -299,16 +294,16 @@ class _StateSnapshot {
 
 class _TopMetrics extends StatelessWidget {
   const _TopMetrics({
-    required this.states,
-    required this.attentionStates,
+    required this.lgas,
+    required this.attentionLgas,
     required this.openIncidents,
     required this.activeResponses,
     required this.resultSubmissions,
     required this.approvedAgents,
   });
 
-  final int states;
-  final int attentionStates;
+  final int lgas;
+  final int attentionLgas;
   final int openIncidents;
   final int activeResponses;
   final int resultSubmissions;
@@ -333,8 +328,8 @@ class _TopMetrics extends StatelessWidget {
             children: [
               TgcgMetricCard(
                 width: width,
-                label: 'States in view',
-                value: '$states',
+                label: 'LGAs in view',
+                value: '$lgas',
                 detail: 'Based on current access scope',
                 icon: Icons.map_outlined,
                 tone: TgcgMetricTone.info,
@@ -342,10 +337,10 @@ class _TopMetrics extends StatelessWidget {
               TgcgMetricCard(
                 width: width,
                 label: 'Need attention',
-                value: '$attentionStates',
+                value: '$attentionLgas',
                 detail: 'Elevated, serious or critical',
                 icon: Icons.crisis_alert_outlined,
-                tone: attentionStates == 0
+                tone: attentionLgas == 0
                     ? TgcgMetricTone.success
                     : TgcgMetricTone.warning,
               ),
@@ -389,32 +384,32 @@ class _TopMetrics extends StatelessWidget {
       );
 }
 
-class _NigeriaStateMap extends StatelessWidget {
-  const _NigeriaStateMap({
-    required this.allStates,
+class _KadunaLgaMap extends StatelessWidget {
+  const _KadunaLgaMap({
+    required this.allLgas,
     required this.snapshots,
-    required this.selectedStateId,
+    required this.selectedLgaId,
     required this.onSelect,
   });
 
-  final List<CanonicalState> allStates;
-  final List<_StateSnapshot> snapshots;
-  final String? selectedStateId;
+  final List<CanonicalLga> allLgas;
+  final List<_LgaSnapshot> snapshots;
+  final String? selectedLgaId;
   final ValueChanged<String> onSelect;
 
   @override
   Widget build(BuildContext context) {
-    final stateById = <String, CanonicalState>{
-      for (final state in allStates) state.id: state,
+    final lgaById = <String, CanonicalLga>{
+      for (final lga in allLgas) lga.id: lga,
     };
-    final snapshotById = <String, _StateSnapshot>{
-      for (final snapshot in snapshots) snapshot.state.id: snapshot,
+    final snapshotById = <String, _LgaSnapshot>{
+      for (final snapshot in snapshots) snapshot.lga.id: snapshot,
     };
 
     return TgcgSectionCard(
-      title: 'Nigeria state situation map',
+      title: 'Kaduna LGA situation map',
       subtitle:
-          'Select a state to inspect current operational issues, response activity and field data.',
+          'Select an LGA to inspect current operational issues, response activity and field data.',
       trailing: TgcgStatusPill(
         label: '${snapshots.length} IN SCOPE',
         color: TgcgColors.primary,
@@ -437,22 +432,23 @@ class _NigeriaStateMap extends StatelessWidget {
               child: FittedBox(
                 fit: BoxFit.contain,
                 child: SizedBox(
-                  width: 570,
-                  height: 355,
+                  width: 440,
+                  height: 320,
                   child: Stack(
                     children: [
-                      for (final cell in _stateCells)
-                        if (stateById[cell.stateId] != null)
+                      for (final cell in _lgaCells)
+                        if (lgaById[cell.lgaId] != null)
                           Positioned(
                             left: 20 + cell.column * 55.0,
                             top: 12 + cell.row * 46.0,
-                            child: _StateHexTile(
-                              state: stateById[cell.stateId]!,
-                              snapshot: snapshotById[cell.stateId],
-                              selected: selectedStateId == cell.stateId,
-                              onTap: snapshotById[cell.stateId] == null
+                            child: _LgaHexTile(
+                              lga: lgaById[cell.lgaId]!,
+                              code: cell.code,
+                              snapshot: snapshotById[cell.lgaId],
+                              selected: selectedLgaId == cell.lgaId,
+                              onTap: snapshotById[cell.lgaId] == null
                                   ? null
-                                  : () => onSelect(cell.stateId),
+                                  : () => onSelect(cell.lgaId),
                             ),
                           ),
                     ],
@@ -469,63 +465,52 @@ class _NigeriaStateMap extends StatelessWidget {
   }
 }
 
-class _StateMapCell {
-  const _StateMapCell(this.stateId, this.row, this.column);
-  final String stateId;
+class _LgaMapCell {
+  const _LgaMapCell(this.lgaId, this.code, this.row, this.column);
+  final String lgaId;
+  final String code;
   final int row;
   final int column;
 }
 
-const _stateCells = <_StateMapCell>[
-  _StateMapCell('KE', 0, 1),
-  _StateMapCell('SO', 0, 2),
-  _StateMapCell('ZA', 0, 3),
-  _StateMapCell('KT', 0, 4),
-  _StateMapCell('KN', 0, 5),
-  _StateMapCell('JI', 0, 6),
-  _StateMapCell('YO', 0, 7),
-  _StateMapCell('BO', 0, 8),
-  _StateMapCell('NI', 1, 1),
-  _StateMapCell('KD', 1, 3),
-  _StateMapCell('BA', 1, 5),
-  _StateMapCell('GO', 1, 6),
-  _StateMapCell('AD', 1, 7),
-  _StateMapCell('KW', 2, 0),
-  _StateMapCell('FCT', 2, 2),
-  _StateMapCell('NA', 2, 3),
-  _StateMapCell('PL', 2, 4),
-  _StateMapCell('TA', 2, 6),
-  _StateMapCell('OY', 3, 0),
-  _StateMapCell('OS', 3, 1),
-  _StateMapCell('EK', 3, 2),
-  _StateMapCell('KO', 3, 3),
-  _StateMapCell('BN', 3, 4),
-  _StateMapCell('OG', 4, 0),
-  _StateMapCell('ON', 4, 1),
-  _StateMapCell('ED', 4, 2),
-  _StateMapCell('EN', 4, 3),
-  _StateMapCell('EB', 4, 4),
-  _StateMapCell('CR', 4, 5),
-  _StateMapCell('LA', 5, 0),
-  _StateMapCell('DE', 5, 1),
-  _StateMapCell('AN', 5, 2),
-  _StateMapCell('IM', 5, 3),
-  _StateMapCell('AB', 5, 4),
-  _StateMapCell('BY', 6, 1),
-  _StateMapCell('RI', 6, 2),
-  _StateMapCell('AK', 6, 3),
+const _lgaCells = <_LgaMapCell>[
+  _LgaMapCell('KD-KUDAN', 'KUD', 0, 3),
+  _LgaMapCell('KD-MAKARFI', 'MKF', 0, 4),
+  _LgaMapCell('KD-IKARA', 'IKR', 0, 5),
+  _LgaMapCell('KD-KUBAU', 'KBU', 0, 6),
+  _LgaMapCell('KD-GIWA', 'GWA', 1, 2),
+  _LgaMapCell('KD-ZARIA', 'ZAR', 1, 3),
+  _LgaMapCell('KD-SABON-GARI', 'SBG', 1, 4),
+  _LgaMapCell('KD-SOBA', 'SBA', 1, 5),
+  _LgaMapCell('KD-LERE', 'LRE', 1, 6),
+  _LgaMapCell('KD-BIRNIN-GWARI', 'BGW', 2, 0),
+  _LgaMapCell('KD-IGABI', 'IGB', 2, 2),
+  _LgaMapCell('KD-KADUNA-NORTH', 'KDN', 2, 3),
+  _LgaMapCell('KD-KAURU', 'KRU', 2, 5),
+  _LgaMapCell('KD-CHIKUN', 'CHK', 3, 2),
+  _LgaMapCell('KD-KADUNA-SOUTH', 'KDS', 3, 3),
+  _LgaMapCell('KD-KAJURU', 'KJR', 3, 4),
+  _LgaMapCell('KD-ZANGON-KATAF', 'ZKF', 3, 5),
+  _LgaMapCell('KD-KAURA', 'KRA', 3, 6),
+  _LgaMapCell('KD-KAGARKO', 'KGK', 4, 2),
+  _LgaMapCell('KD-KACHIA', 'KCH', 4, 3),
+  _LgaMapCell('KD-JABA', 'JBA', 4, 4),
+  _LgaMapCell('KD-JEMAA', 'JMA', 4, 5),
+  _LgaMapCell('KD-SANGA', 'SNG', 5, 5),
 ];
 
-class _StateHexTile extends StatelessWidget {
-  const _StateHexTile({
-    required this.state,
+class _LgaHexTile extends StatelessWidget {
+  const _LgaHexTile({
+    required this.lga,
+    required this.code,
     required this.snapshot,
     required this.selected,
     required this.onTap,
   });
 
-  final CanonicalState state;
-  final _StateSnapshot? snapshot;
+  final CanonicalLga lga;
+  final String code;
+  final _LgaSnapshot? snapshot;
   final bool selected;
   final VoidCallback? onTap;
 
@@ -541,8 +526,8 @@ class _StateHexTile extends StatelessWidget {
 
     return Tooltip(
       message: enabled
-          ? '${state.name} • ${_conditionLabel(condition)}'
-          : '${state.name} • outside current scope',
+          ? '${lga.name} • ${_conditionLabel(condition)}'
+          : '${lga.name} • outside current scope',
       child: GestureDetector(
         onTap: onTap,
         child: SizedBox(
@@ -560,10 +545,10 @@ class _StateHexTile extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    state.id == 'FCT' ? 'FCT' : state.id,
+                    code,
                     style: TextStyle(
                       color: foreground,
-                      fontSize: state.id == 'FCT' ? 10 : 11,
+                      fontSize: 11,
                       fontWeight: FontWeight.w900,
                       letterSpacing: .15,
                     ),
@@ -685,13 +670,13 @@ class _LegendItem extends StatelessWidget {
       );
 }
 
-class _StateInspector extends StatelessWidget {
-  const _StateInspector({
+class _LgaInspector extends StatelessWidget {
+  const _LgaInspector({
     required this.snapshot,
     required this.emergency,
   });
 
-  final _StateSnapshot? snapshot;
+  final _LgaSnapshot? snapshot;
   final EmergencyResponseController emergency;
 
   @override
@@ -701,8 +686,8 @@ class _StateInspector extends StatelessWidget {
       return const TgcgSectionCard(
         child: TgcgEmptyState(
           icon: Icons.touch_app_outlined,
-          title: 'Select a state',
-          message: 'Choose a state on the map to inspect its operational picture.',
+          title: 'Select an LGA',
+          message: 'Choose an LGA on the map to inspect its operational picture.',
         ),
       );
     }
@@ -713,10 +698,8 @@ class _StateInspector extends StatelessWidget {
       ..sort((a, b) => b.assignedAt.compareTo(a.assignedAt));
 
     return TgcgSectionCard(
-      title: item.state.isFederalCapitalTerritory
-          ? item.state.name
-          : '${item.state.name} State',
-      subtitle: item.state.zoneName,
+      title: '${item.lga.name} LGA',
+      subtitle: '${item.lga.senatorialDistrictName} Senatorial Zone',
       trailing: TgcgStatusPill(
         label: _conditionLabel(item.condition).toUpperCase(),
         color: _conditionColor(item.condition),
@@ -800,7 +783,7 @@ class _StateInspector extends StatelessWidget {
 
 class _InspectorMetrics extends StatelessWidget {
   const _InspectorMetrics({required this.snapshot});
-  final _StateSnapshot snapshot;
+  final _LgaSnapshot snapshot;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -1057,33 +1040,31 @@ class _ZoneOverview extends StatelessWidget {
   const _ZoneOverview({
     required this.geography,
     required this.snapshots,
-    required this.selectedStateId,
-    required this.onSelectState,
+    required this.selectedLgaId,
+    required this.onSelectLga,
   });
 
   final GeographyRegistry geography;
-  final List<_StateSnapshot> snapshots;
-  final String? selectedStateId;
-  final ValueChanged<String> onSelectState;
+  final List<_LgaSnapshot> snapshots;
+  final String? selectedLgaId;
+  final ValueChanged<String> onSelectLga;
 
   @override
   Widget build(BuildContext context) {
-    final visibleZones = geography.zones
-        .where((zone) => snapshots.any((item) => item.state.zoneId == zone.id))
+    final visibleZones = geography.senatorialDistricts
+        .where((zone) => snapshots.any((item) => item.lga.senatorialDistrictId == zone.id))
         .toList(growable: false);
 
     return TgcgSectionCard(
-      title: 'Zone overview',
-      subtitle: 'Operational summary across the geopolitical zones in your scope.',
+      title: 'Senatorial zone overview',
+      subtitle: 'Operational summary across the senatorial zones in your scope.',
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final columns = constraints.maxWidth >= 1080
-              ? 6
-              : constraints.maxWidth >= 680
-                  ? 3
-                  : constraints.maxWidth >= 440
-                      ? 2
-                      : 1;
+          final columns = constraints.maxWidth >= 680
+              ? 3
+              : constraints.maxWidth >= 440
+                  ? 2
+                  : 1;
           const gap = 10.0;
           final width =
               (constraints.maxWidth - gap * (columns - 1)) / columns;
@@ -1092,10 +1073,10 @@ class _ZoneOverview extends StatelessWidget {
             runSpacing: gap,
             children: visibleZones.map((zone) {
               final items = snapshots
-                  .where((item) => item.state.zoneId == zone.id)
+                  .where((item) => item.lga.senatorialDistrictId == zone.id)
                   .toList(growable: false);
-              final selected = items.any((item) => item.state.id == selectedStateId);
-              final focus = _preferredState(items);
+              final selected = items.any((item) => item.lga.id == selectedLgaId);
+              final focus = _preferredLga(items);
               final incidents = items.fold<int>(
                 0,
                 (total, item) => total + item.openIncidents.length,
@@ -1116,7 +1097,7 @@ class _ZoneOverview extends StatelessWidget {
               );
               return InkWell(
                 borderRadius: BorderRadius.circular(14),
-                onTap: () => onSelectState(focus.state.id),
+                onTap: () => onSelectLga(focus.lga.id),
                 child: Container(
                   width: width,
                   padding: const EdgeInsets.all(12),
@@ -1146,7 +1127,7 @@ class _ZoneOverview extends StatelessWidget {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            zone.id,
+                            zone.id.replaceAll('/', ' / '),
                             style: const TextStyle(
                               color: TgcgColors.primary,
                               fontSize: 10,
@@ -1168,7 +1149,7 @@ class _ZoneOverview extends StatelessWidget {
                       ),
                       const SizedBox(height: 9),
                       Text(
-                        '${items.length} states • $incidents incidents',
+                        '${items.length} LGAs • $incidents incidents',
                         style: const TextStyle(
                           color: TgcgColors.muted,
                           fontSize: 8.5,
@@ -1200,7 +1181,7 @@ class _OperationalActivity extends StatelessWidget {
     required this.emergency,
   });
 
-  final List<_StateSnapshot> snapshots;
+  final List<_LgaSnapshot> snapshots;
   final EmergencyResponseController emergency;
 
   @override

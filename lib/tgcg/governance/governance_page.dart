@@ -499,9 +499,9 @@ class _OutboxList extends StatelessWidget {
           width: 170,
           child: DropdownButtonFormField<SyncState?>(
             initialValue: filter,
-            decoration: const InputDecoration(labelText: 'State'),
+            decoration: const InputDecoration(labelText: 'Sync status'),
             items: [
-              const DropdownMenuItem(value: null, child: Text('All states')),
+              const DropdownMenuItem(value: null, child: Text('All statuses')),
               ...SyncState.values.map(
                 (value) => DropdownMenuItem(
                   value: value,

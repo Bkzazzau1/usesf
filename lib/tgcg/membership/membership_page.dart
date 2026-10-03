@@ -1743,24 +1743,12 @@ bool _isOperationallyReady(AccreditedAgent agent) =>
     agent.simFingerprint != null;
 
 List<GeographicScope> _assignmentScopes(GeographyRegistry registry) {
-  final values = <String, GeographicScope>{'country': GeographicScope.nigeria};
+  final values = <String, GeographicScope>{
+    _scopeKey(GeographicScope.kaduna): GeographicScope.kaduna,
+  };
   for (final unit in registry.pollingUnits) {
     final pu = unit.scope;
     final candidates = <GeographicScope>[
-      GeographicScope(
-        level: GeographyLevel.geopoliticalZone,
-        country: pu.country,
-        zoneId: pu.zoneId,
-        zoneName: pu.zoneName,
-      ),
-      GeographicScope(
-        level: GeographyLevel.state,
-        country: pu.country,
-        zoneId: pu.zoneId,
-        zoneName: pu.zoneName,
-        stateId: pu.stateId,
-        stateName: pu.stateName,
-      ),
       GeographicScope(
         level: GeographyLevel.senatorialDistrict,
         country: pu.country,
@@ -1822,7 +1810,7 @@ String _scopeKey(GeographicScope scope) => switch (scope.level) {
     };
 
 const _assignableRoles = <TgcgRole>[
-  TgcgRole.zonalCoordinator,
+  TgcgRole.senatorialCoordinator,
   TgcgRole.stateCoordinator,
   TgcgRole.lgaCoordinator,
   TgcgRole.wardCoordinator,

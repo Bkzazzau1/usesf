@@ -58,14 +58,14 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
   late final List<_Meeting> meetings = [
     _Meeting(
       id: 'MTG-1001',
-      title: 'National Operations Conference',
+      title: 'Kaduna State Operations Conference',
       host: 'Situation Room Director',
       time: 'Live now',
       kind: _MeetingKind.conference,
       status: _MeetingStatus.live,
       participants: const [
-        _Participant(name: 'National Operations', role: 'Host'),
-        _Participant(name: 'North West Desk', role: 'Zonal Coordinator'),
+        _Participant(name: 'State Operations', role: 'Host'),
+        _Participant(name: 'Kaduna North Desk', role: 'Senatorial Zone Coordinator'),
         _Participant(name: 'Field Support', role: 'Technical Support', muted: true),
         _Participant(name: 'Legal Desk', role: 'Legal Officer'),
       ],
@@ -73,14 +73,14 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
     _Meeting(
       id: 'MTG-1002',
       title: 'State Coordinators Check-in',
-      host: 'National Operations Desk',
+      host: 'State Operations Desk',
       time: '13:30',
       kind: _MeetingKind.video,
       status: _MeetingStatus.scheduled,
       participants: const [
-        _Participant(name: 'National Operations', role: 'Host'),
+        _Participant(name: 'State Operations', role: 'Host'),
         _Participant(name: 'Kaduna Desk', role: 'State Coordinator'),
-        _Participant(name: 'Lagos Desk', role: 'State Coordinator'),
+        _Participant(name: 'Kaduna South Desk', role: 'State Coordinator'),
       ],
     ),
     _Meeting(
@@ -110,7 +110,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
   ];
 
   static const contacts = [
-    _Participant(name: 'National Operations Desk', role: 'Situation Room'),
+    _Participant(name: 'State Operations Desk', role: 'Situation Room'),
     _Participant(name: 'Technical Support', role: 'Support Desk'),
     _Participant(name: 'Legal & Evidence Desk', role: 'Legal Officer'),
     _Participant(name: 'Field Coordination', role: 'Coordinator'),
@@ -298,7 +298,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
       status: _MeetingStatus.live,
       participants: [
         _Participant(name: session.operatorName, role: roleLabel(session.role!)),
-        const _Participant(name: 'National Operations Desk', role: 'Operations'),
+        const _Participant(name: 'State Operations Desk', role: 'Operations'),
         if (kind == _MeetingKind.conference)
           const _Participant(name: 'Technical Support', role: 'Support Desk'),
       ],

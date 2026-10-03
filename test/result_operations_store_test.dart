@@ -6,7 +6,7 @@ void main() {
   test('prototype review queue contains flagged submissions only', () {
     final store = ResultOperationsController.prototypeSeed();
 
-    final review = store.reviewQueueForScope(GeographicScope.nigeria);
+    final review = store.reviewQueueForScope(GeographicScope.kaduna);
 
     expect(review.map((item) => item.id), containsAll(<String>['RES-0002', 'RES-0004']));
     expect(review.any((item) => item.id == 'RES-0001'), isFalse);
@@ -17,14 +17,14 @@ void main() {
 
     final verified = await store.verify(
       submissionId: 'RES-0002',
-      verifierId: 'NATIONAL-REVIEWER',
-      role: TgcgRole.nationalCollationOfficer,
-      userScope: GeographicScope.nigeria,
+      verifierId: 'STATE-REVIEWER',
+      role: TgcgRole.stateCollationOfficer,
+      userScope: GeographicScope.kaduna,
     );
 
     expect(verified, isTrue);
     expect(
-      store.reviewQueueForScope(GeographicScope.nigeria).any((item) => item.id == 'RES-0002'),
+      store.reviewQueueForScope(GeographicScope.kaduna).any((item) => item.id == 'RES-0002'),
       isFalse,
     );
   });
@@ -34,10 +34,10 @@ void main() {
     const scope = GeographicScope(
       level: GeographyLevel.pollingUnit,
       country: 'Nigeria',
-      zoneId: 'NE',
-      zoneName: 'North East',
-      stateId: 'BA',
-      stateName: 'Bauchi',
+      zoneId: 'NW',
+      zoneName: 'North West',
+      stateId: 'KD',
+      stateName: 'Kaduna',
       lgaId: 'BA-DEMO',
       lgaName: 'Demo LGA',
       wardId: 'BA-DEMO-W01',
@@ -68,10 +68,10 @@ void main() {
     const scope = GeographicScope(
       level: GeographyLevel.pollingUnit,
       country: 'Nigeria',
-      zoneId: 'SE',
-      zoneName: 'South East',
-      stateId: 'EN',
-      stateName: 'Enugu',
+      zoneId: 'NW',
+      zoneName: 'North West',
+      stateId: 'KD',
+      stateName: 'Kaduna',
       lgaId: 'EN-DEMO',
       lgaName: 'Demo LGA',
       wardId: 'EN-DEMO-W01',

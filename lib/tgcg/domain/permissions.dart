@@ -1,7 +1,7 @@
 import 'models.dart';
 
 enum TgcgCapability {
-  viewNationalDashboard,
+  viewStateDashboard,
   viewSituationRoom,
   viewGeography,
   manageMembership,
@@ -41,11 +41,11 @@ class TgcgPermissionPolicy {
   const TgcgPermissionPolicy._();
 
   static const Map<TgcgRole, Set<TgcgCapability>> _roleCapabilities = {
-    TgcgRole.nationalAdministrator: {
+    TgcgRole.stateAdministrator: {
       ...TgcgCapability.values,
     },
-    TgcgRole.nationalCollationOfficer: {
-      TgcgCapability.viewNationalDashboard,
+    TgcgRole.stateCollationOfficer: {
+      TgcgCapability.viewStateDashboard,
       TgcgCapability.viewSituationRoom,
       TgcgCapability.viewGeography,
       TgcgCapability.viewIncidents,
@@ -67,7 +67,7 @@ class TgcgPermissionPolicy {
       TgcgCapability.exportReports,
     },
     TgcgRole.situationRoomDirector: {
-      TgcgCapability.viewNationalDashboard,
+      TgcgCapability.viewStateDashboard,
       TgcgCapability.viewSituationRoom,
       TgcgCapability.viewGeography,
       TgcgCapability.viewIncidents,
@@ -94,7 +94,7 @@ class TgcgPermissionPolicy {
       TgcgCapability.viewAudit,
       TgcgCapability.exportReports,
     },
-    TgcgRole.zonalCoordinator: {
+    TgcgRole.senatorialCoordinator: {
       TgcgCapability.viewSituationRoom,
       TgcgCapability.viewGeography,
       TgcgCapability.viewIncidents,
@@ -253,7 +253,7 @@ class TgcgPermissionPolicy {
       TgcgCapability.manageSystemSettings,
     },
     TgcgRole.readOnlyExecutive: {
-      TgcgCapability.viewNationalDashboard,
+      TgcgCapability.viewStateDashboard,
       TgcgCapability.viewSituationRoom,
       TgcgCapability.viewGeography,
       TgcgCapability.viewIncidents,

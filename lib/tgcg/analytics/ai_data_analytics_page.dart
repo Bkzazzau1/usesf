@@ -489,14 +489,14 @@ class _DistributionPanel extends StatelessWidget {
         _AnalyticsFocus.overview =>
           'Combined operational activity from approved agents, reports, incidents and result submissions.',
         _AnalyticsFocus.incidents =>
-          'Unresolved field incidents by authorized geopolitical scope.',
+          'Unresolved field incidents by senatorial zone.',
         _AnalyticsFocus.verification =>
           'Result submissions requiring human integrity review.',
         _AnalyticsFocus.fieldActivity =>
           'Approved agent assignments and field reports.',
       },
       trailing: TgcgStatusPill(
-        label: '${zones.length} ZONE${zones.length == 1 ? '' : 'S'}',
+        label: '${zones.length} SENATORIAL ZONE${zones.length == 1 ? '' : 'S'}',
         color: TgcgColors.primary,
         icon: Icons.public_rounded,
         compact: true,
@@ -1013,26 +1013,29 @@ class _ZoneSummary {
       };
 }
 
-List<CanonicalZone> _visibleZones(
+/// Senatorial zones (Kaduna North, Central, South) visible to the session.
+List<CanonicalSenatorialDistrict> _visibleZones(
   GeographyRegistry geography,
   GeographicScope sessionScope,
 ) {
-  if (sessionScope.level == GeographyLevel.country) return geography.zones;
-  final zoneId = sessionScope.zoneId;
-  if (zoneId == null) return const [];
-  return geography.zones
-      .where((zone) => zone.id == zoneId)
+  if (sessionScope.level == GeographyLevel.state) {
+    return geography.senatorialDistricts;
+  }
+  final districtId = sessionScope.senatorialDistrictId;
+  if (districtId == null) return const [];
+  return geography.senatorialDistricts
+      .where((district) => district.id == districtId)
       .toList(growable: false);
 }
 
 _ZoneSummary _zoneSummary({
-  required CanonicalZone zone,
+  required CanonicalSenatorialDistrict zone,
   required GeographicScope sessionScope,
   required MembershipOperationsController membership,
   required FieldOperationsController field,
   required ResultOperationsController results,
 }) {
-  final scope = sessionScope.level == GeographyLevel.country
+  final scope = sessionScope.level == GeographyLevel.state
       ? zone.scope
       : sessionScope;
   final incidents = field.incidentsForScope(scope);

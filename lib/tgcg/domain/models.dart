@@ -11,10 +11,10 @@ enum GeographyLevel {
 }
 
 enum TgcgRole {
-  nationalAdministrator,
-  nationalCollationOfficer,
+  stateAdministrator,
+  stateCollationOfficer,
   situationRoomDirector,
-  zonalCoordinator,
+  senatorialCoordinator,
   stateCoordinator,
   lgaCoordinator,
   wardCoordinator,
@@ -116,9 +116,14 @@ class GeographicScope {
   final String? pollingUnitId;
   final String? pollingUnitName;
 
-  static const nigeria = GeographicScope(
-    level: GeographyLevel.country,
+  /// The operational root: USESF is a Kaduna State programme.
+  static const kaduna = GeographicScope(
+    level: GeographyLevel.state,
     country: 'Nigeria',
+    zoneId: 'NW',
+    zoneName: 'North West',
+    stateId: 'KD',
+    stateName: 'Kaduna',
   );
 
   String get label => switch (level) {

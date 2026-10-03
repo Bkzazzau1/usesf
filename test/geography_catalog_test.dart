@@ -4,7 +4,7 @@ import 'package:usesf/tgcg/geography/geography_catalog.dart';
 
 void main() {
   group('GeographyCatalogValidator', () {
-    test('accepts a valid national hierarchy', () {
+    test('accepts a valid Kaduna hierarchy', () {
       final catalog = GeographyCatalog(
         version: '2026.09',
         importedAt: DateTime.utc(2026, 9, 27),
@@ -17,38 +17,38 @@ void main() {
             code: 'NG',
           ),
           GeographyNode(
-            id: 'NG-NC',
-            name: 'North Central',
+            id: 'NG-NW',
+            name: 'North West',
             level: GeographyLevel.geopoliticalZone,
             parentId: 'NG',
             code: 'NC',
           ),
           GeographyNode(
-            id: 'NG-BN',
-            name: 'Benue',
+            id: 'NG-KD',
+            name: 'Kaduna',
             level: GeographyLevel.state,
-            parentId: 'NG-NC',
+            parentId: 'NG-NW',
             code: 'BN',
           ),
           GeographyNode(
-            id: 'NG-BN-MKD',
-            name: 'Makurdi',
+            id: 'NG-KD-ZAR',
+            name: 'Zaria',
             level: GeographyLevel.lga,
-            parentId: 'NG-BN',
+            parentId: 'NG-KD',
             code: 'MKD',
           ),
           GeographyNode(
-            id: 'NG-BN-MKD-W01',
+            id: 'NG-KD-ZAR-W01',
             name: 'Ward 01',
             level: GeographyLevel.ward,
-            parentId: 'NG-BN-MKD',
+            parentId: 'NG-KD-ZAR',
             code: 'W01',
           ),
           GeographyNode(
-            id: 'NG-BN-MKD-W01-PU001',
+            id: 'NG-KD-ZAR-W01-PU001',
             name: 'Polling Unit 001',
             level: GeographyLevel.pollingUnit,
-            parentId: 'NG-BN-MKD-W01',
+            parentId: 'NG-KD-ZAR-W01',
             code: 'PU001',
             latitude: 7.73,
             longitude: 8.54,
@@ -74,22 +74,22 @@ void main() {
             level: GeographyLevel.country,
           ),
           GeographyNode(
-            id: 'NG-NC',
-            name: 'North Central',
+            id: 'NG-NW',
+            name: 'North West',
             level: GeographyLevel.geopoliticalZone,
             parentId: 'NG',
           ),
           GeographyNode(
-            id: 'NG-BN',
-            name: 'Benue',
+            id: 'NG-KD',
+            name: 'Kaduna',
             level: GeographyLevel.state,
-            parentId: 'NG-NC',
+            parentId: 'NG-NW',
           ),
           GeographyNode(
             id: 'BAD-PU',
             name: 'Bad Polling Unit',
             level: GeographyLevel.pollingUnit,
-            parentId: 'NG-BN',
+            parentId: 'NG-KD',
             latitude: 7.73,
             longitude: 8.54,
           ),

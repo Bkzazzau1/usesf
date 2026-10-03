@@ -2,19 +2,20 @@ import 'package:flutter/material.dart';
 
 import '../session.dart';
 import '../ui/tgcg_design.dart';
+import '../geography/geography_registry.dart';
 import 'membership_store.dart';
 
-class NationalMembershipPage extends StatefulWidget {
-  const NationalMembershipPage({super.key});
+class StateMembershipPage extends StatefulWidget {
+  const StateMembershipPage({super.key});
 
   @override
-  State<NationalMembershipPage> createState() =>
-      _NationalMembershipPageState();
+  State<StateMembershipPage> createState() =>
+      _StateMembershipPageState();
 }
 
-class _NationalMembershipPageState extends State<NationalMembershipPage> {
+class _StateMembershipPageState extends State<StateMembershipPage> {
   String? selectedZoneId;
-  String? selectedStateId;
+  String? selectedLgaId;
   String query = '';
 
   @override
@@ -29,39 +30,39 @@ class _NationalMembershipPageState extends State<NationalMembershipPage> {
     final approvedAgents = store.agents
         .where((item) => item.status == AccreditationStatus.approved)
         .length;
-    final statesWithMembers = geography.states
+    final lgasWithMembers = geography.lgas
         .where((item) => store.memberCountForScope(item.scope) > 0)
         .length;
-    final zonesWithMembers = geography.zones
+    final zonesWithMembers = geography.senatorialDistricts
         .where((item) => store.memberCountForScope(item.scope) > 0)
         .length;
 
-    final stateRows = geography.states.where((state) {
-      if (selectedZoneId != null && state.zoneId != selectedZoneId) return false;
+    final lgaRows = geography.lgas.where((lga) {
+      if (selectedZoneId != null && lga.senatorialDistrictId != selectedZoneId) return false;
       final needle = query.trim().toLowerCase();
       return needle.isEmpty ||
-          state.name.toLowerCase().contains(needle) ||
-          state.zoneName.toLowerCase().contains(needle);
+          lga.name.toLowerCase().contains(needle) ||
+          lga.senatorialDistrictName.toLowerCase().contains(needle);
     }).toList(growable: false);
 
-    final selectedState = selectedStateId == null
+    final selectedLga = selectedLgaId == null
         ? null
-        : geography.states
-            .where((item) => item.id == selectedStateId)
+        : geography.lgas
+            .where((item) => item.id == selectedLgaId)
             .firstOrNull;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 36),
       children: [
         TgcgPageHeader(
-          eyebrow: 'NATIONAL MEMBERSHIP NETWORK',
+          eyebrow: 'KADUNA STATE MEMBERSHIP NETWORK',
           title: 'Registered Members',
           subtitle:
-              '${session.scope.label}: national membership registration, zonal coverage, state membership and accredited-agent visibility.',
+              '${session.scope.label}: membership registration, senatorial zone coverage, LGA membership and accredited-agent visibility.',
           trailing: const TgcgStatusPill(
-            label: 'NATIONWIDE',
+            label: 'STATE-WIDE',
             color: TgcgColors.primary,
-            icon: Icons.public_rounded,
+            icon: Icons.location_city_rounded,
           ),
         ),
         const SizedBox(height: 18),
@@ -71,7 +72,7 @@ class _NationalMembershipPageState extends State<NationalMembershipPage> {
           agents: store.agents.length,
           approvedAgents: approvedAgents,
           zones: zonesWithMembers,
-          states: statesWithMembers,
+          lgas: lgasWithMembers,
         ),
         const SizedBox(height: 16),
         _ZoneCoverage(
@@ -79,36 +80,36 @@ class _NationalMembershipPageState extends State<NationalMembershipPage> {
           selectedZoneId: selectedZoneId,
           onSelect: (zoneId) => setState(() {
             selectedZoneId = selectedZoneId == zoneId ? null : zoneId;
-            selectedStateId = null;
+            selectedLgaId = null;
           }),
         ),
         const SizedBox(height: 16),
         LayoutBuilder(
           builder: (context, constraints) {
-            final stateDirectory = _StateDirectory(
+            final lgaDirectory = _LgaDirectory(
               store: store,
-              states: stateRows,
+              lgas: lgaRows,
               query: query,
-              selectedStateId: selectedStateId,
+              selectedLgaId: selectedLgaId,
               onQueryChanged: (value) => setState(() => query = value),
               onSelect: (stateId) =>
-                  setState(() => selectedStateId = stateId),
+                  setState(() => selectedLgaId = stateId),
               onClearZone: selectedZoneId == null
                   ? null
                   : () => setState(() {
                         selectedZoneId = null;
-                        selectedStateId = null;
+                        selectedLgaId = null;
                       }),
             );
-            final inspector = _StateInspector(
+            final inspector = _LgaInspector(
               store: store,
-              state: selectedState,
+              lga: selectedLga,
             );
 
             if (constraints.maxWidth < 1040) {
               return Column(
                 children: [
-                  stateDirectory,
+                  lgaDirectory,
                   const SizedBox(height: 16),
                   inspector,
                 ],
@@ -117,7 +118,7 @@ class _NationalMembershipPageState extends State<NationalMembershipPage> {
             return Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(flex: 7, child: stateDirectory),
+                Expanded(flex: 7, child: lgaDirectory),
                 const SizedBox(width: 16),
                 Expanded(flex: 5, child: inspector),
               ],
@@ -136,7 +137,7 @@ class _SummaryMetrics extends StatelessWidget {
     required this.agents,
     required this.approvedAgents,
     required this.zones,
-    required this.states,
+    required this.lgas,
   });
 
   final int members;
@@ -144,7 +145,7 @@ class _SummaryMetrics extends StatelessWidget {
   final int agents;
   final int approvedAgents;
   final int zones;
-  final int states;
+  final int lgas;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -180,17 +181,17 @@ class _SummaryMetrics extends StatelessWidget {
               ),
               TgcgMetricCard(
                 width: width,
-                label: 'Zones active',
-                value: '$zones / 6',
+                label: 'Senatorial zones active',
+                value: '$zones / 3',
                 detail: 'Zones with registered members',
-                icon: Icons.public_outlined,
+                icon: Icons.hub_outlined,
                 tone: TgcgMetricTone.neutral,
               ),
               TgcgMetricCard(
                 width: width,
-                label: 'States active',
-                value: '$states',
-                detail: 'States/FCT with registrations',
+                label: 'LGAs active',
+                value: '$lgas / 23',
+                detail: 'LGAs with registrations',
                 icon: Icons.map_outlined,
                 tone: TgcgMetricTone.warning,
               ),
@@ -233,23 +234,21 @@ class _ZoneCoverage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => TgcgSectionCard(
-        title: 'Geopolitical zones',
-        subtitle: 'Select a zone to filter the state directory.',
+        title: 'Senatorial zones',
+        subtitle: 'Select a senatorial zone to filter the LGA directory.',
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final columns = constraints.maxWidth >= 1050
-                ? 6
-                : constraints.maxWidth >= 680
-                    ? 3
-                    : constraints.maxWidth >= 440
-                        ? 2
-                        : 1;
+            final columns = constraints.maxWidth >= 680
+                ? 3
+                : constraints.maxWidth >= 440
+                    ? 2
+                    : 1;
             const gap = 10.0;
             final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
             return Wrap(
               spacing: gap,
               runSpacing: gap,
-              children: store.geography.zones.map((zone) {
+              children: store.geography.senatorialDistricts.map((zone) {
                 final members = store.membersForScope(zone.scope).length;
                 final agents = store.agentsForScope(zone.scope).length;
                 final active = selectedZoneId == zone.id;
@@ -277,13 +276,13 @@ class _ZoneCoverage extends StatelessWidget {
                           Row(
                             children: [
                               const Icon(
-                                Icons.public_rounded,
+                                Icons.hub_rounded,
                                 size: 17,
                                 color: TgcgColors.primary,
                               ),
                               const Spacer(),
                               Text(
-                                '${store.geography.statesForZone(zone.id).length} states',
+                                '${zone.lgaSlugs.length} LGAs',
                                 style: const TextStyle(
                                   color: TgcgColors.muted,
                                   fontSize: 9.5,
@@ -329,58 +328,58 @@ class _ZoneCoverage extends StatelessWidget {
       );
 }
 
-class _StateDirectory extends StatelessWidget {
-  const _StateDirectory({
+class _LgaDirectory extends StatelessWidget {
+  const _LgaDirectory({
     required this.store,
-    required this.states,
+    required this.lgas,
     required this.query,
-    required this.selectedStateId,
+    required this.selectedLgaId,
     required this.onQueryChanged,
     required this.onSelect,
     required this.onClearZone,
   });
 
   final MembershipOperationsController store;
-  final List<dynamic> states;
+  final List<CanonicalLga> lgas;
   final String query;
-  final String? selectedStateId;
+  final String? selectedLgaId;
   final ValueChanged<String> onQueryChanged;
   final ValueChanged<String> onSelect;
   final VoidCallback? onClearZone;
 
   @override
   Widget build(BuildContext context) => TgcgSectionCard(
-        title: 'State membership directory',
-        subtitle: 'Registered-member and agent coverage across every state and FCT.',
+        title: 'LGA membership directory',
+        subtitle: 'Registered-member and agent coverage across all 23 LGAs of Kaduna State.',
         trailing: onClearZone == null
             ? null
             : TextButton.icon(
                 onPressed: onClearZone,
                 icon: const Icon(Icons.filter_alt_off_outlined, size: 17),
-                label: const Text('All states'),
+                label: const Text('All LGAs'),
               ),
         child: Column(
           children: [
             TextField(
               onChanged: onQueryChanged,
               decoration: const InputDecoration(
-                hintText: 'Search state or zone',
+                hintText: 'Search LGA or senatorial zone',
                 prefixIcon: Icon(Icons.search_rounded),
               ),
             ),
             const SizedBox(height: 12),
-            ...states.map((state) {
-              final members = store.membersForScope(state.scope);
-              final agents = store.agentsForScope(state.scope);
+            ...lgas.map((lga) {
+              final members = store.membersForScope(lga.scope);
+              final agents = store.agentsForScope(lga.scope);
               final approved = agents
                   .where((item) =>
                       item.status == AccreditationStatus.approved)
                   .length;
-              final selected = selectedStateId == state.id;
+              final selected = selectedLgaId == lga.id;
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: InkWell(
-                  onTap: () => onSelect(state.id),
+                  onTap: () => onSelect(lga.id),
                   borderRadius: BorderRadius.circular(13),
                   child: Container(
                     padding: const EdgeInsets.all(12),
@@ -416,7 +415,7 @@ class _StateDirectory extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                state.name,
+                                lga.name,
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w900,
                                   color: TgcgColors.ink,
@@ -424,7 +423,7 @@ class _StateDirectory extends StatelessWidget {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                state.zoneName,
+                                lga.senatorialDistrictName,
                                 style: const TextStyle(
                                   color: TgcgColors.muted,
                                   fontSize: 10,
@@ -483,33 +482,34 @@ class _Count extends StatelessWidget {
       );
 }
 
-class _StateInspector extends StatelessWidget {
-  const _StateInspector({required this.store, required this.state});
+class _LgaInspector extends StatelessWidget {
+  const _LgaInspector({required this.store, required this.lga});
 
   final MembershipOperationsController store;
-  final dynamic state;
+  final CanonicalLga? lga;
 
   @override
   Widget build(BuildContext context) {
-    if (state == null) {
+    final lga = this.lga;
+    if (lga == null) {
       return const TgcgSectionCard(
-        title: 'State details',
-        subtitle: 'Select a state to inspect its membership and agents.',
+        title: 'LGA details',
+        subtitle: 'Select an LGA to inspect its membership and agents.',
         child: TgcgEmptyState(
           icon: Icons.map_outlined,
-          title: 'Select a state',
+          title: 'Select an LGA',
           message: 'Member identities and agent assignments will appear here.',
         ),
       );
     }
 
-    final members = store.membersForScope(state.scope);
-    final agents = store.agentsForScope(state.scope);
+    final members = store.membersForScope(lga.scope);
+    final agents = store.agentsForScope(lga.scope);
     return Column(
       children: [
         TgcgSectionCard(
-          title: state.name,
-          subtitle: state.zoneName,
+          title: '${lga.name} LGA',
+          subtitle: lga.senatorialDistrictName,
           trailing: TgcgStatusPill(
             label: '${members.length} MEMBERS',
             color: TgcgColors.primary,
@@ -546,12 +546,12 @@ class _StateInspector extends StatelessWidget {
         const SizedBox(height: 14),
         TgcgSectionCard(
           title: 'Registered members',
-          subtitle: 'Members enrolled under this state.',
+          subtitle: 'Members enrolled in this LGA.',
           child: members.isEmpty
               ? const TgcgEmptyState(
                   icon: Icons.person_search_outlined,
                   title: 'No members yet',
-                  message: 'State registrations will appear here.',
+                  message: 'LGA registrations will appear here.',
                 )
               : Column(
                   children: members
@@ -582,8 +582,8 @@ class _StateInspector extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         TgcgSectionCard(
-          title: 'State agents',
-          subtitle: 'Agent assignments currently visible in this state.',
+          title: 'LGA agents',
+          subtitle: 'Agent assignments currently visible in this LGA.',
           child: agents.isEmpty
               ? const TgcgEmptyState(
                   icon: Icons.badge_outlined,

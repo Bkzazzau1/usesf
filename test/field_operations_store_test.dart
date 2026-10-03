@@ -4,31 +4,35 @@ import 'package:usesf/tgcg/field/field_operations_store.dart';
 
 void main() {
   group('FieldOperationsController', () {
-    test('country scope sees all prototype incidents', () {
+    test('state scope sees all prototype incidents', () {
       final store = FieldOperationsController.prototypeSeed();
 
-      expect(store.incidentsForScope(GeographicScope.nigeria).length, 4);
-      expect(store.reportsForScope(GeographicScope.nigeria).length, 3);
+      expect(store.incidentsForScope(GeographicScope.kaduna).length, 4);
+      expect(store.reportsForScope(GeographicScope.kaduna).length, 3);
     });
 
-    test('state scope only sees matching state records', () {
+    test('senatorial zone scope only sees matching zone records', () {
       final store = FieldOperationsController.prototypeSeed();
-      const kaduna = GeographicScope(
-        level: GeographyLevel.state,
+      const kadunaSouth = GeographicScope(
+        level: GeographyLevel.senatorialDistrict,
         country: 'Nigeria',
         zoneId: 'NW',
         zoneName: 'North West',
         stateId: 'KD',
         stateName: 'Kaduna',
+        senatorialDistrictId: 'SD/054/KD',
+        senatorialDistrictName: 'Kaduna South',
       );
 
-      final incidents = store.incidentsForScope(kaduna);
-      final reports = store.reportsForScope(kaduna);
+      final all = store.incidentsForScope(GeographicScope.kaduna);
+      final incidents = store.incidentsForScope(kadunaSouth);
 
-      expect(incidents.length, 1);
-      expect(incidents.single.scope.stateId, 'KD');
-      expect(reports.length, 1);
-      expect(reports.single.scope.stateId, 'KD');
+      expect(incidents, isNotEmpty);
+      expect(incidents.length, lessThan(all.length));
+      expect(
+        incidents.every((item) => item.scope.senatorialDistrictId == 'SD/054/KD'),
+        isTrue,
+      );
     });
 
     test('incident status update is shared operational state', () {

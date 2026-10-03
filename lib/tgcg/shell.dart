@@ -16,7 +16,7 @@ import 'governance/governance_page.dart';
 import 'governance/role_assignment_page.dart';
 import 'media/media_intelligence_page.dart';
 import 'meeting/meeting_room_page.dart';
-import 'membership/national_membership_page.dart';
+import 'membership/state_membership_page.dart';
 import 'membership/pvc_enrollment_page.dart';
 import 'monitoring/system_monitoring_page.dart';
 import 'offline/offline_persistence.dart';
@@ -140,7 +140,7 @@ class _TgcgShellState extends State<TgcgShell> {
   Widget _pageFor(TgcgModule module) => switch (module) {
         TgcgModule.overview => TgcgDashboardPage(onOpenModule: _select),
         TgcgModule.accreditation => const PvcEnrollmentPage(),
-        TgcgModule.membershipNetwork => const NationalMembershipPage(),
+        TgcgModule.membershipNetwork => const StateMembershipPage(),
         TgcgModule.roleAssignment => const RoleAssignmentPage(),
         TgcgModule.geography => const GeographyPage(),
         TgcgModule.liveOperations => const LiveOperationsPage(),

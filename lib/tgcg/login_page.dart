@@ -18,8 +18,7 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
   final passwordController = TextEditingController();
 
   TgcgRole selectedRole = TgcgRole.situationRoomDirector;
-  String? selectedZoneId;
-  String? selectedStateId;
+  String? selectedDistrictId;
   bool obscurePassword = true;
   bool rememberDevice = true;
   bool showSignIn = false;
@@ -34,14 +33,12 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
 
   void _signIn() {
     final membership = MembershipOperations.of(context, listen: false);
-    var scope = GeographicScope.nigeria;
+    var scope = GeographicScope.kaduna;
 
-    if (selectedRole == TgcgRole.zonalCoordinator) {
-      final zoneId = selectedZoneId ?? membership.geography.zones.first.id;
-      scope = membership.geography.zone(zoneId)?.scope ?? scope;
-    } else if (selectedRole == TgcgRole.stateCoordinator) {
-      final stateId = selectedStateId ?? membership.geography.states.first.id;
-      scope = membership.geography.state(stateId)?.scope ?? scope;
+    if (selectedRole == TgcgRole.senatorialCoordinator) {
+      final districts = membership.geography.senatorialDistricts;
+      final districtId = selectedDistrictId ?? districts.first.id;
+      scope = membership.geography.senatorialDistrict(districtId)?.scope ?? scope;
     }
 
     TgcgSession.of(context, listen: false).signIn(
@@ -151,7 +148,7 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
             if (!compact) ...[
               const SizedBox(height: 10),
               const Text(
-                'Accreditation, field monitoring, incident management, evidence, result capture, collation and nationwide coordination.',
+                'Accreditation, field monitoring, incident management, evidence, result capture, collation and coordination across all 23 LGAs of Kaduna State.',
                 style: TextStyle(color: Colors.white70, height: 1.5),
               ),
             ],
@@ -160,9 +157,10 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
               spacing: 8,
               runSpacing: 8,
               children: const [
-                _Stat('36 + FCT', 'States'),
-                _Stat('774', 'LGAs'),
-                _Stat('176,846', 'Polling Units'),
+                _Stat('3', 'Senatorial Zones'),
+                _Stat('23', 'LGAs'),
+                _Stat('255', 'Wards'),
+                _Stat('8,012', 'Polling Units'),
               ],
             ),
           ],
@@ -300,8 +298,7 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
                 ),
                 const SizedBox(height: 12),
                 _roleGrid(),
-                if (selectedRole == TgcgRole.zonalCoordinator ||
-                    selectedRole == TgcgRole.stateCoordinator) ...[
+                if (selectedRole == TgcgRole.senatorialCoordinator) ...[
                   const SizedBox(height: 14),
                   _roleScopeSelector(),
                 ],
@@ -408,49 +405,26 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
       );
 
   Widget _roleScopeSelector() {
-    final geography =
-        MembershipOperations.of(context, listen: false).geography;
-
-    if (selectedRole == TgcgRole.zonalCoordinator) {
-      final value = selectedZoneId ?? geography.zones.first.id;
-      selectedZoneId ??= value;
-      return DropdownButtonFormField<String>(
-        initialValue: value,
-        isExpanded: true,
-        decoration: const InputDecoration(
-          labelText: 'Assigned geopolitical zone',
-          prefixIcon: Icon(Icons.public_outlined),
-        ),
-        items: geography.zones
-            .map(
-              (zone) => DropdownMenuItem(
-                value: zone.id,
-                child: Text(zone.name),
-              ),
-            )
-            .toList(),
-        onChanged: (next) => setState(() => selectedZoneId = next),
-      );
-    }
-
-    final value = selectedStateId ?? geography.states.first.id;
-    selectedStateId ??= value;
+    final districts =
+        MembershipOperations.of(context, listen: false).geography.senatorialDistricts;
+    final value = selectedDistrictId ?? districts.first.id;
+    selectedDistrictId ??= value;
     return DropdownButtonFormField<String>(
       initialValue: value,
       isExpanded: true,
       decoration: const InputDecoration(
-        labelText: 'Assigned state / FCT',
-        prefixIcon: Icon(Icons.map_outlined),
+        labelText: 'Assigned senatorial zone',
+        prefixIcon: Icon(Icons.hub_outlined),
       ),
-      items: geography.states
+      items: districts
           .map(
-            (state) => DropdownMenuItem(
-              value: state.id,
-              child: Text('${state.name} • ${state.zoneName}'),
+            (district) => DropdownMenuItem(
+              value: district.id,
+              child: Text('${district.name} • ${district.lgaSlugs.length} LGAs'),
             ),
           )
           .toList(),
-      onChanged: (next) => setState(() => selectedStateId = next),
+      onChanged: (next) => setState(() => selectedDistrictId = next),
     );
   }
 
@@ -473,8 +447,7 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
                 borderRadius: BorderRadius.circular(14),
                 onTap: () => setState(() {
                   selectedRole = role;
-                  if (role != TgcgRole.zonalCoordinator) selectedZoneId = null;
-                  if (role != TgcgRole.stateCoordinator) selectedStateId = null;
+                  if (role != TgcgRole.senatorialCoordinator) selectedDistrictId = null;
                 }),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 160),

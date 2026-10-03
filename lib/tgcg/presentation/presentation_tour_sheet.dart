@@ -27,8 +27,8 @@ Future<void> showPresentationTour(
   const steps = <PresentationTourStep>[
     PresentationTourStep(
       number: 1,
-      title: 'National Command',
-      subtitle: 'Start with the nationwide operational picture.',
+      title: 'State Command',
+      subtitle: 'Start with the Kaduna State operational picture.',
       module: TgcgModule.overview,
       icon: Icons.space_dashboard_outlined,
     ),

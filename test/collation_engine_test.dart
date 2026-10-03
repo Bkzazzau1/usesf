@@ -10,7 +10,7 @@ void main() {
     zoneName: 'North West',
     stateId: 'KD',
     stateName: 'Kaduna',
-    senatorialDistrictId: 'KD-SD-01',
+    senatorialDistrictId: 'SD/053/KD',
     senatorialDistrictName: 'District 01',
     lgaId: 'KD-LGA-01',
     lgaName: 'LGA 01',
@@ -26,7 +26,7 @@ void main() {
     zoneName: 'North West',
     stateId: 'KD',
     stateName: 'Kaduna',
-    senatorialDistrictId: 'KD-SD-01',
+    senatorialDistrictId: 'SD/053/KD',
     senatorialDistrictName: 'District 01',
     lgaId: 'KD-LGA-01',
     lgaName: 'LGA 01',
@@ -62,7 +62,7 @@ void main() {
 
   test('only verified polling-unit submissions are included', () {
     final summary = engine.summarize(
-      GeographicScope.nigeria,
+      GeographicScope.kaduna,
       [
         result(id: 'R1', scope: pu1, status: RecordStatus.verified),
         result(id: 'R2', scope: pu2, status: RecordStatus.submitted),
@@ -79,7 +79,7 @@ void main() {
 
   test('two verified records for one polling unit create a conflict and count neither', () {
     final summary = engine.summarize(
-      GeographicScope.nigeria,
+      GeographicScope.kaduna,
       [
         result(id: 'R1', scope: pu1, status: RecordStatus.verified),
         result(
@@ -100,7 +100,7 @@ void main() {
 
   test('disputed result remains excluded from collation', () {
     final summary = engine.summarize(
-      GeographicScope.nigeria,
+      GeographicScope.kaduna,
       [result(id: 'R1', scope: pu1, status: RecordStatus.disputed)],
     );
 
@@ -123,6 +123,6 @@ void main() {
 
     expect(children, hasLength(1));
     expect(children.single.level, GeographyLevel.senatorialDistrict);
-    expect(children.single.senatorialDistrictId, 'KD-SD-01');
+    expect(children.single.senatorialDistrictId, 'SD/053/KD');
   });
 }

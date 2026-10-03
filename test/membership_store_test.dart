@@ -53,7 +53,13 @@ void main() {
         stateName: kaduna.stateName,
       );
 
-      expect(store.assignedPollingUnitsWithin(state), 1);
+      expect(store.assignedPollingUnitsWithin(state), 2);
+      expect(
+        store.assignedPollingUnitsWithin(
+          geography.senatorialDistrict('SD/053/KD')!.scope,
+        ),
+        1,
+      );
     });
 
     test('status changes update accreditation record', () {

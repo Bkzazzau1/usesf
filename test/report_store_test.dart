@@ -12,10 +12,10 @@ void main() {
     final job = reports.requestExport(
       kind: ReportKind.incidentSummary,
       format: ExportFormat.pdf,
-      targetScope: GeographicScope.nigeria,
+      targetScope: GeographicScope.kaduna,
       actorId: 'ADMIN-001',
-      role: TgcgRole.nationalAdministrator,
-      userScope: GeographicScope.nigeria,
+      role: TgcgRole.stateAdministrator,
+      userScope: GeographicScope.kaduna,
       recordCount: 4,
     );
 
@@ -33,10 +33,10 @@ void main() {
     final job = reports.requestExport(
       kind: ReportKind.auditTrail,
       format: ExportFormat.csv,
-      targetScope: GeographicScope.nigeria,
+      targetScope: GeographicScope.kaduna,
       actorId: 'AG-001',
       role: TgcgRole.pollingUnitAgent,
-      userScope: GeographicScope.nigeria,
+      userScope: GeographicScope.kaduna,
     );
 
     expect(job, isNull);
@@ -49,18 +49,18 @@ void main() {
     final auditJob = reports.requestExport(
       kind: ReportKind.auditTrail,
       format: ExportFormat.csv,
-      targetScope: GeographicScope.nigeria,
+      targetScope: GeographicScope.kaduna,
       actorId: 'STATE-001',
       role: TgcgRole.stateCoordinator,
-      userScope: GeographicScope.nigeria,
+      userScope: GeographicScope.kaduna,
     );
     final incidentJob = reports.requestExport(
       kind: ReportKind.incidentSummary,
       format: ExportFormat.pdf,
-      targetScope: GeographicScope.nigeria,
+      targetScope: GeographicScope.kaduna,
       actorId: 'STATE-001',
       role: TgcgRole.stateCoordinator,
-      userScope: GeographicScope.nigeria,
+      userScope: GeographicScope.kaduna,
     );
 
     expect(auditJob, isNull);
@@ -70,60 +70,70 @@ void main() {
   test('export target cannot escape operator geographic scope', () {
     final governance = GovernanceOperationsController.prototypeSeed();
     final reports = ReportOperationsController.prototypeSeed(governance);
-    const kaduna = GeographicScope(
-      level: GeographyLevel.state,
+    const kadunaCentral = GeographicScope(
+      level: GeographyLevel.senatorialDistrict,
       country: 'Nigeria',
       zoneId: 'NW',
       zoneName: 'North West',
       stateId: 'KD',
       stateName: 'Kaduna',
+      senatorialDistrictId: 'SD/053/KD',
+      senatorialDistrictName: 'Kaduna Central',
     );
-    const lagos = GeographicScope(
-      level: GeographyLevel.state,
+    const kadunaSouth = GeographicScope(
+      level: GeographyLevel.senatorialDistrict,
       country: 'Nigeria',
-      zoneId: 'SW',
-      zoneName: 'South West',
-      stateId: 'LA',
-      stateName: 'Lagos',
+      zoneId: 'NW',
+      zoneName: 'North West',
+      stateId: 'KD',
+      stateName: 'Kaduna',
+      senatorialDistrictId: 'SD/054/KD',
+      senatorialDistrictName: 'Kaduna South',
     );
 
     final job = reports.requestExport(
       kind: ReportKind.fieldActivity,
       format: ExportFormat.csv,
-      targetScope: lagos,
-      actorId: 'ADMIN-KD',
-      role: TgcgRole.nationalAdministrator,
-      userScope: kaduna,
+      targetScope: kadunaSouth,
+      actorId: 'COORD-KC',
+      role: TgcgRole.senatorialCoordinator,
+      userScope: kadunaCentral,
     );
 
     expect(job, isNull);
   });
 
-  test('scoped export history does not expose broader national jobs', () {
+  test('scoped export history does not expose broader state-wide jobs', () {
     final governance = GovernanceOperationsController.prototypeSeed();
     final reports = ReportOperationsController.prototypeSeed(governance);
-    const kaduna = GeographicScope(
-      level: GeographyLevel.state,
+    const kadunaCentral = GeographicScope(
+      level: GeographyLevel.senatorialDistrict,
       country: 'Nigeria',
       zoneId: 'NW',
       zoneName: 'North West',
       stateId: 'KD',
       stateName: 'Kaduna',
+      senatorialDistrictId: 'SD/053/KD',
+      senatorialDistrictName: 'Kaduna Central',
     );
 
-    expect(reports.jobsForScope(kaduna), isEmpty);
+    expect(reports.jobsForScope(GeographicScope.kaduna), isNotEmpty);
+    expect(reports.jobsForScope(kadunaCentral), isEmpty);
 
     final job = reports.requestExport(
       kind: ReportKind.incidentSummary,
       format: ExportFormat.pdf,
-      targetScope: kaduna,
-      actorId: 'ADMIN-KD',
-      role: TgcgRole.nationalAdministrator,
-      userScope: kaduna,
+      targetScope: kadunaCentral,
+      actorId: 'COORD-KC',
+      role: TgcgRole.senatorialCoordinator,
+      userScope: kadunaCentral,
     );
 
     expect(job, isNotNull);
-    expect(reports.jobsForScope(kaduna).map((item) => item.id), contains(job!.id));
+    expect(
+      reports.jobsForScope(kadunaCentral).map((item) => item.id),
+      [job!.id],
+    );
   });
 
   test('history hides report kinds the viewer cannot access', () {
@@ -143,16 +153,16 @@ void main() {
       format: ExportFormat.csv,
       targetScope: kaduna,
       actorId: 'ADMIN-001',
-      role: TgcgRole.nationalAdministrator,
-      userScope: GeographicScope.nigeria,
+      role: TgcgRole.stateAdministrator,
+      userScope: GeographicScope.kaduna,
     );
     final incidentJob = reports.requestExport(
       kind: ReportKind.incidentSummary,
       format: ExportFormat.pdf,
       targetScope: kaduna,
       actorId: 'ADMIN-001',
-      role: TgcgRole.nationalAdministrator,
-      userScope: GeographicScope.nigeria,
+      role: TgcgRole.stateAdministrator,
+      userScope: GeographicScope.kaduna,
     );
 
     expect(auditJob, isNotNull);
@@ -173,10 +183,10 @@ void main() {
     final job = reports.requestExport(
       kind: ReportKind.evidencePackage,
       format: ExportFormat.zip,
-      targetScope: GeographicScope.nigeria,
+      targetScope: GeographicScope.kaduna,
       actorId: 'LEGAL-001',
-      role: TgcgRole.nationalAdministrator,
-      userScope: GeographicScope.nigeria,
+      role: TgcgRole.stateAdministrator,
+      userScope: GeographicScope.kaduna,
       recordCount: 3,
     )!;
 

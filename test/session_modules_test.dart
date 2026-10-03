@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:usesf/tgcg/session.dart';
 
 void main() {
-  group('TGCG role-aware modules', () {
+  group('USESF role-aware modules', () {
     test('polling unit agent sees operational submission modules only', () {
       final modules = allowedModules(TgcgRole.pollingUnitAgent);
 
@@ -17,8 +17,8 @@ void main() {
       expect(modules, isNot(contains(TgcgModule.governance)));
     });
 
-    test('national administrator sees every application module', () {
-      final modules = allowedModules(TgcgRole.nationalAdministrator);
+    test('state administrator sees every application module', () {
+      final modules = allowedModules(TgcgRole.stateAdministrator);
       expect(modules, containsAll(TgcgModule.values));
     });
 

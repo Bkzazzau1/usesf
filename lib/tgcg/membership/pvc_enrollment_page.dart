@@ -23,7 +23,7 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
   PvcRecognitionResult? _scan;
   bool _reading = false;
   TgcgMember? _created;
-  String? _selectedStateId;
+  String? _selectedLgaId;
 
   @override
   void dispose() {
@@ -38,7 +38,7 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
   Widget build(BuildContext context) {
     final session = TgcgSession.of(context);
     final store = MembershipOperations.of(context);
-    _selectedStateId ??= store.geography.states.first.id;
+    _selectedLgaId ??= store.geography.lgas.first.id;
     final canManage = TgcgPermissionPolicy.allows(
       session.role!,
       TgcgCapability.manageMembership,
@@ -55,7 +55,7 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
           eyebrow: 'PVC IDENTITY ENROLMENT',
           title: 'Member Enrolment',
           subtitle:
-              'Scan a Permanent Voter Card, confirm the recognized identity, assign the registration state and continue to field accreditation.',
+              'Scan a Permanent Voter Card, confirm the recognized identity, assign the registration LGA and continue to field accreditation.',
           trailing: TgcgStatusPill(
             label: '${store.members.length} MEMBERS',
             color: TgcgColors.primary,
@@ -79,10 +79,10 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
               phone: _phone,
               email: _email,
               voterId: _voterId,
-              states: store.geography.states,
-              selectedStateId: _selectedStateId!,
-              onStateChanged: (value) =>
-                  setState(() => _selectedStateId = value),
+              lgas: store.geography.lgas,
+              selectedLgaId: _selectedLgaId!,
+              onLgaChanged: (value) =>
+                  setState(() => _selectedLgaId = value),
               scan: _scan,
               created: _created,
               enabled: canManage && _scan != null,
@@ -145,16 +145,16 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
     if (_scan == null ||
         _name.text.trim().isEmpty ||
         _phone.text.trim().isEmpty ||
-        _selectedStateId == null) {
+        _selectedLgaId == null) {
       return;
     }
-    final state = store.geography.state(_selectedStateId!);
-    if (state == null) return;
+    final lga = store.geography.lga(_selectedLgaId!);
+    if (lga == null) return;
     final member = store.createMember(
       fullName: _name.text.trim(),
       phoneNumber: _phone.text.trim(),
       email: _email.text.trim(),
-      registrationScope: state.scope,
+      registrationScope: lga.scope,
     );
     setState(() => _created = member);
   }
@@ -434,9 +434,9 @@ class _IdentityForm extends StatelessWidget {
     required this.phone,
     required this.email,
     required this.voterId,
-    required this.states,
-    required this.selectedStateId,
-    required this.onStateChanged,
+    required this.lgas,
+    required this.selectedLgaId,
+    required this.onLgaChanged,
     required this.scan,
     required this.created,
     required this.enabled,
@@ -448,9 +448,9 @@ class _IdentityForm extends StatelessWidget {
   final TextEditingController phone;
   final TextEditingController email;
   final TextEditingController voterId;
-  final List<CanonicalState> states;
-  final String selectedStateId;
-  final ValueChanged<String> onStateChanged;
+  final List<CanonicalLga> lgas;
+  final String selectedLgaId;
+  final ValueChanged<String> onLgaChanged;
   final PvcRecognitionResult? scan;
   final TgcgMember? created;
   final bool enabled;
@@ -461,7 +461,7 @@ class _IdentityForm extends StatelessWidget {
   Widget build(BuildContext context) => TgcgSectionCard(
         title: 'Confirm identity',
         subtitle:
-            'Review the recognized fields and registration state before creating the membership record.',
+            'Review the recognized fields and registration LGA before creating the membership record.',
         child: Column(
           children: [
             TextField(
@@ -477,20 +477,20 @@ class _IdentityForm extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
-              initialValue: selectedStateId,
+              initialValue: selectedLgaId,
               isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Registration state'),
-              items: states
+              decoration: const InputDecoration(labelText: 'Registration LGA'),
+              items: lgas
                   .map(
-                    (state) => DropdownMenuItem(
-                      value: state.id,
-                      child: Text('${state.name} • ${state.zoneName}'),
+                    (lga) => DropdownMenuItem(
+                      value: lga.id,
+                      child: Text('${lga.name} • ${lga.senatorialDistrictName}'),
                     ),
                   )
                   .toList(),
               onChanged: enabled && created == null
                   ? (value) {
-                      if (value != null) onStateChanged(value);
+                      if (value != null) onLgaChanged(value);
                     }
                   : null,
             ),
@@ -588,7 +588,7 @@ class _RecentMembers extends StatelessWidget {
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
               subtitle: Text(
-                '${member.membershipNumber ?? member.id} • ${scope?.label ?? 'Nigeria'} • ${member.phoneNumber}',
+                '${member.membershipNumber ?? member.id} • ${scope?.label ?? 'Kaduna State'} • ${member.phoneNumber}',
               ),
               trailing: TgcgStatusPill(
                 label: member.status.name.toUpperCase(),

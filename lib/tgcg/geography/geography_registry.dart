@@ -1,6 +1,5 @@
 import '../domain/models.dart';
-import 'nigeria_lga_catalog.dart';
-import 'nigeria_senatorial_catalog.dart';
+import 'kaduna_geography.dart';
 
 class CanonicalZone {
   const CanonicalZone({required this.id, required this.name});
@@ -22,14 +21,12 @@ class CanonicalState {
     required this.name,
     required this.zoneId,
     required this.zoneName,
-    this.isFederalCapitalTerritory = false,
   });
 
   final String id;
   final String name;
   final String zoneId;
   final String zoneName;
-  final bool isFederalCapitalTerritory;
 
   GeographicScope get scope => GeographicScope(
         level: GeographyLevel.state,
@@ -130,54 +127,19 @@ class GeographyRegistry {
   final List<CanonicalState> states;
   final List<CanonicalPollingUnit> pollingUnits;
 
+  /// Kaduna State is the operational root; zone and country are retained
+  /// only as parent metadata on every record.
+  static const kadunaZone = CanonicalZone(id: 'NW', name: 'North West');
+  static const kaduna = CanonicalState(
+    id: kadunaStateId,
+    name: kadunaStateName,
+    zoneId: 'NW',
+    zoneName: 'North West',
+  );
+
   factory GeographyRegistry.prototypeSeed() => const GeographyRegistry(
-        zones: [
-          CanonicalZone(id: 'NC', name: 'North Central'),
-          CanonicalZone(id: 'NE', name: 'North East'),
-          CanonicalZone(id: 'NW', name: 'North West'),
-          CanonicalZone(id: 'SE', name: 'South East'),
-          CanonicalZone(id: 'SS', name: 'South South'),
-          CanonicalZone(id: 'SW', name: 'South West'),
-        ],
-        states: [
-          CanonicalState(id: 'BN', name: 'Benue', zoneId: 'NC', zoneName: 'North Central'),
-          CanonicalState(id: 'FCT', name: 'Federal Capital Territory', zoneId: 'NC', zoneName: 'North Central', isFederalCapitalTerritory: true),
-          CanonicalState(id: 'KO', name: 'Kogi', zoneId: 'NC', zoneName: 'North Central'),
-          CanonicalState(id: 'KW', name: 'Kwara', zoneId: 'NC', zoneName: 'North Central'),
-          CanonicalState(id: 'NA', name: 'Nasarawa', zoneId: 'NC', zoneName: 'North Central'),
-          CanonicalState(id: 'NI', name: 'Niger', zoneId: 'NC', zoneName: 'North Central'),
-          CanonicalState(id: 'PL', name: 'Plateau', zoneId: 'NC', zoneName: 'North Central'),
-          CanonicalState(id: 'AD', name: 'Adamawa', zoneId: 'NE', zoneName: 'North East'),
-          CanonicalState(id: 'BA', name: 'Bauchi', zoneId: 'NE', zoneName: 'North East'),
-          CanonicalState(id: 'BO', name: 'Borno', zoneId: 'NE', zoneName: 'North East'),
-          CanonicalState(id: 'GO', name: 'Gombe', zoneId: 'NE', zoneName: 'North East'),
-          CanonicalState(id: 'TA', name: 'Taraba', zoneId: 'NE', zoneName: 'North East'),
-          CanonicalState(id: 'YO', name: 'Yobe', zoneId: 'NE', zoneName: 'North East'),
-          CanonicalState(id: 'JI', name: 'Jigawa', zoneId: 'NW', zoneName: 'North West'),
-          CanonicalState(id: 'KD', name: 'Kaduna', zoneId: 'NW', zoneName: 'North West'),
-          CanonicalState(id: 'KN', name: 'Kano', zoneId: 'NW', zoneName: 'North West'),
-          CanonicalState(id: 'KT', name: 'Katsina', zoneId: 'NW', zoneName: 'North West'),
-          CanonicalState(id: 'KE', name: 'Kebbi', zoneId: 'NW', zoneName: 'North West'),
-          CanonicalState(id: 'SO', name: 'Sokoto', zoneId: 'NW', zoneName: 'North West'),
-          CanonicalState(id: 'ZA', name: 'Zamfara', zoneId: 'NW', zoneName: 'North West'),
-          CanonicalState(id: 'AB', name: 'Abia', zoneId: 'SE', zoneName: 'South East'),
-          CanonicalState(id: 'AN', name: 'Anambra', zoneId: 'SE', zoneName: 'South East'),
-          CanonicalState(id: 'EB', name: 'Ebonyi', zoneId: 'SE', zoneName: 'South East'),
-          CanonicalState(id: 'EN', name: 'Enugu', zoneId: 'SE', zoneName: 'South East'),
-          CanonicalState(id: 'IM', name: 'Imo', zoneId: 'SE', zoneName: 'South East'),
-          CanonicalState(id: 'AK', name: 'Akwa Ibom', zoneId: 'SS', zoneName: 'South South'),
-          CanonicalState(id: 'BY', name: 'Bayelsa', zoneId: 'SS', zoneName: 'South South'),
-          CanonicalState(id: 'CR', name: 'Cross River', zoneId: 'SS', zoneName: 'South South'),
-          CanonicalState(id: 'DE', name: 'Delta', zoneId: 'SS', zoneName: 'South South'),
-          CanonicalState(id: 'ED', name: 'Edo', zoneId: 'SS', zoneName: 'South South'),
-          CanonicalState(id: 'RI', name: 'Rivers', zoneId: 'SS', zoneName: 'South South'),
-          CanonicalState(id: 'EK', name: 'Ekiti', zoneId: 'SW', zoneName: 'South West'),
-          CanonicalState(id: 'LA', name: 'Lagos', zoneId: 'SW', zoneName: 'South West'),
-          CanonicalState(id: 'OG', name: 'Ogun', zoneId: 'SW', zoneName: 'South West'),
-          CanonicalState(id: 'ON', name: 'Ondo', zoneId: 'SW', zoneName: 'South West'),
-          CanonicalState(id: 'OS', name: 'Osun', zoneId: 'SW', zoneName: 'South West'),
-          CanonicalState(id: 'OY', name: 'Oyo', zoneId: 'SW', zoneName: 'South West'),
-        ],
+        zones: [kadunaZone],
+        states: [kaduna],
         pollingUnits: [
           CanonicalPollingUnit(
             code: 'KD-KN-W01-PU001',
@@ -187,8 +149,8 @@ class GeographyRegistry {
               country: 'Nigeria',
               zoneId: 'NW',
               zoneName: 'North West',
-              stateId: 'KD',
-              stateName: 'Kaduna',
+              stateId: kadunaStateId,
+              stateName: kadunaStateName,
               senatorialDistrictId: 'SD/053/KD',
               senatorialDistrictName: 'Kaduna Central',
               lgaId: 'KD-KADUNA-NORTH',
@@ -207,8 +169,8 @@ class GeographyRegistry {
               country: 'Nigeria',
               zoneId: 'NW',
               zoneName: 'North West',
-              stateId: 'KD',
-              stateName: 'Kaduna',
+              stateId: kadunaStateId,
+              stateName: kadunaStateName,
               senatorialDistrictId: 'SD/053/KD',
               senatorialDistrictName: 'Kaduna Central',
               lgaId: 'KD-KADUNA-NORTH',
@@ -220,82 +182,82 @@ class GeographyRegistry {
             ),
           ),
           CanonicalPollingUnit(
-            code: 'BN-MK-W01-PU004',
+            code: 'KD-ZA-W01-PU004',
             registeredVoters: 502,
             scope: GeographicScope(
               level: GeographyLevel.pollingUnit,
               country: 'Nigeria',
-              zoneId: 'NC',
-              zoneName: 'North Central',
-              stateId: 'BN',
-              stateName: 'Benue',
-              senatorialDistrictId: 'SD/020/BN',
-              senatorialDistrictName: 'Benue North West',
-              lgaId: 'BN-MAKURDI',
-              lgaName: 'Makurdi',
-              wardId: 'BN-MK-W01',
+              zoneId: 'NW',
+              zoneName: 'North West',
+              stateId: kadunaStateId,
+              stateName: kadunaStateName,
+              senatorialDistrictId: 'SD/052/KD',
+              senatorialDistrictName: 'Kaduna North',
+              lgaId: 'KD-ZARIA',
+              lgaName: 'Zaria',
+              wardId: 'KD-ZA-W01',
               wardName: 'Ward 01',
-              pollingUnitId: 'BN-MK-W01-PU004',
+              pollingUnitId: 'KD-ZA-W01-PU004',
               pollingUnitName: 'PU 004',
             ),
           ),
           CanonicalPollingUnit(
-            code: 'BN-MK-W01-PU005',
+            code: 'KD-ZA-W01-PU005',
             registeredVoters: 391,
             scope: GeographicScope(
               level: GeographyLevel.pollingUnit,
               country: 'Nigeria',
-              zoneId: 'NC',
-              zoneName: 'North Central',
-              stateId: 'BN',
-              stateName: 'Benue',
-              senatorialDistrictId: 'SD/020/BN',
-              senatorialDistrictName: 'Benue North West',
-              lgaId: 'BN-MAKURDI',
-              lgaName: 'Makurdi',
-              wardId: 'BN-MK-W01',
+              zoneId: 'NW',
+              zoneName: 'North West',
+              stateId: kadunaStateId,
+              stateName: kadunaStateName,
+              senatorialDistrictId: 'SD/052/KD',
+              senatorialDistrictName: 'Kaduna North',
+              lgaId: 'KD-ZARIA',
+              lgaName: 'Zaria',
+              wardId: 'KD-ZA-W01',
               wardName: 'Ward 01',
-              pollingUnitId: 'BN-MK-W01-PU005',
+              pollingUnitId: 'KD-ZA-W01-PU005',
               pollingUnitName: 'PU 005',
             ),
           ),
           CanonicalPollingUnit(
-            code: 'LA-IK-W03-PU012',
+            code: 'KD-JM-W03-PU012',
             registeredVoters: 612,
             scope: GeographicScope(
               level: GeographyLevel.pollingUnit,
               country: 'Nigeria',
-              zoneId: 'SW',
-              zoneName: 'South West',
-              stateId: 'LA',
-              stateName: 'Lagos',
-              senatorialDistrictId: 'SD/072/LA',
-              senatorialDistrictName: 'Lagos West',
-              lgaId: 'LA-IKEJA',
-              lgaName: 'Ikeja',
-              wardId: 'LA-IK-W03',
+              zoneId: 'NW',
+              zoneName: 'North West',
+              stateId: kadunaStateId,
+              stateName: kadunaStateName,
+              senatorialDistrictId: 'SD/054/KD',
+              senatorialDistrictName: 'Kaduna South',
+              lgaId: 'KD-JEMAA',
+              lgaName: "Jema'a",
+              wardId: 'KD-JM-W03',
               wardName: 'Ward 03',
-              pollingUnitId: 'LA-IK-W03-PU012',
+              pollingUnitId: 'KD-JM-W03-PU012',
               pollingUnitName: 'PU 012',
             ),
           ),
           CanonicalPollingUnit(
-            code: 'LA-IK-W03-PU013',
+            code: 'KD-JM-W03-PU013',
             registeredVoters: 577,
             scope: GeographicScope(
               level: GeographyLevel.pollingUnit,
               country: 'Nigeria',
-              zoneId: 'SW',
-              zoneName: 'South West',
-              stateId: 'LA',
-              stateName: 'Lagos',
-              senatorialDistrictId: 'SD/072/LA',
-              senatorialDistrictName: 'Lagos West',
-              lgaId: 'LA-IKEJA',
-              lgaName: 'Ikeja',
-              wardId: 'LA-IK-W03',
+              zoneId: 'NW',
+              zoneName: 'North West',
+              stateId: kadunaStateId,
+              stateName: kadunaStateName,
+              senatorialDistrictId: 'SD/054/KD',
+              senatorialDistrictName: 'Kaduna South',
+              lgaId: 'KD-JEMAA',
+              lgaName: "Jema'a",
+              wardId: 'KD-JM-W03',
               wardName: 'Ward 03',
-              pollingUnitId: 'LA-IK-W03-PU013',
+              pollingUnitId: 'KD-JM-W03-PU013',
               pollingUnitName: 'PU 013',
             ),
           ),
@@ -324,13 +286,13 @@ class GeographyRegistry {
       .expand((item) => districtsForState(item.id))
       .toList(growable: false);
 
-  int get nationalSenatorialDistrictCount => senatorialDistricts.length;
+  int get senatorialDistrictCount => senatorialDistricts.length;
 
   List<CanonicalSenatorialDistrict> districtsForState(String stateId) {
     final stateItem = state(stateId);
     if (stateItem == null) return const [];
-    return nigeriaSenatorialDistricts
-        .where((seed) => seed.stateId == stateId)
+    if (stateId != kadunaStateId) return const [];
+    return kadunaSenatorialDistricts
         .map(
           (seed) => CanonicalSenatorialDistrict(
             id: seed.code,
@@ -366,13 +328,13 @@ class GeographyRegistry {
       .expand((item) => lgasForState(item.id))
       .toList(growable: false);
 
-  int get nationalLgaCount => lgas.length;
+  int get lgaCount => lgas.length;
 
   List<CanonicalLga> lgasForState(String stateId) {
     final stateItem = state(stateId);
     if (stateItem == null) return const [];
-    final slugs = nigeriaLgaSlugsByStateId[stateId] ?? const <String>[];
-    return slugs
+    if (stateId != kadunaStateId) return const [];
+    return kadunaLgaSlugs
         .map((slug) {
           final district = districtForLgaSlug(stateId, slug);
           if (district == null) return null;
@@ -399,7 +361,7 @@ class GeographyRegistry {
   ) =>
       CanonicalLga(
         id: '${stateItem.id}-${slug.toUpperCase().replaceAll("'", '')}',
-        name: nigeriaLgaDisplayName(slug),
+        name: kadunaLgaDisplayName(slug),
         stateId: stateItem.id,
         stateName: stateItem.name,
         zoneId: stateItem.zoneId,

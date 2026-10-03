@@ -197,16 +197,16 @@ class _ReportsPageState extends State<ReportsPage> {
         kind: ReportKind.syncOutbox,
         title: 'Sync Outbox',
         subtitle:
-            'Queued, failed and conflicting offline mutations. National/system scope only.',
+            'Queued, failed and conflicting offline mutations. State/system scope only.',
         icon: Icons.sync_problem_outlined,
         recordCount: canExport(ReportKind.syncOutbox)
             ? governance.outbox.length
             : 0,
         detail: canExport(ReportKind.syncOutbox)
             ? '${governance.pendingOutbox.length} pending mutations'
-            : scope.level == GeographyLevel.country
+            : scope.level == GeographyLevel.state
                 ? 'Additional audit permission required'
-                : 'National/system scope required',
+                : 'State/system scope required',
         formats: const [ExportFormat.csv, ExportFormat.json],
         enabled: canExport(ReportKind.syncOutbox),
         tone: TgcgMetricTone.warning,

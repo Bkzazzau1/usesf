@@ -56,9 +56,9 @@ class TgcgDashboardPage extends StatelessWidget {
     final collationEngine = CollationEngine.prototypeSeed();
     final collation = collationEngine.summarize(scope, results.submissions);
 
-    // Geography navigation comes from the canonical national registry, not
-    // from the small result-collation seed. At national level this therefore
-    // always exposes all six geopolitical zones.
+    // Geography navigation comes from the canonical Kaduna registry, not
+    // from the small result-collation seed. At state level this therefore
+    // always exposes all three senatorial zones.
     final childScopes = membership.geography.childScopes(scope);
     final coverage = childScopes
         .map(
@@ -88,8 +88,8 @@ class TgcgDashboardPage extends StatelessWidget {
           padding: EdgeInsets.fromLTRB(padding, 22, padding, 36),
           children: [
             TgcgPageHeader(
-              eyebrow: scope.level == GeographyLevel.country
-                  ? 'NATIONAL COMMAND CENTRE'
+              eyebrow: scope.level == GeographyLevel.state
+                  ? 'KADUNA STATE COMMAND CENTRE'
                   : 'AUTHORIZED OPERATIONAL SCOPE',
               title: 'Operations Command',
               subtitle:
@@ -329,10 +329,10 @@ class _CoveragePanel extends StatelessWidget {
   final VoidCallback? onOpenGeography;
 
   String get _title => switch (scope.level) {
-        GeographyLevel.country => 'National coverage by geopolitical zone',
-        GeographyLevel.geopoliticalZone => 'Zone coverage by state',
-        GeographyLevel.state => 'State operational geography',
-        GeographyLevel.senatorialDistrict => 'Senatorial district coverage',
+        GeographyLevel.country => 'Coverage',
+        GeographyLevel.geopoliticalZone => 'Coverage',
+        GeographyLevel.state => 'Kaduna State coverage by senatorial zone',
+        GeographyLevel.senatorialDistrict => 'Senatorial zone coverage by LGA',
         GeographyLevel.lga => 'LGA coverage',
         GeographyLevel.ward => 'Ward coverage',
         GeographyLevel.pollingUnit => 'Polling unit',
@@ -400,18 +400,22 @@ class _CoveragePanel extends StatelessWidget {
                             Row(
                               children: [
                                 Icon(
-                                  item.scope.level == GeographyLevel.state
-                                      ? Icons.location_city_outlined
-                                      : Icons.public_outlined,
+                                  item.scope.level == GeographyLevel.senatorialDistrict
+                                      ? Icons.hub_outlined
+                                      : Icons.location_city_outlined,
                                   color: TgcgColors.primary,
                                   size: 18,
                                 ),
                                 const SizedBox(width: 7),
                                 Expanded(
                                   child: Text(
-                                    item.scope.level == GeographyLevel.state
-                                        ? item.scope.stateName ?? item.scope.label
-                                        : item.scope.zoneName ?? item.scope.label,
+                                    switch (item.scope.level) {
+                                      GeographyLevel.senatorialDistrict =>
+                                        item.scope.senatorialDistrictName ?? item.scope.label,
+                                      GeographyLevel.lga => item.scope.lgaName ?? item.scope.label,
+                                      GeographyLevel.ward => item.scope.wardName ?? item.scope.label,
+                                      _ => item.scope.label,
+                                    },
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
@@ -785,7 +789,7 @@ class _QuickCommandPanel extends StatelessWidget {
       (
         module: TgcgModule.membershipNetwork,
         label: 'Registered Members',
-        detail: 'Zones, states, members and agents',
+        detail: 'Senatorial zones, LGAs, members and agents',
         icon: Icons.groups_2_outlined,
         tone: TgcgMetricTone.info,
       ),
@@ -799,7 +803,7 @@ class _QuickCommandPanel extends StatelessWidget {
       (
         module: TgcgModule.geography,
         label: 'Geographic Operations',
-        detail: 'National operational coverage',
+        detail: 'Kaduna State operational coverage',
         icon: Icons.public_rounded,
         tone: TgcgMetricTone.neutral,
       ),

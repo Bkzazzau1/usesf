@@ -253,7 +253,7 @@ class BulkCommunicationsController extends ChangeNotifier {
 
   CommunicationContact _contactForMember(TgcgMember member) {
     final scope = _membership.registrationScopeForMember(member.id) ??
-        GeographicScope.nigeria;
+        GeographicScope.kaduna;
     final hasAppDevice = _membership.agents.any(
       (agent) =>
           agent.memberId == member.id &&
@@ -309,7 +309,7 @@ class BulkCommunicationsController extends ChangeNotifier {
     final member = _membership.memberById(memberId);
     if (member == null) return false;
     final memberScope = _membership.registrationScopeForMember(memberId) ??
-        GeographicScope.nigeria;
+        GeographicScope.kaduna;
     if (!TgcgPermissionPolicy.scopeAllows(actorScope, memberScope)) return false;
     final normalizedSource = source.trim();
     if (normalizedSource.isEmpty) return false;

@@ -67,11 +67,11 @@ class _DiscussionRoomPageState extends State<DiscussionRoomPage> {
   late final List<_SocialPost> posts = [
     _SocialPost(
       id: 'POST-1001',
-      author: 'National Operations Desk',
+      author: 'State Operations Desk',
       role: 'Situation Room',
-      scope: 'Nigeria',
+      scope: 'Kaduna State',
       body:
-          'Morning coordination is active. State and zonal desks can post field updates, operational needs and verified observations here for shared visibility.',
+          'Morning coordination is active. Senatorial zone and LGA desks can post field updates, operational needs and verified observations here for shared visibility.',
       time: '08:05',
       category: 'Operations',
       icon: Icons.public_rounded,
@@ -80,7 +80,7 @@ class _DiscussionRoomPageState extends State<DiscussionRoomPage> {
       comments: const [
         _SocialComment(
           author: 'North West Desk',
-          role: 'Zonal Coordinator',
+          role: 'Senatorial Zone Coordinator',
           body: 'Coverage check completed and priority support items have been routed.',
           time: '08:18',
         ),
@@ -118,7 +118,7 @@ class _DiscussionRoomPageState extends State<DiscussionRoomPage> {
       id: 'POST-1003',
       author: 'Media Monitoring Desk',
       role: 'Media Intelligence',
-      scope: 'National',
+      scope: 'Kaduna State',
       body:
           'Public-source monitoring is showing increased discussion around polling access and election logistics. Verification teams are reviewing high-visibility claims before escalation.',
       time: '09:04',
@@ -132,7 +132,7 @@ class _DiscussionRoomPageState extends State<DiscussionRoomPage> {
       id: 'POST-1004',
       author: 'Legal & Evidence Desk',
       role: 'Legal Officer',
-      scope: 'National',
+      scope: 'Kaduna State',
       body:
           'For evidence handoff, retain the original submission reference, polling-unit code and reviewer notes so the record can be traced end to end.',
       time: '09:16',
@@ -823,7 +823,7 @@ class _CommunityPanel extends StatelessWidget {
         subtitle: 'Follow conversations by operational area.',
         child: Column(
           children: [
-            _SpaceRow(Icons.public_rounded, 'National Operations', '128 members'),
+            _SpaceRow(Icons.location_city_rounded, 'Kaduna State Operations', '128 members'),
             _SpaceRow(Icons.radar_rounded, 'Situation Room', '46 members'),
             _SpaceRow(Icons.support_agent_rounded, 'Field Support', '89 members'),
             _SpaceRow(Icons.gavel_rounded, 'Legal & Evidence', '24 members'),
