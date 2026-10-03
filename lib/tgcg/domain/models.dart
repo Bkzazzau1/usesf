@@ -241,6 +241,8 @@ class FieldIncident {
     required this.reporterId,
     this.summary,
     this.assignedTeam,
+    this.assignmentId,
+    this.deviceId,
     this.latitude,
     this.longitude,
     this.evidence = const [],
@@ -257,6 +259,8 @@ class FieldIncident {
   final String reporterId;
   final String? summary;
   final String? assignedTeam;
+  final String? assignmentId;
+  final String? deviceId;
   final double? latitude;
   final double? longitude;
   final List<EvidenceAttachment> evidence;
