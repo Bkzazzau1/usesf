@@ -234,6 +234,24 @@ class EmergencyResponseController extends ChangeNotifier {
       _dispatches.where((item) => _overlaps(scope, item.scope)).toList(growable: false)
         ..sort((a, b) => b.assignedAt.compareTo(a.assignedAt));
 
+  List<EmergencyDispatch> dispatchesForAgency({
+    required GeographicScope scope,
+    required String agencyId,
+  }) =>
+      _dispatches
+          .where(
+            (item) =>
+                item.agencyId == agencyId && _overlaps(scope, item.scope),
+          )
+          .toList(growable: false)
+        ..sort((a, b) => b.assignedAt.compareTo(a.assignedAt));
+
+  bool agencyCanAccessDispatch({
+    required String agencyId,
+    required EmergencyDispatch dispatch,
+  }) =>
+      dispatch.agencyId == agencyId;
+
   List<EmergencyDispatch> dispatchesForIncident(String incidentId) => _dispatches
       .where((item) => item.incidentId == incidentId)
       .toList(growable: false)
@@ -301,10 +319,21 @@ class EmergencyResponseController extends ChangeNotifier {
     required String dispatchId,
     required EmergencyDispatchStatus status,
     required String actorId,
+    String? actingAgencyId,
   }) {
     final index = _dispatches.indexWhere((item) => item.id == dispatchId);
     if (index < 0) return;
     final current = _dispatches[index];
+    if (actingAgencyId != null && current.agencyId != actingAgencyId) {
+      throw StateError(
+        'This dispatch is assigned to a different response agency.',
+      );
+    }
+    if (!_isValidTransition(current.status, status)) {
+      throw StateError(
+        'Invalid response transition from ${current.status.name} to ${status.name}.',
+      );
+    }
     final now = DateTime.now().toUtc();
     _dispatches[index] = EmergencyDispatch(
       id: current.id,
@@ -343,6 +372,24 @@ class EmergencyResponseController extends ChangeNotifier {
     );
     notifyListeners();
   }
+
+  static bool _isValidTransition(
+    EmergencyDispatchStatus current,
+    EmergencyDispatchStatus next,
+  ) =>
+      switch (current) {
+        EmergencyDispatchStatus.assigned =>
+          next == EmergencyDispatchStatus.acknowledged,
+        EmergencyDispatchStatus.acknowledged =>
+          next == EmergencyDispatchStatus.responding,
+        EmergencyDispatchStatus.responding =>
+          next == EmergencyDispatchStatus.onScene,
+        EmergencyDispatchStatus.onScene =>
+          next == EmergencyDispatchStatus.resolved,
+        EmergencyDispatchStatus.resolved =>
+          next == EmergencyDispatchStatus.closed,
+        EmergencyDispatchStatus.closed => false,
+      };
 
   static bool _overlaps(GeographicScope a, GeographicScope b) =>
       _within(a, b) || _within(b, a);
