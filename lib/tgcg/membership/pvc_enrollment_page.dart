@@ -99,9 +99,7 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
               scan: _scan,
               created: _created,
               enabled: canManage && _scan != null,
-              onCreate: () {
-                _createMember(store);
-              },
+              onCreate: () => _createMember(store),
               onReset: _reset,
             );
             if (constraints.maxWidth < 980) {
@@ -645,7 +643,6 @@ class _IdentityForm extends StatelessWidget {
                             created == null &&
                             selectedPollingUnitId != null &&
                             RegExp(r'^\d{6}
-                        : null,
                     icon: const Icon(Icons.person_add_alt_1_rounded),
                     label: const Text('Create member'),
                   ),
@@ -790,7 +787,6 @@ class _AgentAccreditationPanel extends StatelessWidget {
       linkedBy:
           session.accessId.isEmpty ? session.operatorName : session.accessId,
     );
-
     final voterId = _voterId.text.trim();
     if (voterId.isNotEmpty) {
       await store.setPvcCredential(
@@ -814,7 +810,6 @@ class _AgentAccreditationPanel extends StatelessWidget {
       _phone.clear();
       _email.clear();
       _voterId.clear();
-      _selectedPollingUnitId = null;
     });
   }
 
@@ -824,8 +819,7 @@ class _AgentAccreditationPanel extends StatelessWidget {
   ) async {
     if (store.members.isEmpty || store.geography.pollingUnits.isEmpty) return;
     var memberId = store.members.first.id;
-    var scope = store.homePollingUnitForMember(memberId)?.scope ??
-        store.geography.pollingUnits.first.scope;
+    var scope = store.geography.pollingUnits.first.scope;
     final phone = TextEditingController(text: store.members.first.phoneNumber);
     final created = await showDialog<bool>(
       context: context,
@@ -857,8 +851,6 @@ class _AgentAccreditationPanel extends StatelessWidget {
                     setDialogState(() {
                       memberId = value;
                       phone.text = member.phoneNumber;
-                      scope =
-                          store.homePollingUnitForMember(value)?.scope ?? scope;
                     });
                   },
                 ),
@@ -957,13 +949,11 @@ class _Metrics extends StatelessWidget {
             ),
             TgcgMetricCard(
               width: width,
-              label: 'PU linked',
-              value: '${store.membersWithHomePollingUnit}',
-              detail: '${store.membersWithoutHomePollingUnit} without home PU',
-              icon: Icons.location_on_outlined,
-              tone: store.membersWithoutHomePollingUnit == 0
-                  ? TgcgMetricTone.success
-                  : TgcgMetricTone.warning,
+              label: 'Agents',
+              value: '${store.agents.length}',
+              detail: 'Field accreditations',
+              icon: Icons.badge_outlined,
+              tone: TgcgMetricTone.neutral,
             ),
             TgcgMetricCard(
               width: width,
@@ -1054,17 +1044,6 @@ class _ScannerPanel extends StatelessWidget {
                                 fontSize: 11,
                               ),
                             ),
-                            if (scan!.pollingUnitCode != null) ...[
-                              const SizedBox(height: 5),
-                              Text(
-                                'PU CODE • ${scan!.pollingUnitCode}',
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ],
                           ],
                         ],
                       ),
@@ -1102,11 +1081,8 @@ class _IdentityForm extends StatelessWidget {
     required this.email,
     required this.voterId,
     required this.lgas,
-    required this.pollingUnits,
     required this.selectedLgaId,
-    required this.selectedPollingUnitId,
     required this.onLgaChanged,
-    required this.onPollingUnitChanged,
     required this.scan,
     required this.created,
     required this.enabled,
@@ -1119,11 +1095,8 @@ class _IdentityForm extends StatelessWidget {
   final TextEditingController email;
   final TextEditingController voterId;
   final List<CanonicalLga> lgas;
-  final List<CanonicalPollingUnit> pollingUnits;
   final String selectedLgaId;
-  final String? selectedPollingUnitId;
   final ValueChanged<String> onLgaChanged;
-  final ValueChanged<String?> onPollingUnitChanged;
   final PvcRecognitionResult? scan;
   final TgcgMember? created;
   final bool enabled;
@@ -1134,7 +1107,7 @@ class _IdentityForm extends StatelessWidget {
   Widget build(BuildContext context) => TgcgSectionCard(
         title: 'Confirm identity',
         subtitle:
-            'Review the recognized identity and confirm the home polling unit before creating the membership record.',
+            'Review the recognized fields and registration LGA before creating the membership record.',
         child: Column(
           children: [
             TextField(
@@ -1167,55 +1140,6 @@ class _IdentityForm extends StatelessWidget {
                     }
                   : null,
             ),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              key: ValueKey('pu-$selectedLgaId-$selectedPollingUnitId'),
-              initialValue: pollingUnits.any(
-                (unit) => unit.code == selectedPollingUnitId,
-              )
-                  ? selectedPollingUnitId
-                  : null,
-              isExpanded: true,
-              decoration: InputDecoration(
-                labelText: 'Home polling unit',
-                helperText: scan?.pollingUnitCode == null
-                    ? 'Select the member polling unit'
-                    : 'PVC code detected: ${scan!.pollingUnitCode}',
-                prefixIcon: const Icon(Icons.location_on_outlined),
-              ),
-              items: pollingUnits
-                  .map(
-                    (unit) => DropdownMenuItem(
-                      value: unit.code,
-                      child: Text(
-                        '${unit.displayCode} • ${unit.scope.pollingUnitName ?? unit.scope.label}',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  )
-                  .toList(),
-              onChanged: enabled && created == null
-                  ? onPollingUnitChanged
-                  : null,
-            ),
-            if (scan?.pollingUnitCode != null) ...[
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TgcgStatusPill(
-                  label: selectedPollingUnitId == null
-                      ? 'PVC PU CODE NOT YET MATCHED'
-                      : 'PVC PU MATCHED',
-                  color: selectedPollingUnitId == null
-                      ? TgcgColors.warning
-                      : TgcgColors.success,
-                  icon: selectedPollingUnitId == null
-                      ? Icons.manage_search_rounded
-                      : Icons.verified_outlined,
-                  compact: true,
-                ),
-              ),
-            ],
             const SizedBox(height: 10),
             TextField(
               controller: phone,
@@ -1255,11 +1179,7 @@ class _IdentityForm extends StatelessWidget {
               children: [
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: enabled &&
-                            created == null &&
-                            selectedPollingUnitId != null
-                        ? onCreate
-                        : null,
+                    onPressed: enabled && created == null ? onCreate : null,
                     icon: const Icon(Icons.person_add_alt_1_rounded),
                     label: const Text('Create member'),
                   ),
@@ -1300,7 +1220,6 @@ class _RecentMembers extends StatelessWidget {
         child: Column(
           children: store.members.take(6).map((member) {
             final scope = store.registrationScopeForMember(member.id);
-            final homePu = store.homePollingUnitForMember(member.id);
             return ListTile(
               contentPadding: EdgeInsets.zero,
               leading: CircleAvatar(
@@ -1315,12 +1234,8 @@ class _RecentMembers extends StatelessWidget {
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
               subtitle: Text(
-                homePu == null
-                    ? '${member.membershipNumber ?? member.id} • ${scope?.label ?? 'Kaduna State'} • ${member.phoneNumber}'
-                    : '${member.membershipNumber ?? member.id} • HOME PU: ${homePu.displayCode}\n'
-                        '${homePu.scope.label} • ${member.phoneNumber}',
+                '${member.membershipNumber ?? member.id} • ${scope?.label ?? 'Kaduna State'} • ${member.phoneNumber}',
               ),
-              isThreeLine: homePu != null,
               trailing: TgcgStatusPill(
                 label: member.status.name.toUpperCase(),
                 color: member.status == RecordStatus.verified
@@ -1422,7 +1337,6 @@ class _RecentMembers extends StatelessWidget {
         child: Column(
           children: store.members.take(6).map((member) {
             final scope = store.registrationScopeForMember(member.id);
-            final homePu = store.homePollingUnitForMember(member.id);
             return ListTile(
               contentPadding: EdgeInsets.zero,
               leading: CircleAvatar(
@@ -1437,12 +1351,8 @@ class _RecentMembers extends StatelessWidget {
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
               subtitle: Text(
-                homePu == null
-                    ? '${member.membershipNumber ?? member.id} • ${scope?.label ?? 'Kaduna State'} • ${member.phoneNumber}'
-                    : '${member.membershipNumber ?? member.id} • HOME PU: ${homePu.displayCode}\n'
-                        '${homePu.scope.label} • ${member.phoneNumber}',
+                '${member.membershipNumber ?? member.id} • ${scope?.label ?? 'Kaduna State'} • ${member.phoneNumber}',
               ),
-              isThreeLine: homePu != null,
               trailing: TgcgStatusPill(
                 label: member.status.name.toUpperCase(),
                 color: member.status == RecordStatus.verified
@@ -1526,7 +1436,6 @@ class _AgentAccreditationPanel extends StatelessWidget {
       linkedBy:
           session.accessId.isEmpty ? session.operatorName : session.accessId,
     );
-
     final voterId = _voterId.text.trim();
     if (voterId.isNotEmpty) {
       await store.setPvcCredential(
@@ -1550,7 +1459,6 @@ class _AgentAccreditationPanel extends StatelessWidget {
       _phone.clear();
       _email.clear();
       _voterId.clear();
-      _selectedPollingUnitId = null;
     });
   }
 
@@ -1560,8 +1468,7 @@ class _AgentAccreditationPanel extends StatelessWidget {
   ) async {
     if (store.members.isEmpty || store.geography.pollingUnits.isEmpty) return;
     var memberId = store.members.first.id;
-    var scope = store.homePollingUnitForMember(memberId)?.scope ??
-        store.geography.pollingUnits.first.scope;
+    var scope = store.geography.pollingUnits.first.scope;
     final phone = TextEditingController(text: store.members.first.phoneNumber);
     final created = await showDialog<bool>(
       context: context,
@@ -1593,8 +1500,6 @@ class _AgentAccreditationPanel extends StatelessWidget {
                     setDialogState(() {
                       memberId = value;
                       phone.text = member.phoneNumber;
-                      scope =
-                          store.homePollingUnitForMember(value)?.scope ?? scope;
                     });
                   },
                 ),
@@ -1693,13 +1598,11 @@ class _Metrics extends StatelessWidget {
             ),
             TgcgMetricCard(
               width: width,
-              label: 'PU linked',
-              value: '${store.membersWithHomePollingUnit}',
-              detail: '${store.membersWithoutHomePollingUnit} without home PU',
-              icon: Icons.location_on_outlined,
-              tone: store.membersWithoutHomePollingUnit == 0
-                  ? TgcgMetricTone.success
-                  : TgcgMetricTone.warning,
+              label: 'Agents',
+              value: '${store.agents.length}',
+              detail: 'Field accreditations',
+              icon: Icons.badge_outlined,
+              tone: TgcgMetricTone.neutral,
             ),
             TgcgMetricCard(
               width: width,
@@ -1790,17 +1693,6 @@ class _ScannerPanel extends StatelessWidget {
                                 fontSize: 11,
                               ),
                             ),
-                            if (scan!.pollingUnitCode != null) ...[
-                              const SizedBox(height: 5),
-                              Text(
-                                'PU CODE • ${scan!.pollingUnitCode}',
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ],
                           ],
                         ],
                       ),
@@ -1838,11 +1730,8 @@ class _IdentityForm extends StatelessWidget {
     required this.email,
     required this.voterId,
     required this.lgas,
-    required this.pollingUnits,
     required this.selectedLgaId,
-    required this.selectedPollingUnitId,
     required this.onLgaChanged,
-    required this.onPollingUnitChanged,
     required this.scan,
     required this.created,
     required this.enabled,
@@ -1855,11 +1744,8 @@ class _IdentityForm extends StatelessWidget {
   final TextEditingController email;
   final TextEditingController voterId;
   final List<CanonicalLga> lgas;
-  final List<CanonicalPollingUnit> pollingUnits;
   final String selectedLgaId;
-  final String? selectedPollingUnitId;
   final ValueChanged<String> onLgaChanged;
-  final ValueChanged<String?> onPollingUnitChanged;
   final PvcRecognitionResult? scan;
   final TgcgMember? created;
   final bool enabled;
@@ -1870,7 +1756,7 @@ class _IdentityForm extends StatelessWidget {
   Widget build(BuildContext context) => TgcgSectionCard(
         title: 'Confirm identity',
         subtitle:
-            'Review the recognized identity and confirm the home polling unit before creating the membership record.',
+            'Review the recognized fields and registration LGA before creating the membership record.',
         child: Column(
           children: [
             TextField(
@@ -1903,55 +1789,6 @@ class _IdentityForm extends StatelessWidget {
                     }
                   : null,
             ),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              key: ValueKey('pu-$selectedLgaId-$selectedPollingUnitId'),
-              initialValue: pollingUnits.any(
-                (unit) => unit.code == selectedPollingUnitId,
-              )
-                  ? selectedPollingUnitId
-                  : null,
-              isExpanded: true,
-              decoration: InputDecoration(
-                labelText: 'Home polling unit',
-                helperText: scan?.pollingUnitCode == null
-                    ? 'Select the member polling unit'
-                    : 'PVC code detected: ${scan!.pollingUnitCode}',
-                prefixIcon: const Icon(Icons.location_on_outlined),
-              ),
-              items: pollingUnits
-                  .map(
-                    (unit) => DropdownMenuItem(
-                      value: unit.code,
-                      child: Text(
-                        '${unit.displayCode} • ${unit.scope.pollingUnitName ?? unit.scope.label}',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  )
-                  .toList(),
-              onChanged: enabled && created == null
-                  ? onPollingUnitChanged
-                  : null,
-            ),
-            if (scan?.pollingUnitCode != null) ...[
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TgcgStatusPill(
-                  label: selectedPollingUnitId == null
-                      ? 'PVC PU CODE NOT YET MATCHED'
-                      : 'PVC PU MATCHED',
-                  color: selectedPollingUnitId == null
-                      ? TgcgColors.warning
-                      : TgcgColors.success,
-                  icon: selectedPollingUnitId == null
-                      ? Icons.manage_search_rounded
-                      : Icons.verified_outlined,
-                  compact: true,
-                ),
-              ),
-            ],
             const SizedBox(height: 10),
             TextField(
               controller: phone,
@@ -1991,11 +1828,7 @@ class _IdentityForm extends StatelessWidget {
               children: [
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: enabled &&
-                            created == null &&
-                            selectedPollingUnitId != null
-                        ? onCreate
-                        : null,
+                    onPressed: enabled && created == null ? onCreate : null,
                     icon: const Icon(Icons.person_add_alt_1_rounded),
                     label: const Text('Create member'),
                   ),
@@ -2036,7 +1869,6 @@ class _RecentMembers extends StatelessWidget {
         child: Column(
           children: store.members.take(6).map((member) {
             final scope = store.registrationScopeForMember(member.id);
-            final homePu = store.homePollingUnitForMember(member.id);
             return ListTile(
               contentPadding: EdgeInsets.zero,
               leading: CircleAvatar(
@@ -2051,12 +1883,8 @@ class _RecentMembers extends StatelessWidget {
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
               subtitle: Text(
-                homePu == null
-                    ? '${member.membershipNumber ?? member.id} • ${scope?.label ?? 'Kaduna State'} • ${member.phoneNumber}'
-                    : '${member.membershipNumber ?? member.id} • HOME PU: ${homePu.displayCode}\n'
-                        '${homePu.scope.label} • ${member.phoneNumber}',
+                '${member.membershipNumber ?? member.id} • ${scope?.label ?? 'Kaduna State'} • ${member.phoneNumber}',
               ),
-              isThreeLine: homePu != null,
               trailing: TgcgStatusPill(
                 label: member.status.name.toUpperCase(),
                 color: member.status == RecordStatus.verified
