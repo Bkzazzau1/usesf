@@ -54,6 +54,12 @@ class TgcgSessionController extends ChangeNotifier {
     GeographicScope scope = GeographicScope.kaduna,
     String? agencyId,
   }) {
+    if (role == TgcgRole.securityOfficer &&
+        (agencyId == null || agencyId.trim().isEmpty)) {
+      throw ArgumentError(
+        'Security Officer access requires an authorized response agency.',
+      );
+    }
     _role = role;
     _agencyId = agencyId;
     _operatorName =
