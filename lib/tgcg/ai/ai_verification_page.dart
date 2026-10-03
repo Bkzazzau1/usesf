@@ -174,19 +174,32 @@ class _Chip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: active ? TgcgColors.primary : TgcgColors.surfaceSoft,
-          borderRadius: BorderRadius.circular(13),
-          border: Border.all(color: active ? TgcgColors.primary : TgcgColors.border),
+          gradient: active
+              ? const LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [TgcgColors.gold100, TgcgColors.surface],
+                )
+              : null,
+          color: active ? null : TgcgColors.surfaceSoft,
+          borderRadius: BorderRadius.circular(TgcgRadius.sm),
+          border: Border.all(
+            color: active ? TgcgColors.gold400 : TgcgColors.border,
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 17, color: active ? Colors.white : TgcgColors.muted),
+            Icon(
+              icon,
+              size: 17,
+              color: active ? TgcgColors.accentStrong : TgcgColors.muted,
+            ),
             const SizedBox(width: 7),
             Text(
               label,
               style: TextStyle(
-                color: active ? Colors.white : TgcgColors.ink,
+                color: active ? TgcgColors.primaryDark : TgcgColors.ink,
                 fontSize: 11,
                 fontWeight: FontWeight.w900,
               ),
@@ -349,9 +362,13 @@ class _DocumentPreview extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(28),
           decoration: BoxDecoration(
-            color: const Color(0xFFF9FAFB),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: TgcgColors.border),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [TgcgColors.surface, TgcgColors.gold100],
+            ),
+            borderRadius: BorderRadius.circular(TgcgRadius.lg),
+            border: Border.all(color: TgcgColors.gold200),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -371,8 +388,9 @@ class _DocumentPreview extends StatelessWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     decoration: BoxDecoration(
-                      color: TgcgColors.primarySoft,
+                      color: TgcgColors.navy50,
                       borderRadius: BorderRadius.circular(9),
+                      border: Border.all(color: TgcgColors.border),
                     ),
                     child: Text(line, style: const TextStyle(fontWeight: FontWeight.w900, color: TgcgColors.ink)),
                   ),
@@ -394,16 +412,23 @@ class _FacePreview extends StatelessWidget {
         child: Container(
           height: 330,
           decoration: BoxDecoration(
-            gradient: const LinearGradient(colors: [Color(0xFF06112A), Color(0xFF10275E)]),
-            borderRadius: BorderRadius.circular(18),
+            gradient: TgcgGradients.navigation,
+            borderRadius: BorderRadius.circular(TgcgRadius.lg),
+            border: Border.all(
+              color: TgcgColors.accent.withValues(alpha: .18),
+            ),
           ),
           child: Stack(
             alignment: Alignment.center,
             children: [
               const CircleAvatar(
                 radius: 82,
-                backgroundColor: Color(0xFF1C2E57),
-                child: Icon(Icons.person_rounded, size: 112, color: Color(0xFFA9B1C4)),
+                backgroundColor: TgcgColors.navy700,
+                child: Icon(
+                  Icons.person_rounded,
+                  size: 112,
+                  color: TgcgColors.gold200,
+                ),
               ),
               Container(
                 width: 196,
