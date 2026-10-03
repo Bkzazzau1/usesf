@@ -51,15 +51,15 @@ class _PresentationAccessLoginState extends State<PresentationAccessLogin> {
                         resetting ? 'Restoring...' : 'Reset Presentation',
                       ),
                       style: OutlinedButton.styleFrom(
-                        backgroundColor: TgcgColors.surface,
+                        backgroundColor: TgcgColors.surface.withValues(alpha: .96),
                         foregroundColor: TgcgColors.primaryDark,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 15,
                         ),
-                        side: const BorderSide(color: TgcgColors.border),
+                        side: const BorderSide(color: TgcgColors.gold200),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(TgcgRadius.md),
                         ),
                       ),
                     ),
@@ -73,14 +73,15 @@ class _PresentationAccessLoginState extends State<PresentationAccessLogin> {
                       icon: const Icon(Icons.how_to_vote_rounded),
                       label: const Text('Quick Field Access'),
                       style: FilledButton.styleFrom(
-                        backgroundColor: TgcgColors.primaryDark,
-                        foregroundColor: Colors.white,
+                        backgroundColor: TgcgColors.accent,
+                        foregroundColor: TgcgColors.primaryDark,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 18,
                           vertical: 16,
                         ),
+                        side: const BorderSide(color: TgcgColors.gold400),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(TgcgRadius.md),
                         ),
                       ),
                     ),
@@ -154,8 +155,9 @@ class _PresentationAccessLoginState extends State<PresentationAccessLogin> {
         padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
         decoration: BoxDecoration(
           color: TgcgColors.surface,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: TgcgColors.border),
+          borderRadius: BorderRadius.circular(TgcgRadius.xl),
+          border: Border.all(color: TgcgColors.gold200),
+          boxShadow: TgcgShadows.elevated,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -214,8 +216,12 @@ class _PresentationAccessLoginState extends State<PresentationAccessLogin> {
                   child: Container(
                     padding: const EdgeInsets.all(15),
                     decoration: BoxDecoration(
-                      color: TgcgColors.surfaceSoft,
-                      borderRadius: BorderRadius.circular(16),
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [TgcgColors.surface, TgcgColors.navy50],
+                      ),
+                      borderRadius: BorderRadius.circular(TgcgRadius.md),
                       border: Border.all(color: TgcgColors.border),
                     ),
                     child: Row(
