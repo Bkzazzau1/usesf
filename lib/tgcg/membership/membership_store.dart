@@ -3,16 +3,42 @@ import 'package:flutter/widgets.dart';
 import '../domain/models.dart';
 import '../geography/geography_registry.dart';
 
+enum MemberPollingUnitLinkSource {
+  pvc,
+  manual,
+  imported,
+}
+
+class MemberPollingUnitLink {
+  const MemberPollingUnitLink({
+    required this.memberId,
+    required this.pollingUnitId,
+    required this.linkedAt,
+    required this.source,
+    this.pvcPollingUnitCode,
+    this.linkedBy,
+  });
+
+  final String memberId;
+  final String pollingUnitId;
+  final DateTime linkedAt;
+  final MemberPollingUnitLinkSource source;
+  final String? pvcPollingUnitCode;
+  final String? linkedBy;
+}
+
 class MembershipOperationsController extends ChangeNotifier {
   MembershipOperationsController._({
     required GeographyRegistry geography,
     required List<TgcgMember> members,
     required List<AccreditedAgent> agents,
     required Map<String, GeographicScope> memberScopes,
+    required Map<String, MemberPollingUnitLink> memberPollingUnits,
   })  : _geography = geography,
         _members = members,
         _agents = agents,
-        _memberScopes = memberScopes;
+        _memberScopes = memberScopes,
+        _memberPollingUnits = memberPollingUnits;
 
   factory MembershipOperationsController.prototypeSeed(
     GeographyRegistry geography,
@@ -140,6 +166,26 @@ class MembershipOperationsController extends ChangeNotifier {
     return MembershipOperationsController._(
       geography: geography,
       members: members,
+      memberPollingUnits: {
+        'MEM-0001': MemberPollingUnitLink(
+          memberId: 'MEM-0001',
+          pollingUnitId: kdPu.pollingUnitId!,
+          linkedAt: now.subtract(const Duration(days: 20)),
+          source: MemberPollingUnitLinkSource.imported,
+        ),
+        'MEM-0002': MemberPollingUnitLink(
+          memberId: 'MEM-0002',
+          pollingUnitId: zaPu.pollingUnitId!,
+          linkedAt: now.subtract(const Duration(days: 18)),
+          source: MemberPollingUnitLinkSource.imported,
+        ),
+        'MEM-0004': MemberPollingUnitLink(
+          memberId: 'MEM-0004',
+          pollingUnitId: jmPu.pollingUnitId!,
+          linkedAt: now.subtract(const Duration(days: 9)),
+          source: MemberPollingUnitLinkSource.imported,
+        ),
+      },
       memberScopes: {
         'MEM-0001': lgaScope('Kaduna North'),
         'MEM-0002': lgaScope('Zaria'),
@@ -283,6 +329,7 @@ class MembershipOperationsController extends ChangeNotifier {
   final List<TgcgMember> _members;
   final List<AccreditedAgent> _agents;
   final Map<String, GeographicScope> _memberScopes;
+  final Map<String, MemberPollingUnitLink> _memberPollingUnits;
 
   GeographyRegistry get geography => _geography;
   List<TgcgMember> get members => List.unmodifiable(_members);
