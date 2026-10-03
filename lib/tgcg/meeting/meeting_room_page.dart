@@ -1016,7 +1016,7 @@ class _ParticipantTile extends StatelessWidget {
                     )
                   : const Icon(
                       Icons.videocam_off_rounded,
-                      color: const Color(0xFF8695AB),
+                      color: Color(0xFF8695AB),
                       size: 52,
                     ),
             ),

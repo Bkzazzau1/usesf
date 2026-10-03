@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../domain/models.dart';
 import '../field/field_operations_store.dart';
 import '../geography/geography_registry.dart';
 import '../geography/kaduna_map.dart';
