@@ -167,6 +167,59 @@ class ManagedDeviceController extends ChangeNotifier {
       .where((item) => item.status == ManagedDeviceStatus.revoked)
       .length;
 
+  Future<void> hydrateFromOffline() async {
+    final rows = await _persistence.readEntities(
+      entityType: 'managed_device',
+    );
+    var changed = false;
+    for (final row in rows) {
+      final id = row['id']?.toString();
+      final label = row['label']?.toString();
+      final statusName = row['status']?.toString();
+      final registeredAtText = row['registeredAt']?.toString();
+      if (id == null ||
+          id.isEmpty ||
+          label == null ||
+          statusName == null ||
+          registeredAtText == null) {
+        continue;
+      }
+
+      final status = ManagedDeviceStatus.values
+          .where((item) => item.name == statusName)
+          .firstOrNull;
+      final registeredAt = DateTime.tryParse(registeredAtText);
+      if (status == null || registeredAt == null) continue;
+
+      final restored = ManagedDevice(
+        id: id,
+        label: label,
+        status: status,
+        registeredAt: registeredAt.toUtc(),
+        serialReference: row['serialReference']?.toString(),
+        imeiReference: row['imeiReference']?.toString(),
+        assignedMemberId: row['assignedMemberId']?.toString(),
+        assignedAt: _date(row['assignedAt']),
+        lastSeenAt: _date(row['lastSeenAt']),
+        lastLatitude: _double(row['lastLatitude']),
+        lastLongitude: _double(row['lastLongitude']),
+        lastAccuracyMeters: _double(row['lastAccuracyMeters']),
+        batteryPercent: _int(row['batteryPercent']),
+        appVersion: row['appVersion']?.toString(),
+        syncState: row['syncState']?.toString(),
+      );
+
+      final index = _devices.indexWhere((item) => item.id == id);
+      if (index < 0) {
+        _devices.add(restored);
+      } else {
+        _devices[index] = restored;
+      }
+      changed = true;
+    }
+    if (changed) notifyListeners();
+  }
+
   Future<ManagedDevice> registerDevice({
     required String label,
     String? serialReference,
@@ -331,6 +384,9 @@ class ManagedDeviceController extends ChangeNotifier {
         'assignedMemberId': device.assignedMemberId,
         'assignedAt': device.assignedAt?.toIso8601String(),
         'lastSeenAt': device.lastSeenAt?.toIso8601String(),
+        'lastLatitude': device.lastLatitude,
+        'lastLongitude': device.lastLongitude,
+        'lastAccuracyMeters': device.lastAccuracyMeters,
         'batteryPercent': device.batteryPercent,
         'appVersion': device.appVersion,
         'syncState': device.syncState,
@@ -340,10 +396,29 @@ class ManagedDeviceController extends ChangeNotifier {
     );
   }
 
+  static DateTime? _date(Object? value) {
+    if (value == null) return null;
+    return DateTime.tryParse(value.toString())?.toUtc();
+  }
+
+  static double? _double(Object? value) {
+    if (value is num) return value.toDouble();
+    return value == null ? null : double.tryParse(value.toString());
+  }
+
+  static int? _int(Object? value) {
+    if (value is num) return value.toInt();
+    return value == null ? null : int.tryParse(value.toString());
+  }
+
   static String? _clean(String? value) {
     final text = value?.trim();
     return text == null || text.isEmpty ? null : text;
   }
+}
+
+extension _FirstOrNull<T> on Iterable<T> {
+  T? get firstOrNull => isEmpty ? null : first;
 }
 
 class ManagedDevices extends InheritedNotifier<ManagedDeviceController> {
