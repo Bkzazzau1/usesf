@@ -53,7 +53,9 @@ class _TgcgShellState extends State<TgcgShell> {
     final session = TgcgSession.of(context);
     final allowed = allowedModules(session.role!);
     if (!allowed.contains(selectedModule)) {
-      selectedModule = TgcgModule.overview;
+      selectedModule = allowed.contains(TgcgModule.overview)
+          ? TgcgModule.overview
+          : allowed.first;
     }
 
     final destinations = _destinations
