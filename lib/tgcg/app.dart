@@ -55,7 +55,20 @@ class _TgcgAppState extends State<TgcgApp> {
   void initState() {
     super.initState();
     _createControllers();
-    unawaited(offlinePersistenceController.initialize());
+    unawaited(_initializePersistenceAndHydrate());
+  }
+
+  Future<void> _initializePersistenceAndHydrate() async {
+    await offlinePersistenceController.initialize();
+    if (!offlinePersistenceController.isReady) return;
+
+    try {
+      await managedDeviceController.hydrateFromOffline();
+      await assignmentController.hydrateFromOffline();
+    } catch (_) {
+      // Keep the prototype-seeded in-memory state available if a persisted
+      // record is corrupt or from an incompatible development build.
+    }
   }
 
   void _createControllers() {
@@ -122,7 +135,7 @@ class _TgcgAppState extends State<TgcgApp> {
     if (!mounted) return;
 
     setState(_createControllers);
-    unawaited(offlinePersistenceController.initialize());
+    unawaited(_initializePersistenceAndHydrate());
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       oldSession.dispose();
