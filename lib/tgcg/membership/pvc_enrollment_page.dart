@@ -203,7 +203,8 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
   ) async {
     if (store.members.isEmpty || store.geography.pollingUnits.isEmpty) return;
     var memberId = store.members.first.id;
-    var scope = store.geography.pollingUnits.first.scope;
+    var scope = store.homePollingUnitForMember(memberId)?.scope ??
+        store.geography.pollingUnits.first.scope;
     final phone = TextEditingController(text: store.members.first.phoneNumber);
     final created = await showDialog<bool>(
       context: context,
@@ -235,6 +236,8 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
                     setDialogState(() {
                       memberId = value;
                       phone.text = member.phoneNumber;
+                      scope =
+                          store.homePollingUnitForMember(value)?.scope ?? scope;
                     });
                   },
                 ),
