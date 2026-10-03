@@ -111,6 +111,7 @@ class FieldOperationsController extends ChangeNotifier {
           mimeType: 'video/mp4',
           caption:
               'Prototype security video evidence. Replace with verified field media.',
+          sourceReference: 'prototype://$id.mp4',
           latitude: latitude,
           longitude: longitude,
           origin: RecordOrigin.systemDerived,
