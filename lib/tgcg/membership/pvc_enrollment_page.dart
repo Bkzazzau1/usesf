@@ -359,8 +359,11 @@ class _ScannerPanel extends StatelessWidget {
             Container(
               height: 220,
               decoration: BoxDecoration(
-                color: TgcgColors.primaryDark,
-                borderRadius: BorderRadius.circular(18),
+                gradient: TgcgGradients.navigation,
+                borderRadius: BorderRadius.circular(TgcgRadius.lg),
+                border: Border.all(
+                  color: TgcgColors.accent.withValues(alpha: .18),
+                ),
               ),
               child: Center(
                 child: reading
@@ -394,7 +397,7 @@ class _ScannerPanel extends StatelessWidget {
                                   ? 'Identity text recognized'
                                   : 'Card captured',
                               style: const TextStyle(
-                                color: Color(0xFFAEB4C3),
+                                color: TgcgColors.gold200,
                                 fontSize: 11,
                               ),
                             ),
