@@ -63,6 +63,7 @@ class _TgcgAppState extends State<TgcgApp> {
     if (!offlinePersistenceController.isReady) return;
 
     try {
+      await membershipOperationsController.hydrateFromOffline();
       await managedDeviceController.hydrateFromOffline();
       await assignmentController.hydrateFromOffline();
     } catch (_) {
