@@ -187,10 +187,10 @@ class MembershipOperationsController extends ChangeNotifier {
         ),
       },
       memberScopes: {
-        'MEM-0001': lgaScope('Kaduna North'),
-        'MEM-0002': lgaScope('Zaria'),
+        'MEM-0001': kdPu,
+        'MEM-0002': zaPu,
         'MEM-0003': lgaScope('Chikun'),
-        'MEM-0004': lgaScope("Jema'a"),
+        'MEM-0004': jmPu,
         'MEM-0005': lgaScope('Igabi'),
         'MEM-0006': lgaScope('Kaduna South'),
         'MEM-0007': lgaScope('Sabon Gari'),
