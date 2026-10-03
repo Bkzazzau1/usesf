@@ -121,6 +121,7 @@ class MemberAssignment {
     this.dueAt,
     this.lastLocation,
     this.requiredEvidence = const [],
+    this.evidence = const [],
   });
 
   final String id;
@@ -143,6 +144,7 @@ class MemberAssignment {
   final DateTime? dueAt;
   final AssignmentLocationPing? lastLocation;
   final List<EvidenceType> requiredEvidence;
+  final List<EvidenceAttachment> evidence;
 
   bool get isTerminal =>
       status == AssignmentStatus.completed ||
@@ -169,6 +171,7 @@ class MemberAssignment {
     DateTime? dueAt,
     bool clearDueAt = false,
     AssignmentLocationPing? lastLocation,
+    List<EvidenceAttachment>? evidence,
   }) =>
       MemberAssignment(
         id: id,
@@ -192,6 +195,7 @@ class MemberAssignment {
         dueAt: clearDueAt ? null : dueAt ?? this.dueAt,
         lastLocation: lastLocation ?? this.lastLocation,
         requiredEvidence: requiredEvidence,
+        evidence: evidence ?? this.evidence,
       );
 }
 
@@ -393,6 +397,7 @@ class AssignmentController extends ChangeNotifier {
       deviceId: device?.id,
       dueAt: dueAt?.toUtc(),
       requiredEvidence: List.unmodifiable(requiredEvidence),
+      evidence: const [],
     );
     _assignments.insert(0, assignment);
     await _appendEvent(
@@ -483,6 +488,7 @@ class AssignmentController extends ChangeNotifier {
       deviceId: device?.id,
       dueAt: current.dueAt,
       requiredEvidence: current.requiredEvidence,
+      evidence: current.evidence,
     );
     _assignments[index] = updated;
     await _appendEvent(
@@ -623,6 +629,64 @@ class AssignmentController extends ChangeNotifier {
     return updated;
   }
 
+  Future<MemberAssignment> attachEvidence({
+    required String assignmentId,
+    required EvidenceAttachment evidence,
+    required String actorId,
+    required String deviceId,
+  }) async {
+    final index =
+        _assignments.indexWhere((item) => item.id == assignmentId);
+    if (index < 0) {
+      throw ArgumentError('Unknown assignment: $assignmentId');
+    }
+    final current = _assignments[index];
+    if (current.deviceId != null && current.deviceId != deviceId) {
+      throw StateError(
+        'Evidence was captured from a device that is not bound to this assignment.',
+      );
+    }
+    if (current.isTerminal) {
+      throw StateError(
+        'Evidence cannot be added after this assignment is closed.',
+      );
+    }
+    if (current.evidence.any((item) => item.id == evidence.id)) {
+      return current;
+    }
+
+    final updated = current.copyWith(
+      evidence: List.unmodifiable([...current.evidence, evidence]),
+      deviceId: deviceId,
+    );
+    _assignments[index] = updated;
+
+    await _persistence.persistMutation(
+      entityType: 'assignment_evidence',
+      entityId: evidence.id,
+      mutationType: SyncMutationType.create,
+      scopeKey: scopeStorageKey(updated.targetScope),
+      ownerId: updated.memberId,
+      payload: {
+        'assignmentId': updated.id,
+        'memberId': updated.memberId,
+        'pollingUnitId': updated.targetPollingUnitId,
+        'deviceId': deviceId,
+        'evidence': evidenceToJson(evidence),
+      },
+    );
+    await _appendEvent(
+      updated,
+      action: 'evidence_attached',
+      actorId: actorId,
+      detail:
+          '${evidence.type.name} evidence ${evidence.fileName} attached from $deviceId.',
+    );
+    notifyListeners();
+    await _persistAssignment(updated);
+    return updated;
+  }
+
   AssignmentPresence presenceFor(
     MemberAssignment assignment, {
     DateTime? now,
@@ -706,6 +770,8 @@ class AssignmentController extends ChangeNotifier {
           'dueAt': assignment.dueAt?.toIso8601String(),
           'requiredEvidence':
               assignment.requiredEvidence.map((item) => item.name).toList(),
+          'evidence':
+              assignment.evidence.map(evidenceToJson).toList(growable: false),
           'lastLocation': assignment.lastLocation == null
               ? null
               : {
