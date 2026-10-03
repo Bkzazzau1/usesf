@@ -423,9 +423,17 @@ class _KadunaLgaMap extends StatelessWidget {
             height: 420,
             width: double.infinity,
             decoration: BoxDecoration(
-              color: TgcgColors.surfaceSoft,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: TgcgColors.border),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  TgcgColors.navy50,
+                  TgcgColors.surface,
+                  TgcgColors.gold100,
+                ],
+              ),
+              borderRadius: BorderRadius.circular(TgcgRadius.lg),
+              border: Border.all(color: TgcgColors.gold200),
             ),
             padding: const EdgeInsets.all(16),
             child: Center(
@@ -536,8 +544,8 @@ class _LgaHexTile extends StatelessWidget {
           child: CustomPaint(
             painter: _HexPainter(
               fill: fill,
-              border: selected ? TgcgColors.accent : Colors.white,
-              borderWidth: selected ? 3.2 : 1.4,
+              border: selected ? TgcgColors.gold400 : Colors.white,
+              borderWidth: selected ? 3.4 : 1.4,
               muted: !enabled,
             ),
             child: Center(
@@ -759,16 +767,20 @@ class _LgaInspector extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: TgcgColors.primarySoft,
-              borderRadius: BorderRadius.circular(13),
-              border: Border.all(color: TgcgColors.border),
+              gradient: const LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [TgcgColors.gold100, TgcgColors.navy50],
+              ),
+              borderRadius: BorderRadius.circular(TgcgRadius.sm),
+              border: Border.all(color: TgcgColors.gold200),
             ),
             child: Text(
               '${item.results.length} unofficial field result submission${item.results.length == 1 ? '' : 's'} • '
               '${item.reports.length} field report${item.reports.length == 1 ? '' : 's'} • '
               '${item.members} registered member${item.members == 1 ? '' : 's'}',
               style: const TextStyle(
-                color: TgcgColors.primary,
+                color: TgcgColors.primaryDark,
                 fontSize: 9.5,
                 height: 1.4,
                 fontWeight: FontWeight.w800,
@@ -847,9 +859,16 @@ class _MiniMetric extends StatelessWidget {
         width: width,
         padding: const EdgeInsets.all(11),
         decoration: BoxDecoration(
-          color: TgcgColors.surfaceSoft,
-          borderRadius: BorderRadius.circular(13),
-          border: Border.all(color: TgcgColors.border),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              TgcgColors.surface,
+              color.withValues(alpha: .035),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(TgcgRadius.sm),
+          border: Border.all(color: color.withValues(alpha: .14)),
         ),
         child: Row(
           children: [
