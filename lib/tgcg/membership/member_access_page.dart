@@ -399,7 +399,9 @@ class _MemberAccessPageState extends State<MemberAccessPage> {
   ) async {
     final member = _member;
     if (member == null) return;
-    if (!membership.hasMemberPin(member.id)) {
+    final hasPin = await membership.hasMemberPinCredential(member.id);
+    if (!mounted) return;
+    if (!hasPin) {
       setState(() {
         _message =
             'This member does not yet have a sign-in PIN. Complete member credential setup at enrolment.';
