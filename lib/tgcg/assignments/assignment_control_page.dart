@@ -153,6 +153,11 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
           assignments: visible,
           membership: membership,
           controller: assignments,
+          canManage: canManageAssignments,
+          authorizedMembers: authorizedMembers,
+          actorId:
+              session.accessId.isEmpty ? session.operatorName : session.accessId,
+          authorizedScope: session.scope,
         ),
         const SizedBox(height: 16),
         _DeviceRegistry(
@@ -728,11 +733,19 @@ class _AssignmentList extends StatelessWidget {
     required this.assignments,
     required this.membership,
     required this.controller,
+    required this.canManage,
+    required this.authorizedMembers,
+    required this.actorId,
+    required this.authorizedScope,
   });
 
   final List<MemberAssignment> assignments;
   final MembershipOperationsController membership;
   final AssignmentController controller;
+  final bool canManage;
+  final List<TgcgMember> authorizedMembers;
+  final String actorId;
+  final GeographicScope authorizedScope;
 
   @override
   Widget build(BuildContext context) => TgcgSectionCard(
