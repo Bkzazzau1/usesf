@@ -2,12 +2,16 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'assignments/assignment_store.dart';
+import 'assignments/assignment_tracking_store.dart';
 import 'communications/bulk_communications_store.dart';
 import 'communications/communications_store.dart';
+import 'devices/managed_device_store.dart';
 import 'field/field_agent_shell.dart';
 import 'field/field_operations_store.dart';
 import 'geography/geography_registry.dart';
 import 'governance/governance_store.dart';
+import 'membership/member_shell.dart';
 import 'membership/membership_store.dart';
 import 'media/device_media.dart';
 import 'offline/offline_persistence.dart';
@@ -36,6 +40,9 @@ class _TgcgAppState extends State<TgcgApp> {
   late TgcgSessionController sessionController;
   late OfflinePersistenceController offlinePersistenceController;
   late MembershipOperationsController membershipOperationsController;
+  late ManagedDeviceController managedDeviceController;
+  late AssignmentController assignmentController;
+  late AssignmentTrackingController assignmentTrackingController;
   late GovernanceOperationsController governanceOperationsController;
   late FieldOperationsController fieldOperationsController;
   late ResultOperationsController resultOperationsController;
@@ -48,7 +55,21 @@ class _TgcgAppState extends State<TgcgApp> {
   void initState() {
     super.initState();
     _createControllers();
-    unawaited(offlinePersistenceController.initialize());
+    unawaited(_initializePersistenceAndHydrate());
+  }
+
+  Future<void> _initializePersistenceAndHydrate() async {
+    await offlinePersistenceController.initialize();
+    if (!offlinePersistenceController.isReady) return;
+
+    try {
+      await membershipOperationsController.hydrateFromOffline();
+      await managedDeviceController.hydrateFromOffline();
+      await assignmentController.hydrateFromOffline();
+    } catch (_) {
+      // Keep the prototype-seeded in-memory state available if a persisted
+      // record is corrupt or from an incompatible development build.
+    }
   }
 
   void _createControllers() {
@@ -56,6 +77,19 @@ class _TgcgAppState extends State<TgcgApp> {
     offlinePersistenceController = OfflinePersistenceController();
     membershipOperationsController = MembershipOperationsController.prototypeSeed(
       GeographyRegistry.prototypeSeed(),
+      persistence: offlinePersistenceController,
+    );
+    managedDeviceController = ManagedDeviceController.prototypeSeed(
+      membership: membershipOperationsController,
+      persistence: offlinePersistenceController,
+    );
+    assignmentController = AssignmentController.prototypeSeed(
+      membership: membershipOperationsController,
+      devices: managedDeviceController,
+      persistence: offlinePersistenceController,
+    );
+    assignmentTrackingController = AssignmentTrackingController(
+      assignments: assignmentController,
     );
     governanceOperationsController = GovernanceOperationsController.prototypeSeed();
     fieldOperationsController = FieldOperationsController.prototypeSeed(
@@ -82,6 +116,9 @@ class _TgcgAppState extends State<TgcgApp> {
     final oldSession = sessionController;
     final oldOffline = offlinePersistenceController;
     final oldMembership = membershipOperationsController;
+    final oldDevices = managedDeviceController;
+    final oldAssignments = assignmentController;
+    final oldAssignmentTracking = assignmentTrackingController;
     final oldGovernance = governanceOperationsController;
     final oldField = fieldOperationsController;
     final oldResults = resultOperationsController;
@@ -91,6 +128,7 @@ class _TgcgAppState extends State<TgcgApp> {
     final oldEmergency = emergencyResponseController;
 
     try {
+      await oldMembership.clearLocalCredentials();
       await oldOffline.clearPresentationData();
     } catch (_) {
       // Recreating all in-memory controllers still restores the presentation
@@ -100,12 +138,15 @@ class _TgcgAppState extends State<TgcgApp> {
     if (!mounted) return;
 
     setState(_createControllers);
-    unawaited(offlinePersistenceController.initialize());
+    unawaited(_initializePersistenceAndHydrate());
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       oldSession.dispose();
       oldField.dispose();
       oldResults.dispose();
+      oldAssignmentTracking.dispose();
+      oldAssignments.dispose();
+      oldDevices.dispose();
       oldMembership.dispose();
       oldCommunications.dispose();
       oldBulkCommunications.dispose();
@@ -121,6 +162,9 @@ class _TgcgAppState extends State<TgcgApp> {
     sessionController.dispose();
     fieldOperationsController.dispose();
     resultOperationsController.dispose();
+    assignmentTrackingController.dispose();
+    assignmentController.dispose();
+    managedDeviceController.dispose();
     membershipOperationsController.dispose();
     communicationsController.dispose();
     bulkCommunicationsController.dispose();
@@ -149,17 +193,26 @@ class _TgcgAppState extends State<TgcgApp> {
                     controller: bulkCommunicationsController,
                     child: MembershipOperations(
                       controller: membershipOperationsController,
-                      child: FieldOperations(
-                        controller: fieldOperationsController,
-                        child: ResultOperations(
-                          controller: resultOperationsController,
-                          child: MaterialApp(
-                            navigatorKey: tgcgNavigatorKey,
-                            debugShowCheckedModeBanner: false,
-                            title: 'USESF',
-                            theme: _theme(),
-                            home: _AuthenticationGate(
-                              onResetPresentation: _resetPresentation,
+                      child: ManagedDevices(
+                        controller: managedDeviceController,
+                        child: Assignments(
+                          controller: assignmentController,
+                          child: AssignmentTracking(
+                            controller: assignmentTrackingController,
+                            child: FieldOperations(
+                              controller: fieldOperationsController,
+                              child: ResultOperations(
+                                controller: resultOperationsController,
+                                child: MaterialApp(
+                                  navigatorKey: tgcgNavigatorKey,
+                                  debugShowCheckedModeBanner: false,
+                                  title: 'USESF',
+                                  theme: _theme(),
+                                  home: _AuthenticationGate(
+                                    onResetPresentation: _resetPresentation,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -438,6 +491,9 @@ class _AuthenticationGate extends StatelessWidget {
         key: const ValueKey('presentation-access-login'),
         onResetPresentation: onResetPresentation,
       );
+    }
+    if (session.role == TgcgRole.member) {
+      return const MemberShell(key: ValueKey('member-shell'));
     }
     if (session.role == TgcgRole.pollingUnitAgent) {
       return const FieldAgentShell(key: ValueKey('field-agent-shell'));

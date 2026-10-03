@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../assignments/assignment_location_service.dart';
+import '../assignments/assignment_store.dart';
+import '../assignments/assignment_tracking_store.dart';
 import '../communications/communications_store.dart';
+import '../devices/managed_device_store.dart';
 import '../membership/membership_store.dart';
 import '../offline/offline_persistence.dart';
 import '../results/result_operations_store.dart';
@@ -20,6 +24,8 @@ class FieldAgentDashboardPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final session = TgcgSession.of(context);
     final membership = MembershipOperations.of(context);
+    final assignments = Assignments.of(context);
+    final devices = ManagedDevices.of(context);
     final field = FieldOperations.of(context);
     final results = ResultOperations.of(context);
     final communications = Communications.of(context);
@@ -29,6 +35,11 @@ class FieldAgentDashboardPage extends StatelessWidget {
     if (agent == null) return const SizedBox.shrink();
 
     final member = membership.memberById(agent.memberId);
+    final activeAssignments =
+        assignments.activeAssignmentsForMember(agent.memberId);
+    final primaryAssignment =
+        activeAssignments.isEmpty ? null : activeAssignments.first;
+    final managedDevice = devices.deviceForMember(agent.memberId);
     final incidents = field
         .incidentsForScope(agent.scope)
         .where((item) => item.reporterId == agent.agentId)
@@ -59,7 +70,12 @@ class FieldAgentDashboardPage extends StatelessWidget {
       (count, room) => count + communications.messagesForRoom(room.id).length,
     );
 
-    final checkedIn = reports.any((item) => item.category == 'Agent check-in');
+    final checkedIn = activeAssignments.any(
+          (item) =>
+              item.status == AssignmentStatus.checkedIn ||
+              item.status == AssignmentStatus.active,
+        ) ||
+        reports.any((item) => item.category == 'Agent check-in');
     final ready = agent.status == AccreditationStatus.approved &&
         agent.trainingCompleted &&
         agent.biometricEnrolled &&
@@ -80,7 +96,12 @@ class FieldAgentDashboardPage extends StatelessWidget {
                 pendingSync: pendingSync,
               ),
               const SizedBox(height: 14),
-              _AssignmentStrip(agent: agent),
+              _AssignmentStrip(
+                agent: agent,
+                assignment: primaryAssignment,
+                controller: assignments,
+                managedDevice: managedDevice,
+              ),
               const SizedBox(height: 16),
               _SectionTitle(
                 title: 'Quick Actions',
@@ -91,7 +112,13 @@ class FieldAgentDashboardPage extends StatelessWidget {
                 checkedIn: checkedIn,
                 onCheckIn: checkedIn
                     ? null
-                    : () => _checkIn(context, field, agent),
+                    : () => _checkIn(
+                          context,
+                          field,
+                          assignments,
+                          managedDevice,
+                          agent,
+                        ),
                 onIncident: () => onOpenModule(TgcgModule.fieldMonitoring),
                 onEvidence: () => onOpenModule(TgcgModule.evidenceCapture),
                 onResult: () => onOpenModule(TgcgModule.resultCapture),
@@ -135,18 +162,71 @@ class FieldAgentDashboardPage extends StatelessWidget {
   Future<void> _checkIn(
     BuildContext context,
     FieldOperationsController field,
+    AssignmentController assignments,
+    ManagedDevice? managedDevice,
     AccreditedAgent agent,
   ) async {
     try {
-      await field.submitFieldReport(
-        category: 'Agent check-in',
-        summary: 'Agent checked in for field duty.',
-        scope: agent.scope,
-        reporterId: agent.agentId,
-      );
+      final active = assignments.activeAssignmentsForMember(agent.memberId);
+      if (active.isNotEmpty) {
+        final assignment = active.first;
+        if (managedDevice == null) {
+          throw StateError(
+            'A managed USESF phone must be assigned before GPS check-in.',
+          );
+        }
+        if (assignment.status == AssignmentStatus.assigned) {
+          await assignments.transition(
+            assignmentId: assignment.id,
+            status: AssignmentStatus.accepted,
+            actorId: agent.agentId,
+          );
+          await assignments.transition(
+            assignmentId: assignment.id,
+            status: AssignmentStatus.enRoute,
+            actorId: agent.agentId,
+          );
+        } else if (assignment.status == AssignmentStatus.accepted) {
+          await assignments.transition(
+            assignmentId: assignment.id,
+            status: AssignmentStatus.enRoute,
+            actorId: agent.agentId,
+          );
+        }
+
+        final fix = await const AssignmentLocationService().captureCurrentFix();
+        final updated = await assignments.checkIn(
+          assignmentId: assignment.id,
+          actorId: agent.agentId,
+          deviceId: managedDevice.id,
+          latitude: fix.latitude,
+          longitude: fix.longitude,
+          accuracyMeters: fix.accuracyMeters,
+          capturedAt: fix.capturedAt,
+        );
+        if (updated.status == AssignmentStatus.checkedIn && context.mounted) {
+          await AssignmentTracking.of(context, listen: false).start(
+            assignmentId: updated.id,
+            deviceId: managedDevice.id,
+          );
+        }
+      } else {
+        await field.submitFieldReport(
+          category: 'Agent check-in',
+          summary:
+              'Agent checked in for accredited polling-unit duty. No temporary assignment was active.',
+          scope: agent.scope,
+          reporterId: agent.agentId,
+        );
+      }
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Check-in completed.')),
+      );
+    } on StateError catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
       );
     } catch (_) {
       if (!context.mounted) return;
@@ -353,12 +433,26 @@ class _HeroStat extends StatelessWidget {
 }
 
 class _AssignmentStrip extends StatelessWidget {
-  const _AssignmentStrip({required this.agent});
+  const _AssignmentStrip({
+    required this.agent,
+    required this.assignment,
+    required this.controller,
+    required this.managedDevice,
+  });
 
   final AccreditedAgent agent;
+  final MemberAssignment? assignment;
+  final AssignmentController controller;
+  final ManagedDevice? managedDevice;
 
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) {
+    final current = assignment;
+    final tracking = AssignmentTracking.of(context);
+    final presence = current == null
+        ? AssignmentPresence.unknown
+        : controller.presenceFor(current);
+    return Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
@@ -398,7 +492,8 @@ class _AssignmentStrip extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    agent.scope.pollingUnitName ?? agent.scope.label,
+                    current?.title ??
+                        (agent.scope.pollingUnitName ?? agent.scope.label),
                     style: const TextStyle(
                       color: TgcgColors.ink,
                       fontWeight: FontWeight.w900,
@@ -407,24 +502,80 @@ class _AssignmentStrip extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    '${agent.scope.wardName ?? 'Ward'} • ${agent.scope.lgaName ?? 'LGA'} • ${agent.scope.stateName ?? 'State'}',
+                    current?.targetScope.label ??
+                        '${agent.scope.wardName ?? 'Ward'} • ${agent.scope.lgaName ?? 'LGA'} • ${agent.scope.stateName ?? 'State'}',
                     style: const TextStyle(
                       color: TgcgColors.muted,
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
+                  if (current != null) ...[
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        TgcgStatusPill(
+                          label: current.status.name.toUpperCase(),
+                          color: current.status == AssignmentStatus.checkedIn ||
+                                  current.status == AssignmentStatus.active
+                              ? TgcgColors.success
+                              : current.status ==
+                                      AssignmentStatus.gpsMismatch
+                                  ? TgcgColors.warning
+                                  : TgcgColors.info,
+                          compact: true,
+                        ),
+                        TgcgStatusPill(
+                          label: switch (presence) {
+                            AssignmentPresence.unknown => 'GPS UNKNOWN',
+                            AssignmentPresence.insideGeofence => 'AT LOCATION',
+                            AssignmentPresence.outsideGeofence =>
+                              'OUTSIDE GEOFENCE',
+                            AssignmentPresence.stale => 'GPS STALE',
+                          },
+                          color: presence == AssignmentPresence.insideGeofence
+                              ? TgcgColors.success
+                              : presence == AssignmentPresence.unknown
+                                  ? TgcgColors.muted
+                                  : TgcgColors.warning,
+                          compact: true,
+                        ),
+                        if (current != null &&
+                            tracking.isTrackingAssignment(current.id))
+                          const TgcgStatusPill(
+                            label: 'LIVE GPS',
+                            color: TgcgColors.success,
+                            icon: Icons.location_searching_rounded,
+                            compact: true,
+                          ),
+                        TgcgStatusPill(
+                          label: managedDevice == null
+                              ? 'NO MANAGED PHONE'
+                              : 'PHONE BOUND',
+                          color: managedDevice == null
+                              ? TgcgColors.warning
+                              : TgcgColors.success,
+                          compact: true,
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
             TgcgStatusPill(
-              label: agent.scope.pollingUnitId ?? 'PU',
+              label: current?.targetPollingUnitId ??
+                  agent.scope.pollingUnitId ??
+                  'PU',
               color: TgcgColors.primary,
               compact: true,
             ),
           ],
         ),
       );
+  }
 }
 
 class _SectionTitle extends StatelessWidget {

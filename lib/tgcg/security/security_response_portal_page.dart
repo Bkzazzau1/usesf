@@ -744,6 +744,16 @@ class _DispatchDetail extends StatelessWidget {
                   label: 'Reported by',
                   value: incidentItem.reporterId,
                 ),
+                if (incidentItem.assignmentId != null)
+                  _DetailLine(
+                    label: 'Field assignment',
+                    value: incidentItem.assignmentId!,
+                  ),
+                if (incidentItem.deviceId != null)
+                  _DetailLine(
+                    label: 'Managed device',
+                    value: incidentItem.deviceId!,
+                  ),
                 _DetailLine(
                   label: 'Reported at',
                   value: _formatTimestamp(incidentItem.reportedAt),
@@ -929,6 +939,8 @@ Location: ${dispatch.scope.label}
 Coordinates: $coordinates
 Reported: ${_formatTimestamp(incident.reportedAt)}
 Reported by: ${incident.reporterId}
+Field assignment: ${incident.assignmentId ?? 'Not linked'}
+Managed device: ${incident.deviceId ?? 'Not linked'}
 Summary: ${incident.summary ?? 'No summary'}
 
 Evidence:

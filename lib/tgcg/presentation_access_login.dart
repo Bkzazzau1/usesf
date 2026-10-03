@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'login_page.dart';
+import 'membership/member_access_page.dart';
 import 'membership/membership_store.dart';
 import 'security/security_portal_login_page.dart';
 import 'session.dart';
@@ -35,6 +36,34 @@ class _PresentationAccessLoginState extends State<PresentationAccessLogin> {
                 spacing: 10,
                 runSpacing: 10,
                 children: [
+                  Material(
+                    elevation: 8,
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(16),
+                    child: FilledButton.icon(
+                      onPressed: resetting
+                          ? null
+                          : () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => const MemberAccessPage(),
+                                ),
+                              ),
+                      icon: const Icon(Icons.person_pin_circle_outlined),
+                      label: const Text('Member Access'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: TgcgColors.primaryMid,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 16,
+                        ),
+                        side: const BorderSide(color: TgcgColors.navy700),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(TgcgRadius.md),
+                        ),
+                      ),
+                    ),
+                  ),
                   Material(
                     elevation: 4,
                     color: Colors.transparent,

@@ -1,7 +1,49 @@
+import 'dart:convert';
+import 'dart:math';
+
+import 'package:cryptography/cryptography.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../domain/models.dart';
 import '../geography/geography_registry.dart';
+import '../offline/offline_payloads.dart';
+import '../offline/offline_persistence.dart';
+import '../sync/sync_models.dart';
+
+enum MemberPollingUnitLinkSource {
+  pvc,
+  manual,
+  imported,
+}
+
+class MemberPollingUnitLink {
+  const MemberPollingUnitLink({
+    required this.memberId,
+    required this.pollingUnitId,
+    required this.linkedAt,
+    required this.source,
+    this.pvcPollingUnitCode,
+    this.linkedBy,
+  });
+
+  final String memberId;
+  final String pollingUnitId;
+  final DateTime linkedAt;
+  final MemberPollingUnitLinkSource source;
+  final String? pvcPollingUnitCode;
+  final String? linkedBy;
+}
+
+class _MemberPinCredential {
+  const _MemberPinCredential({
+    required this.salt,
+    required this.hash,
+  });
+
+  final String salt;
+  final String hash;
+}
 
 class MembershipOperationsController extends ChangeNotifier {
   MembershipOperationsController._({
@@ -9,14 +51,19 @@ class MembershipOperationsController extends ChangeNotifier {
     required List<TgcgMember> members,
     required List<AccreditedAgent> agents,
     required Map<String, GeographicScope> memberScopes,
+    required Map<String, MemberPollingUnitLink> memberPollingUnits,
+    required OfflinePersistenceController persistence,
   })  : _geography = geography,
         _members = members,
         _agents = agents,
-        _memberScopes = memberScopes;
+        _memberScopes = memberScopes,
+        _memberPollingUnits = memberPollingUnits,
+        _persistence = persistence;
 
   factory MembershipOperationsController.prototypeSeed(
-    GeographyRegistry geography,
-  ) {
+    GeographyRegistry geography, {
+    OfflinePersistenceController? persistence,
+  }) {
     final now = DateTime.utc(2026, 9, 27, 7, 30);
     final kdPu = geography.pollingUnit('KD-KN-W01-PU001')!.scope;
     final zaPu = geography.pollingUnit('KD-ZA-W01-PU004')!.scope;
@@ -140,11 +187,31 @@ class MembershipOperationsController extends ChangeNotifier {
     return MembershipOperationsController._(
       geography: geography,
       members: members,
+      memberPollingUnits: {
+        'MEM-0001': MemberPollingUnitLink(
+          memberId: 'MEM-0001',
+          pollingUnitId: kdPu.pollingUnitId!,
+          linkedAt: now.subtract(const Duration(days: 20)),
+          source: MemberPollingUnitLinkSource.imported,
+        ),
+        'MEM-0002': MemberPollingUnitLink(
+          memberId: 'MEM-0002',
+          pollingUnitId: zaPu.pollingUnitId!,
+          linkedAt: now.subtract(const Duration(days: 18)),
+          source: MemberPollingUnitLinkSource.imported,
+        ),
+        'MEM-0004': MemberPollingUnitLink(
+          memberId: 'MEM-0004',
+          pollingUnitId: jmPu.pollingUnitId!,
+          linkedAt: now.subtract(const Duration(days: 9)),
+          source: MemberPollingUnitLinkSource.imported,
+        ),
+      },
       memberScopes: {
-        'MEM-0001': lgaScope('Kaduna North'),
-        'MEM-0002': lgaScope('Zaria'),
+        'MEM-0001': kdPu,
+        'MEM-0002': zaPu,
         'MEM-0003': lgaScope('Chikun'),
-        'MEM-0004': lgaScope("Jema'a"),
+        'MEM-0004': jmPu,
         'MEM-0005': lgaScope('Igabi'),
         'MEM-0006': lgaScope('Kaduna South'),
         'MEM-0007': lgaScope('Sabon Gari'),
@@ -154,6 +221,7 @@ class MembershipOperationsController extends ChangeNotifier {
         'MEM-0011': lgaScope('Lere'),
         'MEM-0012': lgaScope('Kagarko'),
       },
+      persistence: persistence ?? OfflinePersistenceController(),
       agents: [
         AccreditedAgent(
           id: 'ACC-0001',
@@ -283,10 +351,190 @@ class MembershipOperationsController extends ChangeNotifier {
   final List<TgcgMember> _members;
   final List<AccreditedAgent> _agents;
   final Map<String, GeographicScope> _memberScopes;
+  final Map<String, MemberPollingUnitLink> _memberPollingUnits;
+  final OfflinePersistenceController _persistence;
+  final Map<String, String> _memberPvcCredentialHashes = {};
+  final Map<String, _MemberPinCredential> _memberPinCredentials = {};
+  final FlutterSecureStorage _credentialStorage =
+      const FlutterSecureStorage();
 
   GeographyRegistry get geography => _geography;
   List<TgcgMember> get members => List.unmodifiable(_members);
   List<AccreditedAgent> get agents => List.unmodifiable(_agents);
+
+  Future<void> hydrateFromOffline() async {
+    final memberRows = await _persistence.readEntities(
+      entityType: 'usesf_member',
+    );
+    final coordinateRows = await _persistence.readEntities(
+      entityType: 'polling_unit_coordinate',
+    );
+    final agentRows = await _persistence.readEntities(
+      entityType: 'accredited_agent',
+    );
+
+    var changed = false;
+
+    for (final row in memberRows) {
+      final id = row['id']?.toString();
+      final fullName = row['fullName']?.toString();
+      final phoneNumber = row['phoneNumber']?.toString();
+      final createdAt =
+          DateTime.tryParse(row['createdAt']?.toString() ?? '')?.toUtc();
+      final status = _recordStatus(row['status']);
+      if (id == null ||
+          fullName == null ||
+          phoneNumber == null ||
+          createdAt == null ||
+          status == null) {
+        continue;
+      }
+
+      final origin = _recordOrigin(row['origin']) ?? RecordOrigin.localEntry;
+      final member = TgcgMember(
+        id: id,
+        fullName: fullName,
+        phoneNumber: phoneNumber,
+        email: _nullableText(row['email']),
+        membershipNumber: _nullableText(row['membershipNumber']),
+        createdAt: createdAt,
+        status: status,
+        origin: origin,
+      );
+      final scope =
+          geographicScopeFromJson(row['registrationScope']) ??
+              GeographicScope.kaduna;
+
+      final index = _members.indexWhere((item) => item.id == id);
+      if (index < 0) {
+        _members.add(member);
+      } else {
+        _members[index] = member;
+      }
+      _memberScopes[id] = scope;
+
+      final homeRaw = row['homePollingUnit'];
+      if (homeRaw is Map) {
+        final home = homeRaw.map(
+          (key, value) => MapEntry(key.toString(), value),
+        );
+        final pollingUnitId = home['pollingUnitId']?.toString();
+        final linkedAt =
+            DateTime.tryParse(home['linkedAt']?.toString() ?? '')?.toUtc();
+        final source = _linkSource(home['source']);
+        if (pollingUnitId != null &&
+            linkedAt != null &&
+            source != null &&
+            _geography.pollingUnit(pollingUnitId) != null) {
+          _memberPollingUnits[id] = MemberPollingUnitLink(
+            memberId: id,
+            pollingUnitId: pollingUnitId,
+            linkedAt: linkedAt,
+            source: source,
+            pvcPollingUnitCode:
+                _nullableText(home['pvcPollingUnitCode']),
+            linkedBy: _nullableText(home['linkedBy']),
+          );
+        }
+      }
+      changed = true;
+    }
+
+    for (final row in agentRows) {
+      final id = row['id']?.toString();
+      final memberId = row['memberId']?.toString();
+      final agentId = row['agentId']?.toString();
+      final role = _role(row['role']);
+      final scope = geographicScopeFromJson(row['scope']);
+      final status = _accreditationStatus(row['status']);
+      final createdAt =
+          DateTime.tryParse(row['createdAt']?.toString() ?? '')?.toUtc();
+      if (id == null ||
+          memberId == null ||
+          agentId == null ||
+          role == null ||
+          scope == null ||
+          status == null ||
+          createdAt == null) {
+        continue;
+      }
+      if (memberById(memberId) == null) continue;
+
+      final restored = AccreditedAgent(
+        id: id,
+        memberId: memberId,
+        agentId: agentId,
+        role: role,
+        scope: scope,
+        status: status,
+        createdAt: createdAt,
+        registeredPhoneNumber:
+            _nullableText(row['registeredPhoneNumber']),
+        deviceId: _nullableText(row['deviceId']),
+        simFingerprint: _nullableText(row['simFingerprint']),
+        biometricEnrolled: row['biometricEnrolled'] == true,
+        trainingCompleted: row['trainingCompleted'] == true,
+        origin: _recordOrigin(row['origin']) ?? RecordOrigin.localEntry,
+      );
+      final index = _agents.indexWhere((item) => item.id == id);
+      if (index < 0) {
+        _agents.add(restored);
+      } else {
+        _agents[index] = restored;
+      }
+      changed = true;
+    }
+
+    for (final row in coordinateRows) {
+      final pollingUnitId = row['pollingUnitId']?.toString();
+      if (pollingUnitId == null ||
+          _geography.pollingUnit(pollingUnitId) == null) {
+        continue;
+      }
+
+      final referenceLatitude = _number(row['referenceLatitude']);
+      final referenceLongitude = _number(row['referenceLongitude']);
+      final referenceSource = _nullableText(row['referenceSource']);
+      if (referenceLatitude != null &&
+          referenceLongitude != null &&
+          referenceSource != null) {
+        _geography.setPollingUnitReferenceCoordinate(
+          pollingUnitId: pollingUnitId,
+          latitude: referenceLatitude,
+          longitude: referenceLongitude,
+          source: referenceSource,
+          officialCode: _nullableText(row['officialCode']),
+        );
+      }
+
+      final verifiedLatitude = _number(row['verifiedLatitude']);
+      final verifiedLongitude = _number(row['verifiedLongitude']);
+      final accuracy = _number(row['verificationAccuracyMeters']);
+      final verifiedBy = _nullableText(row['verifiedBy']);
+      final verifiedAt =
+          DateTime.tryParse(row['verifiedAt']?.toString() ?? '')?.toUtc();
+      if (verifiedLatitude != null &&
+          verifiedLongitude != null &&
+          accuracy != null &&
+          verifiedBy != null &&
+          verifiedAt != null) {
+        _geography.verifyPollingUnitCoordinate(
+          pollingUnitId: pollingUnitId,
+          latitude: verifiedLatitude,
+          longitude: verifiedLongitude,
+          accuracyMeters: accuracy,
+          verifiedBy: verifiedBy,
+          verifiedAt: verifiedAt,
+        );
+      }
+      changed = true;
+    }
+
+    if (changed) {
+      _members.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      notifyListeners();
+    }
+  }
 
   TgcgMember? memberById(String id) {
     for (final member in _members) {
@@ -295,8 +543,235 @@ class MembershipOperationsController extends ChangeNotifier {
     return null;
   }
 
+  TgcgMember? memberByPhone(String phoneNumber) {
+    final target = _normalizePhone(phoneNumber);
+    if (target.isEmpty) return null;
+    for (final member in _members) {
+      if (_normalizePhone(member.phoneNumber) == target) return member;
+    }
+    return null;
+  }
+
+  TgcgMember? memberByEmail(String email) {
+    final target = email.trim().toLowerCase();
+    if (target.isEmpty) return null;
+    for (final member in _members) {
+      if ((member.email ?? '').trim().toLowerCase() == target) return member;
+    }
+    return null;
+  }
+
+  AccreditedAgent? approvedAccreditationForMember(String memberId) {
+    for (final agent in _agents) {
+      if (agent.memberId == memberId &&
+          agent.status == AccreditationStatus.approved) {
+        return agent;
+      }
+    }
+    return null;
+  }
+
+  bool hasMemberPin(String memberId) =>
+      _memberPinCredentials.containsKey(memberId);
+
+  bool hasPvcCredential(String memberId) =>
+      _memberPvcCredentialHashes.containsKey(memberId);
+
+  Future<bool> hasMemberPinCredential(String memberId) async {
+    if (_memberPinCredentials.containsKey(memberId)) return true;
+    final stored = await _credentialStorage.read(
+      key: _pinCredentialKey(memberId),
+    );
+    return stored != null && stored.trim().isNotEmpty;
+  }
+
+  Future<bool> hasPersistedPvcCredential(String memberId) async {
+    if (_memberPvcCredentialHashes.containsKey(memberId)) return true;
+    final fingerprint = await _credentialStorage.read(
+      key: _pvcMemberFingerprintKey(memberId),
+    );
+    return fingerprint != null && fingerprint.trim().isNotEmpty;
+  }
+
+  Future<void> setPvcCredential({
+    required String memberId,
+    required String voterId,
+  }) async {
+    if (memberById(memberId) == null) {
+      throw ArgumentError('Unknown member: $memberId');
+    }
+    final normalized = _normalizePvcCredential(voterId);
+    if (normalized.length < 6) {
+      throw ArgumentError('PVC/Voter ID is not valid enough to register.');
+    }
+
+    final fingerprint = await _sha256Base64(normalized);
+    final previous = _memberPvcCredentialHashes[memberId] ??
+        await _credentialStorage.read(
+          key: _pvcMemberFingerprintKey(memberId),
+        );
+    if (previous != null &&
+        previous.isNotEmpty &&
+        !_constantTimeEquals(previous, fingerprint)) {
+      await _credentialStorage.delete(
+        key: _pvcIndexKey(previous),
+      );
+    }
+
+    _memberPvcCredentialHashes[memberId] = fingerprint;
+    await _credentialStorage.write(
+      key: _pvcMemberFingerprintKey(memberId),
+      value: fingerprint,
+    );
+    await _credentialStorage.write(
+      key: _pvcIndexKey(fingerprint),
+      value: memberId,
+    );
+    notifyListeners();
+  }
+
+  Future<TgcgMember?> memberByPvcCredential(String voterId) async {
+    final normalized = _normalizePvcCredential(voterId);
+    if (normalized.length < 6) return null;
+    final fingerprint = await _sha256Base64(normalized);
+
+    for (final entry in _memberPvcCredentialHashes.entries) {
+      if (_constantTimeEquals(entry.value, fingerprint)) {
+        return memberById(entry.key);
+      }
+    }
+
+    final memberId = await _credentialStorage.read(
+      key: _pvcIndexKey(fingerprint),
+    );
+    if (memberId == null || memberId.isEmpty) return null;
+    final member = memberById(memberId);
+    if (member != null) {
+      _memberPvcCredentialHashes[member.id] = fingerprint;
+    }
+    return member;
+  }
+
+  Future<void> setMemberPin({
+    required String memberId,
+    required String pin,
+  }) async {
+    if (memberById(memberId) == null) {
+      throw ArgumentError('Unknown member: $memberId');
+    }
+    if (!RegExp(r'^\d{6}$').hasMatch(pin)) {
+      throw ArgumentError('Member PIN must contain exactly 6 digits.');
+    }
+    final random = Random.secure();
+    final saltBytes = List<int>.generate(
+      16,
+      (_) => random.nextInt(256),
+      growable: false,
+    );
+    final hash = await _derivePin(pin, saltBytes);
+    final credential = _MemberPinCredential(
+      salt: base64UrlEncode(saltBytes),
+      hash: base64UrlEncode(hash),
+    );
+    _memberPinCredentials[memberId] = credential;
+    await _credentialStorage.write(
+      key: _pinCredentialKey(memberId),
+      value: jsonEncode({
+        'salt': credential.salt,
+        'hash': credential.hash,
+      }),
+    );
+    notifyListeners();
+  }
+
+  Future<void> clearLocalCredentials() async {
+    for (final member in _members) {
+      final fingerprint = _memberPvcCredentialHashes[member.id] ??
+          await _credentialStorage.read(
+            key: _pvcMemberFingerprintKey(member.id),
+          );
+      if (fingerprint != null && fingerprint.isNotEmpty) {
+        await _credentialStorage.delete(
+          key: _pvcIndexKey(fingerprint),
+        );
+      }
+      await _credentialStorage.delete(
+        key: _pvcMemberFingerprintKey(member.id),
+      );
+      await _credentialStorage.delete(
+        key: _pinCredentialKey(member.id),
+      );
+    }
+    _memberPvcCredentialHashes.clear();
+    _memberPinCredentials.clear();
+  }
+
+  Future<bool> verifyMemberPin({
+    required String memberId,
+    required String pin,
+  }) async {
+    if (!RegExp(r'^\d{6}$').hasMatch(pin)) return false;
+
+    var credential = _memberPinCredentials[memberId];
+    if (credential == null) {
+      final stored = await _credentialStorage.read(
+        key: _pinCredentialKey(memberId),
+      );
+      if (stored != null && stored.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(stored);
+          if (decoded is Map &&
+              decoded['salt'] is String &&
+              decoded['hash'] is String) {
+            credential = _MemberPinCredential(
+              salt: decoded['salt'] as String,
+              hash: decoded['hash'] as String,
+            );
+            _memberPinCredentials[memberId] = credential;
+          }
+        } catch (_) {
+          return false;
+        }
+      }
+    }
+    if (credential == null) return false;
+
+    final salt = base64Url.decode(credential.salt);
+    final actual = base64UrlEncode(await _derivePin(pin, salt));
+    return _constantTimeEquals(credential.hash, actual);
+  }
+
   GeographicScope? registrationScopeForMember(String memberId) =>
       _memberScopes[memberId];
+
+  MemberPollingUnitLink? pollingUnitLinkForMember(String memberId) =>
+      _memberPollingUnits[memberId];
+
+  CanonicalPollingUnit? homePollingUnitForMember(String memberId) {
+    final link = pollingUnitLinkForMember(memberId);
+    if (link == null) return null;
+    return _geography.pollingUnit(link.pollingUnitId);
+  }
+
+  List<TgcgMember> membersForPollingUnit(String pollingUnitId) {
+    final unit = _geography.pollingUnit(pollingUnitId);
+    if (unit == null) return const [];
+    return _members
+        .where(
+          (member) =>
+              _memberPollingUnits[member.id]?.pollingUnitId ==
+              unit.scope.pollingUnitId,
+        )
+        .toList(growable: false);
+  }
+
+  int memberCountForPollingUnit(String pollingUnitId) =>
+      membersForPollingUnit(pollingUnitId).length;
+
+  int get membersWithHomePollingUnit => _memberPollingUnits.length;
+
+  int get membersWithoutHomePollingUnit =>
+      _members.length - membersWithHomePollingUnit;
 
   List<TgcgMember> membersForScope(GeographicScope scope) => _members
       .where((member) {
@@ -326,12 +801,25 @@ class MembershipOperationsController extends ChangeNotifier {
       .toSet()
       .length;
 
-  TgcgMember createMember({
+  Future<TgcgMember> createMember({
     required String fullName,
     required String phoneNumber,
     String? email,
     GeographicScope registrationScope = GeographicScope.kaduna,
-  }) {
+    String? homePollingUnitId,
+    String? pvcPollingUnitCode,
+    String? linkedBy,
+  }) async {
+    CanonicalPollingUnit? homePollingUnit;
+    if (homePollingUnitId != null && homePollingUnitId.trim().isNotEmpty) {
+      homePollingUnit = _geography.pollingUnit(homePollingUnitId);
+      if (homePollingUnit == null) {
+        throw ArgumentError(
+          'Home polling unit must exist in the canonical registry.',
+        );
+      }
+    }
+
     final member = TgcgMember(
       id: 'MEM-${(_members.length + 1).toString().padLeft(4, '0')}',
       fullName: fullName.trim(),
@@ -343,20 +831,116 @@ class MembershipOperationsController extends ChangeNotifier {
       status: RecordStatus.submitted,
       origin: RecordOrigin.localEntry,
     );
+    final scope = homePollingUnit?.scope ?? registrationScope;
+    final homeLink = homePollingUnit == null
+        ? null
+        : MemberPollingUnitLink(
+            memberId: member.id,
+            pollingUnitId: homePollingUnit.scope.pollingUnitId!,
+            linkedAt: DateTime.now().toUtc(),
+            source: pvcPollingUnitCode?.trim().isNotEmpty == true
+                ? MemberPollingUnitLinkSource.pvc
+                : MemberPollingUnitLinkSource.manual,
+            pvcPollingUnitCode: pvcPollingUnitCode?.trim().isEmpty == true
+                ? null
+                : pvcPollingUnitCode?.trim(),
+            linkedBy:
+                linkedBy?.trim().isEmpty == true ? null : linkedBy?.trim(),
+          );
+
+    await _persistMemberState(member, scope, homeLink);
+
     _members.insert(0, member);
-    _memberScopes[member.id] = registrationScope;
+    _memberScopes[member.id] = scope;
+    if (homeLink != null) {
+      _memberPollingUnits[member.id] = homeLink;
+    }
     notifyListeners();
     return member;
   }
 
-  AccreditedAgent accredit({
+  Future<MemberPollingUnitLink> linkMemberToPollingUnit({
+    required String memberId,
+    required String pollingUnitId,
+    MemberPollingUnitLinkSource source = MemberPollingUnitLinkSource.manual,
+    String? pvcPollingUnitCode,
+    String? linkedBy,
+  }) async {
+    if (memberById(memberId) == null) {
+      throw ArgumentError('Unknown member: $memberId');
+    }
+    final unit = _geography.pollingUnit(pollingUnitId);
+    if (unit == null) {
+      throw ArgumentError(
+        'Polling-unit link must use canonical geography.',
+      );
+    }
+    final link = MemberPollingUnitLink(
+      memberId: memberId,
+      pollingUnitId: unit.scope.pollingUnitId!,
+      linkedAt: DateTime.now().toUtc(),
+      source: source,
+      pvcPollingUnitCode: pvcPollingUnitCode?.trim().isEmpty == true
+          ? null
+          : pvcPollingUnitCode?.trim(),
+      linkedBy: linkedBy?.trim().isEmpty == true ? null : linkedBy?.trim(),
+    );
+    final member = memberById(memberId)!;
+    await _persistMemberState(member, unit.scope, link);
+    _memberPollingUnits[memberId] = link;
+    _memberScopes[memberId] = unit.scope;
+    notifyListeners();
+    return link;
+  }
+
+  Future<CanonicalPollingUnit> verifyPollingUnitCoordinate({
+    required String pollingUnitId,
+    required double latitude,
+    required double longitude,
+    required double accuracyMeters,
+    required String verifiedBy,
+    DateTime? verifiedAt,
+  }) async {
+    final updated = _geography.verifyPollingUnitCoordinate(
+      pollingUnitId: pollingUnitId,
+      latitude: latitude,
+      longitude: longitude,
+      accuracyMeters: accuracyMeters,
+      verifiedBy: verifiedBy,
+      verifiedAt: verifiedAt,
+    );
+    await _persistPollingUnitCoordinate(updated);
+    notifyListeners();
+    return updated;
+  }
+
+  Future<CanonicalPollingUnit> setPollingUnitReferenceCoordinate({
+    required String pollingUnitId,
+    required double latitude,
+    required double longitude,
+    required String source,
+    String? officialCode,
+  }) async {
+    final updated = _geography.setPollingUnitReferenceCoordinate(
+      pollingUnitId: pollingUnitId,
+      latitude: latitude,
+      longitude: longitude,
+      source: source,
+      officialCode: officialCode,
+    );
+    await _persistPollingUnitCoordinate(updated);
+    notifyListeners();
+    return updated;
+  }
+
+  Future<AccreditedAgent> accredit({
     required String memberId,
     required TgcgRole role,
     required GeographicScope scope,
     String? phoneNumber,
     String? deviceId,
     String? simFingerprint,
-  }) {
+  }) async {
     if (scope.level == GeographyLevel.pollingUnit &&
         _geography.pollingUnit(scope.pollingUnitId ?? '') == null) {
       throw ArgumentError(
@@ -378,29 +962,35 @@ class MembershipOperationsController extends ChangeNotifier {
           simFingerprint?.trim().isEmpty == true ? null : simFingerprint?.trim(),
       origin: RecordOrigin.localEntry,
     );
+    await _persistAgent(agent);
     _agents.insert(0, agent);
     notifyListeners();
     return agent;
   }
 
-  void updateAccreditationStatus(String id, AccreditationStatus status) {
+  Future<void> updateAccreditationStatus(
+    String id,
+    AccreditationStatus status,
+  ) async {
     final index = _agents.indexWhere((agent) => agent.id == id);
     if (index < 0) return;
-    _agents[index] = _copyAgent(_agents[index], status: status);
+    final updated = _copyAgent(_agents[index], status: status);
+    await _persistAgent(updated);
+    _agents[index] = updated;
     notifyListeners();
   }
 
-  void updateReadiness(
+  Future<void> updateReadiness(
     String id, {
     bool? trainingCompleted,
     bool? biometricEnrolled,
     String? deviceId,
     String? simFingerprint,
-  }) {
+  }) async {
     final index = _agents.indexWhere((agent) => agent.id == id);
     if (index < 0) return;
     final current = _agents[index];
-    _agents[index] = AccreditedAgent(
+    final updated = AccreditedAgent(
       id: current.id,
       memberId: current.memberId,
       agentId: current.agentId,
@@ -415,7 +1005,192 @@ class MembershipOperationsController extends ChangeNotifier {
       trainingCompleted: trainingCompleted ?? current.trainingCompleted,
       origin: current.origin,
     );
+    await _persistAgent(updated);
+    _agents[index] = updated;
     notifyListeners();
+  }
+
+  Future<void> _persistAgent(AccreditedAgent agent) =>
+      _persistence.persistMutation(
+        entityType: 'accredited_agent',
+        entityId: agent.id,
+        mutationType: SyncMutationType.upsert,
+        scopeKey: scopeStorageKey(agent.scope),
+        ownerId: agent.memberId,
+        payload: {
+          'id': agent.id,
+          'memberId': agent.memberId,
+          'agentId': agent.agentId,
+          'role': agent.role.name,
+          'scope': geographicScopeToJson(agent.scope),
+          'status': agent.status.name,
+          'createdAt': agent.createdAt.toIso8601String(),
+          'registeredPhoneNumber': agent.registeredPhoneNumber,
+          'deviceId': agent.deviceId,
+          'simFingerprint': agent.simFingerprint,
+          'biometricEnrolled': agent.biometricEnrolled,
+          'trainingCompleted': agent.trainingCompleted,
+          'origin': agent.origin.name,
+        },
+      );
+
+  Future<void> _persistMemberState(
+    TgcgMember member,
+    GeographicScope scope,
+    MemberPollingUnitLink? homeLink,
+  ) =>
+      _persistence.persistMutation(
+        entityType: 'usesf_member',
+        entityId: member.id,
+        mutationType: SyncMutationType.upsert,
+        scopeKey: scopeStorageKey(scope),
+        ownerId: member.id,
+        payload: {
+          'id': member.id,
+          'fullName': member.fullName,
+          'phoneNumber': member.phoneNumber,
+          'email': member.email,
+          'membershipNumber': member.membershipNumber,
+          'createdAt': member.createdAt.toIso8601String(),
+          'status': member.status.name,
+          'origin': member.origin.name,
+          'registrationScope': geographicScopeToJson(scope),
+          'homePollingUnit': homeLink == null
+              ? null
+              : {
+                  'pollingUnitId': homeLink.pollingUnitId,
+                  'linkedAt': homeLink.linkedAt.toIso8601String(),
+                  'source': homeLink.source.name,
+                  'pvcPollingUnitCode': homeLink.pvcPollingUnitCode,
+                  'linkedBy': homeLink.linkedBy,
+                },
+        },
+      );
+
+  Future<void> _persistPollingUnitCoordinate(
+    CanonicalPollingUnit unit,
+  ) =>
+      _persistence.persistMutation(
+        entityType: 'polling_unit_coordinate',
+        entityId: unit.code,
+        mutationType: SyncMutationType.upsert,
+        scopeKey: scopeStorageKey(unit.scope),
+        payload: {
+          'pollingUnitId': unit.code,
+          'officialCode': unit.officialCode,
+          'referenceLatitude': unit.referenceLatitude,
+          'referenceLongitude': unit.referenceLongitude,
+          'referenceSource': unit.referenceSource,
+          'verifiedLatitude': unit.verifiedLatitude,
+          'verifiedLongitude': unit.verifiedLongitude,
+          'verificationAccuracyMeters': unit.verificationAccuracyMeters,
+          'verifiedBy': unit.verifiedBy,
+          'verifiedAt': unit.verifiedAt?.toIso8601String(),
+          'coordinateStatus': unit.coordinateStatus.name,
+          'geofenceRadiusMeters': unit.geofenceRadiusMeters,
+        },
+      );
+
+  static TgcgRole? _role(Object? value) {
+    final name = value?.toString();
+    for (final item in TgcgRole.values) {
+      if (item.name == name) return item;
+    }
+    return null;
+  }
+
+  static AccreditationStatus? _accreditationStatus(Object? value) {
+    final name = value?.toString();
+    for (final item in AccreditationStatus.values) {
+      if (item.name == name) return item;
+    }
+    return null;
+  }
+
+  static RecordStatus? _recordStatus(Object? value) {
+    final name = value?.toString();
+    for (final item in RecordStatus.values) {
+      if (item.name == name) return item;
+    }
+    return null;
+  }
+
+  static RecordOrigin? _recordOrigin(Object? value) {
+    final name = value?.toString();
+    for (final item in RecordOrigin.values) {
+      if (item.name == name) return item;
+    }
+    return null;
+  }
+
+  static MemberPollingUnitLinkSource? _linkSource(Object? value) {
+    final name = value?.toString();
+    for (final item in MemberPollingUnitLinkSource.values) {
+      if (item.name == name) return item;
+    }
+    return null;
+  }
+
+  static String? _nullableText(Object? value) {
+    final text = value?.toString().trim();
+    return text == null || text.isEmpty ? null : text;
+  }
+
+  static double? _number(Object? value) {
+    if (value is num) return value.toDouble();
+    return value == null ? null : double.tryParse(value.toString());
+  }
+
+  static String _pinCredentialKey(String memberId) =>
+      'usesf.member.$memberId.pin';
+
+  static String _pvcMemberFingerprintKey(String memberId) =>
+      'usesf.member.$memberId.pvc_fingerprint';
+
+  static String _pvcIndexKey(String fingerprint) =>
+      'usesf.pvc_index.$fingerprint';
+
+  static String _normalizePvcCredential(String value) =>
+      value.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+
+  static String _normalizePhone(String value) {
+    var digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.startsWith('2340')) {
+      digits = '234${digits.substring(4)}';
+    } else if (digits.length == 11 && digits.startsWith('0')) {
+      digits = '234${digits.substring(1)}';
+    }
+    return digits;
+  }
+
+  static Future<String> _sha256Base64(String value) async {
+    final hash = await Sha256().hash(utf8.encode(value));
+    return base64UrlEncode(hash.bytes);
+  }
+
+  static Future<List<int>> _derivePin(
+    String pin,
+    List<int> salt,
+  ) async {
+    final algorithm = Pbkdf2(
+      macAlgorithm: Hmac.sha256(),
+      iterations: 120000,
+      bits: 256,
+    );
+    final secret = await algorithm.deriveKey(
+      secretKey: SecretKey(utf8.encode(pin)),
+      nonce: salt,
+    );
+    return secret.extractBytes();
+  }
+
+  static bool _constantTimeEquals(String a, String b) {
+    if (a.length != b.length) return false;
+    var difference = 0;
+    for (var index = 0; index < a.length; index++) {
+      difference |= a.codeUnitAt(index) ^ b.codeUnitAt(index);
+    }
+    return difference == 0;
   }
 
   static AccreditedAgent _copyAgent(

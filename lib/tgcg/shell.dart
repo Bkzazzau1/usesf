@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'ai/ai_verification_page.dart';
+import 'assignments/assignment_control_page.dart';
 import 'alerts/alert_center_page.dart';
 import 'analytics/ai_data_analytics_page.dart';
 import 'collation/collation_page.dart';
@@ -153,6 +154,7 @@ class _TgcgShellState extends State<TgcgShell> {
         TgcgModule.membershipNetwork => const StateMembershipPage(),
         TgcgModule.roleAssignment => const RoleAssignmentPage(),
         TgcgModule.geography => const GeographyPage(),
+        TgcgModule.assignmentControl => const AssignmentControlPage(),
         TgcgModule.liveOperations => const LiveOperationsPage(),
         TgcgModule.aiVerification => const AiVerificationPage(),
         TgcgModule.aiAnalytics => const AiDataAnalyticsPage(),
@@ -194,6 +196,7 @@ const _destinations = <_Destination>[
   _Destination(TgcgModule.securityResponse, 'Security Response', Icons.emergency_share_outlined, _NavGroup.command),
   _Destination(TgcgModule.mediaIntelligence, 'Media Intelligence', Icons.insights_outlined, _NavGroup.command),
   _Destination(TgcgModule.geography, 'Geographic Operations', Icons.public_rounded, _NavGroup.command),
+  _Destination(TgcgModule.assignmentControl, 'Assignment Control', Icons.assignment_ind_outlined, _NavGroup.fieldOperations),
   _Destination(TgcgModule.accreditation, 'Member Enrolment', Icons.how_to_reg_outlined, _NavGroup.fieldOperations),
   _Destination(TgcgModule.aiVerification, 'AI Verification', Icons.auto_awesome_rounded, _NavGroup.fieldOperations),
   _Destination(TgcgModule.fieldMonitoring, 'Field Monitoring', Icons.sensors_outlined, _NavGroup.fieldOperations),
@@ -622,6 +625,7 @@ String _moduleLabel(TgcgModule module) => switch (module) {
       TgcgModule.membershipNetwork => 'Registered Members',
       TgcgModule.roleAssignment => 'Role Assignment',
       TgcgModule.geography => 'Geographic Operations',
+      TgcgModule.assignmentControl => 'Assignment Control Centre',
       TgcgModule.liveOperations => 'Live Operations',
       TgcgModule.aiVerification => 'AI Verification Centre',
       TgcgModule.aiAnalytics => 'AI Data Analytics Centre',

@@ -11,6 +11,7 @@ enum TgcgModule {
   membershipNetwork,
   roleAssignment,
   geography,
+  assignmentControl,
   liveOperations,
   aiVerification,
   aiAnalytics,
@@ -123,6 +124,7 @@ String roleLabel(TgcgRole role) => switch (role) {
       TgcgRole.stateCoordinator => 'State Coordinator',
       TgcgRole.lgaCoordinator => 'LGA Coordinator',
       TgcgRole.wardCoordinator => 'Ward Coordinator',
+      TgcgRole.member => 'Member',
       TgcgRole.pollingUnitAgent => 'Polling Unit Agent',
       TgcgRole.observer => 'Observer',
       TgcgRole.legalOfficer => 'Legal Officer',
@@ -146,6 +148,8 @@ String roleDescription(TgcgRole role) => switch (role) {
         'LGA field coordination, reporting, agent assignments and election-day operations.',
       TgcgRole.wardCoordinator =>
         'Ward-level field monitoring, reporting and result submission support.',
+      TgcgRole.member =>
+        'Member profile, home polling-unit information and authorized assignment access.',
       TgcgRole.pollingUnitAgent =>
         'Polling-unit check-in, incident reporting, evidence and result submission.',
       TgcgRole.observer =>
@@ -168,6 +172,7 @@ IconData roleIcon(TgcgRole role) => switch (role) {
       TgcgRole.stateCoordinator => Icons.map_rounded,
       TgcgRole.lgaCoordinator => Icons.location_city_rounded,
       TgcgRole.wardCoordinator => Icons.grid_view_rounded,
+      TgcgRole.member => Icons.person_pin_circle_rounded,
       TgcgRole.pollingUnitAgent => Icons.how_to_vote_rounded,
       TgcgRole.observer => Icons.visibility_rounded,
       TgcgRole.legalOfficer => Icons.gavel_rounded,
@@ -202,6 +207,13 @@ Set<TgcgModule> allowedModules(TgcgRole role) {
       modules.add(TgcgModule.alertCenter);
     }
   }
+  if (TgcgPermissionPolicy.allows(
+    role,
+    TgcgCapability.manageAgentAssignments,
+  )) {
+    modules.add(TgcgModule.assignmentControl);
+  }
+
   if (TgcgPermissionPolicy.allows(role, TgcgCapability.viewIncidents) ||
       TgcgPermissionPolicy.allows(role, TgcgCapability.createIncident) ||
       TgcgPermissionPolicy.allows(role, TgcgCapability.submitFieldReport)) {

@@ -20,10 +20,12 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
   final _phone = TextEditingController();
   final _email = TextEditingController();
   final _voterId = TextEditingController();
+  final _pin = TextEditingController();
   PvcRecognitionResult? _scan;
   bool _reading = false;
   TgcgMember? _created;
   String? _selectedLgaId;
+  String? _selectedPollingUnitId;
 
   @override
   void dispose() {
@@ -31,6 +33,7 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
     _phone.dispose();
     _email.dispose();
     _voterId.dispose();
+    _pin.dispose();
     super.dispose();
   }
 
@@ -39,6 +42,9 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
     final session = TgcgSession.of(context);
     final store = MembershipOperations.of(context);
     _selectedLgaId ??= store.geography.lgas.first.id;
+    final lgaPollingUnits = store.geography.pollingUnits
+        .where((unit) => unit.scope.lgaId == _selectedLgaId)
+        .toList(growable: false);
     final canManage = TgcgPermissionPolicy.allows(
       session.role!,
       TgcgCapability.manageMembership,
@@ -55,7 +61,7 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
           eyebrow: 'PVC IDENTITY ENROLMENT',
           title: 'Member Enrolment',
           subtitle:
-              'Scan a Permanent Voter Card, confirm the recognized identity, assign the registration LGA and continue to field accreditation.',
+              'Scan a Permanent Voter Card, match its polling-unit code to the canonical registry, confirm the member identity and create the home polling-unit relationship.',
           trailing: TgcgStatusPill(
             label: '${store.members.length} MEMBERS',
             color: TgcgColors.primary,
@@ -79,10 +85,17 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
               phone: _phone,
               email: _email,
               voterId: _voterId,
+              pin: _pin,
               lgas: store.geography.lgas,
+              pollingUnits: lgaPollingUnits,
               selectedLgaId: _selectedLgaId!,
-              onLgaChanged: (value) =>
-                  setState(() => _selectedLgaId = value),
+              selectedPollingUnitId: _selectedPollingUnitId,
+              onLgaChanged: (value) => setState(() {
+                _selectedLgaId = value;
+                _selectedPollingUnitId = null;
+              }),
+              onPollingUnitChanged: (value) =>
+                  setState(() => _selectedPollingUnitId = value),
               scan: _scan,
               created: _created,
               enabled: canManage && _scan != null,
@@ -126,10 +139,21 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
           ? await _recognizer.captureAndRecognize()
           : await _recognizer.pickAndRecognize();
       if (!mounted || result == null) return;
+      final store = MembershipOperations.of(context, listen: false);
+      final matchedUnit = result.pollingUnitCode == null
+          ? null
+          : store.geography.pollingUnitByOfficialCode(
+                  result.pollingUnitCode!,
+                ) ??
+              store.geography.pollingUnit(result.pollingUnitCode!);
       setState(() {
         _scan = result;
         _name.text = result.fullName ?? '';
         _voterId.text = result.voterId ?? '';
+        if (matchedUnit != null) {
+          _selectedLgaId = matchedUnit.scope.lgaId;
+          _selectedPollingUnitId = matchedUnit.code;
+        }
       });
     } catch (error) {
       if (!mounted) return;
@@ -141,21 +165,48 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
     }
   }
 
-  void _createMember(MembershipOperationsController store) {
+  Future<void> _createMember(MembershipOperationsController store) async {
     if (_scan == null ||
         _name.text.trim().isEmpty ||
         _phone.text.trim().isEmpty ||
-        _selectedLgaId == null) {
+        _selectedPollingUnitId == null ||
+        !RegExp(r'^\d{6}$').hasMatch(_pin.text.trim())) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Confirm the member details, home polling unit and a 6-digit member PIN.',
+            ),
+          ),
+        );
+      }
       return;
     }
-    final lga = store.geography.lga(_selectedLgaId!);
-    if (lga == null) return;
-    final member = store.createMember(
+    final unit = store.geography.pollingUnit(_selectedPollingUnitId!);
+    if (unit == null) return;
+    final session = TgcgSession.of(context, listen: false);
+    final member = await store.createMember(
       fullName: _name.text.trim(),
       phoneNumber: _phone.text.trim(),
       email: _email.text.trim(),
-      registrationScope: lga.scope,
+      registrationScope: unit.scope,
+      homePollingUnitId: unit.code,
+      pvcPollingUnitCode: _scan?.pollingUnitCode,
+      linkedBy:
+          session.accessId.isEmpty ? session.operatorName : session.accessId,
     );
+    final voterId = _voterId.text.trim();
+    if (voterId.isNotEmpty) {
+      await store.setPvcCredential(
+        memberId: member.id,
+        voterId: voterId,
+      );
+    }
+    await store.setMemberPin(
+      memberId: member.id,
+      pin: _pin.text.trim(),
+    );
+    if (!mounted) return;
     setState(() => _created = member);
   }
 
@@ -167,6 +218,8 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
       _phone.clear();
       _email.clear();
       _voterId.clear();
+      _pin.clear();
+      _selectedPollingUnitId = null;
     });
   }
 
@@ -176,7 +229,8 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
   ) async {
     if (store.members.isEmpty || store.geography.pollingUnits.isEmpty) return;
     var memberId = store.members.first.id;
-    var scope = store.geography.pollingUnits.first.scope;
+    var scope = store.homePollingUnitForMember(memberId)?.scope ??
+        store.geography.pollingUnits.first.scope;
     final phone = TextEditingController(text: store.members.first.phoneNumber);
     final created = await showDialog<bool>(
       context: context,
@@ -208,6 +262,8 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
                     setDialogState(() {
                       memberId = value;
                       phone.text = member.phoneNumber;
+                      scope =
+                          store.homePollingUnitForMember(value)?.scope ?? scope;
                     });
                   },
                 ),
@@ -246,14 +302,16 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
               child: const Text('Cancel'),
             ),
             FilledButton.icon(
-              onPressed: () {
-                store.accredit(
+              onPressed: () async {
+                await store.accredit(
                   memberId: memberId,
                   role: TgcgRole.pollingUnitAgent,
                   scope: scope,
                   phoneNumber: phone.text.trim(),
                 );
-                Navigator.pop(dialogContext, true);
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext, true);
+                }
               },
               icon: const Icon(Icons.badge_outlined),
               label: const Text('Create accreditation'),
@@ -306,11 +364,13 @@ class _Metrics extends StatelessWidget {
             ),
             TgcgMetricCard(
               width: width,
-              label: 'Agents',
-              value: '${store.agents.length}',
-              detail: 'Field accreditations',
-              icon: Icons.badge_outlined,
-              tone: TgcgMetricTone.neutral,
+              label: 'PU linked',
+              value: '${store.membersWithHomePollingUnit}',
+              detail: '${store.membersWithoutHomePollingUnit} without home PU',
+              icon: Icons.location_on_outlined,
+              tone: store.membersWithoutHomePollingUnit == 0
+                  ? TgcgMetricTone.success
+                  : TgcgMetricTone.warning,
             ),
             TgcgMetricCard(
               width: width,
@@ -401,6 +461,17 @@ class _ScannerPanel extends StatelessWidget {
                                 fontSize: 11,
                               ),
                             ),
+                            if (scan!.pollingUnitCode != null) ...[
+                              const SizedBox(height: 5),
+                              Text(
+                                'PU CODE • ${scan!.pollingUnitCode}',
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
                           ],
                         ],
                       ),
@@ -437,9 +508,13 @@ class _IdentityForm extends StatelessWidget {
     required this.phone,
     required this.email,
     required this.voterId,
+    required this.pin,
     required this.lgas,
+    required this.pollingUnits,
     required this.selectedLgaId,
+    required this.selectedPollingUnitId,
     required this.onLgaChanged,
+    required this.onPollingUnitChanged,
     required this.scan,
     required this.created,
     required this.enabled,
@@ -451,9 +526,13 @@ class _IdentityForm extends StatelessWidget {
   final TextEditingController phone;
   final TextEditingController email;
   final TextEditingController voterId;
+  final TextEditingController pin;
   final List<CanonicalLga> lgas;
+  final List<CanonicalPollingUnit> pollingUnits;
   final String selectedLgaId;
+  final String? selectedPollingUnitId;
   final ValueChanged<String> onLgaChanged;
+  final ValueChanged<String?> onPollingUnitChanged;
   final PvcRecognitionResult? scan;
   final TgcgMember? created;
   final bool enabled;
@@ -464,7 +543,7 @@ class _IdentityForm extends StatelessWidget {
   Widget build(BuildContext context) => TgcgSectionCard(
         title: 'Confirm identity',
         subtitle:
-            'Review the recognized fields and registration LGA before creating the membership record.',
+            'Review the recognized identity and confirm the home polling unit before creating the membership record.',
         child: Column(
           children: [
             TextField(
@@ -498,6 +577,55 @@ class _IdentityForm extends StatelessWidget {
                   : null,
             ),
             const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              key: ValueKey('pu-$selectedLgaId-$selectedPollingUnitId'),
+              initialValue: pollingUnits.any(
+                (unit) => unit.code == selectedPollingUnitId,
+              )
+                  ? selectedPollingUnitId
+                  : null,
+              isExpanded: true,
+              decoration: InputDecoration(
+                labelText: 'Home polling unit',
+                helperText: scan?.pollingUnitCode == null
+                    ? 'Select the member polling unit'
+                    : 'PVC code detected: ${scan!.pollingUnitCode}',
+                prefixIcon: const Icon(Icons.location_on_outlined),
+              ),
+              items: pollingUnits
+                  .map(
+                    (unit) => DropdownMenuItem(
+                      value: unit.code,
+                      child: Text(
+                        '${unit.displayCode} • ${unit.scope.pollingUnitName ?? unit.scope.label}',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: enabled && created == null
+                  ? onPollingUnitChanged
+                  : null,
+            ),
+            if (scan?.pollingUnitCode != null) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TgcgStatusPill(
+                  label: selectedPollingUnitId == null
+                      ? 'PVC PU CODE NOT YET MATCHED'
+                      : 'PVC PU MATCHED',
+                  color: selectedPollingUnitId == null
+                      ? TgcgColors.warning
+                      : TgcgColors.success,
+                  icon: selectedPollingUnitId == null
+                      ? Icons.manage_search_rounded
+                      : Icons.verified_outlined,
+                  compact: true,
+                ),
+              ),
+            ],
+            const SizedBox(height: 10),
             TextField(
               controller: phone,
               enabled: enabled,
@@ -508,6 +636,21 @@ class _IdentityForm extends StatelessWidget {
               controller: email,
               enabled: enabled,
               decoration: const InputDecoration(labelText: 'Email (optional)'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: pin,
+              enabled: enabled && created == null,
+              keyboardType: TextInputType.number,
+              obscureText: true,
+              maxLength: 6,
+              decoration: const InputDecoration(
+                labelText: '6-digit member PIN',
+                helperText:
+                    'Used after PVC, phone or email account lookup. The raw PIN is not stored.',
+                prefixIcon: Icon(Icons.pin_outlined),
+                counterText: '',
+              ),
             ),
             if (scan?.rawText.trim().isNotEmpty == true) ...[
               const SizedBox(height: 12),
@@ -536,7 +679,12 @@ class _IdentityForm extends StatelessWidget {
               children: [
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: enabled && created == null ? onCreate : null,
+                    onPressed: enabled &&
+                            created == null &&
+                            selectedPollingUnitId != null &&
+                            RegExp(r'^\d{6}$').hasMatch(pin.text.trim())
+                        ? onCreate
+                        : null,
                     icon: const Icon(Icons.person_add_alt_1_rounded),
                     label: const Text('Create member'),
                   ),
@@ -577,6 +725,7 @@ class _RecentMembers extends StatelessWidget {
         child: Column(
           children: store.members.take(6).map((member) {
             final scope = store.registrationScopeForMember(member.id);
+            final homePu = store.homePollingUnitForMember(member.id);
             return ListTile(
               contentPadding: EdgeInsets.zero,
               leading: CircleAvatar(
@@ -591,8 +740,12 @@ class _RecentMembers extends StatelessWidget {
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
               subtitle: Text(
-                '${member.membershipNumber ?? member.id} • ${scope?.label ?? 'Kaduna State'} • ${member.phoneNumber}',
+                homePu == null
+                    ? '${member.membershipNumber ?? member.id} • ${scope?.label ?? 'Kaduna State'} • ${member.phoneNumber}'
+                    : '${member.membershipNumber ?? member.id} • HOME PU: ${homePu.displayCode}\n'
+                        '${homePu.scope.label} • ${member.phoneNumber}',
               ),
+              isThreeLine: homePu != null,
               trailing: TgcgStatusPill(
                 label: member.status.name.toUpperCase(),
                 color: member.status == RecordStatus.verified

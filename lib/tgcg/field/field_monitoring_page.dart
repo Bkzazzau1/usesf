@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../assignments/assignment_store.dart';
+import '../devices/managed_device_store.dart';
 import '../domain/permissions.dart';
 import '../evidence/device_evidence_service.dart';
 import '../membership/membership_store.dart';
@@ -181,6 +183,8 @@ class _FieldMonitoringPageState extends State<FieldMonitoringPage> {
   Future<void> _showIncidentDialog(BuildContext context) async {
     final session = TgcgSession.of(context, listen: false);
     final membership = MembershipOperations.of(context, listen: false);
+    final assignments = Assignments.of(context, listen: false);
+    final devices = ManagedDevices.of(context, listen: false);
     final store = FieldOperations.of(context, listen: false);
     final evidenceService = DeviceEvidenceService();
     final title = TextEditingController();
@@ -191,8 +195,33 @@ class _FieldMonitoringPageState extends State<FieldMonitoringPage> {
     double? incidentLongitude;
     var category = _incidentCategories.first;
     var severity = IncidentSeverity.medium;
-    final units = membership.geography.pollingUnitsWithin(session.scope);
-    GeographicScope scope = units.isEmpty ? session.scope : units.first.scope;
+
+    final agent = session.role == TgcgRole.pollingUnitAgent
+        ? _fieldAgentByAccessId(membership, session.accessId)
+        : null;
+    final memberId = session.role == TgcgRole.member
+        ? session.accessId
+        : agent?.memberId;
+    final activeAssignments = memberId == null
+        ? const <MemberAssignment>[]
+        : assignments.activeAssignmentsForMember(memberId);
+    MemberAssignment? selectedAssignment =
+        activeAssignments.isEmpty ? null : activeAssignments.first;
+    final managedDevice =
+        memberId == null ? null : devices.deviceForMember(memberId);
+
+    final scopedUnits = membership.geography.pollingUnitsWithin(session.scope);
+    final unitById = <String, CanonicalPollingUnit>{
+      for (final unit in scopedUnits) unit.code: unit,
+    };
+    for (final assignment in activeAssignments) {
+      final unit =
+          membership.geography.pollingUnit(assignment.targetPollingUnitId);
+      if (unit != null) unitById[unit.code] = unit;
+    }
+    final units = unitById.values.toList(growable: false);
+    GeographicScope scope = selectedAssignment?.targetScope ??
+        (units.isEmpty ? session.scope : units.first.scope);
 
     Future<void> capture(
       StateSetter setDialogState,
@@ -294,6 +323,42 @@ class _FieldMonitoringPageState extends State<FieldMonitoringPage> {
                       () => scope = value ?? scope,
                     ),
                   ),
+                  if (activeAssignments.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedAssignment?.id,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Operational assignment',
+                        prefixIcon: Icon(Icons.assignment_ind_outlined),
+                      ),
+                      items: [
+                        const DropdownMenuItem<String>(
+                          value: '',
+                          child: Text('No assignment linkage'),
+                        ),
+                        ...activeAssignments.map(
+                          (assignment) => DropdownMenuItem<String>(
+                            value: assignment.id,
+                            child: Text(
+                              '${assignment.title} • ${assignment.targetScope.label}',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) => setDialogState(() {
+                        selectedAssignment = value == null || value.isEmpty
+                            ? null
+                            : activeAssignments
+                                .where((item) => item.id == value)
+                                .firstOrNull;
+                        if (selectedAssignment != null) {
+                          scope = selectedAssignment!.targetScope;
+                        }
+                      }),
+                    ),
+                  ],
                   const SizedBox(height: 10),
                   TextField(
                     controller: summary,
@@ -361,8 +426,12 @@ class _FieldMonitoringPageState extends State<FieldMonitoringPage> {
                   scope: scope,
                   reporterId: reporterId,
                   summary: summary.text,
-                  latitude: incidentLatitude,
-                  longitude: incidentLongitude,
+                  assignmentId: selectedAssignment?.id,
+                  deviceId: managedDevice?.id,
+                  latitude: incidentLatitude ??
+                      selectedAssignment?.lastLocation?.latitude,
+                  longitude: incidentLongitude ??
+                      selectedAssignment?.lastLocation?.longitude,
                   evidence: attachments,
                 );
                 if (dialogContext.mounted) {
@@ -639,7 +708,7 @@ class _CaptureReadinessBanner extends StatelessWidget {
                 ),
                 SizedBox(height: 7),
                 Text(
-                  'Structured records are live; native media and GPS services are next integrations.',
+                  'Native photo, video and GPS capture are connected to incident and assignment workflows.',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 16,
@@ -649,7 +718,7 @@ class _CaptureReadinessBanner extends StatelessWidget {
                 ),
                 SizedBox(height: 6),
                 Text(
-                  'Photo, video, audio and coordinates are never fabricated. A record explicitly shows when capture data is unavailable.',
+                  'Captured media keeps its hash, source reference and assignment/device context; missing data remains explicit.',
                   style: TextStyle(
                     color: TgcgColors.gold200,
                     fontSize: 10.5,
@@ -663,10 +732,10 @@ class _CaptureReadinessBanner extends StatelessWidget {
               runSpacing: 8,
               children: const [
                 _DarkPill('TEXT RECORDS', Icons.check_circle_outline_rounded),
-                _DarkPill('PHOTO PENDING', Icons.photo_camera_outlined),
-                _DarkPill('VIDEO PENDING', Icons.videocam_outlined),
-                _DarkPill('AUDIO PENDING', Icons.mic_none_rounded),
-                _DarkPill('GPS PENDING', Icons.my_location_rounded),
+                _DarkPill('PHOTO READY', Icons.photo_camera_outlined),
+                _DarkPill('VIDEO READY', Icons.videocam_outlined),
+                _DarkPill('AUDIO READY', Icons.mic_none_rounded),
+                _DarkPill('GPS READY', Icons.my_location_rounded),
               ],
             );
             if (constraints.maxWidth < 820) {
@@ -991,6 +1060,10 @@ class _IncidentInspector extends StatelessWidget {
           _Detail('Severity', _label(current.severity.name)),
           _Detail('Scope', current.scope.label),
           _Detail('Reporter', current.reporterId),
+          if (current.assignmentId != null)
+            _Detail('Assignment', current.assignmentId!),
+          if (current.deviceId != null)
+            _Detail('Managed device', current.deviceId!),
           _Detail('Reported', _fullTime(current.reportedAt)),
           _Detail('Response owner', current.assignedTeam ?? 'Unassigned'),
           _Detail(
@@ -1499,6 +1572,23 @@ class _Detail extends StatelessWidget {
           ],
         ),
       );
+}
+
+AccreditedAgent? _fieldAgentByAccessId(
+  MembershipOperationsController membership,
+  String accessId,
+) {
+  final normalized = accessId.trim().toLowerCase();
+  if (normalized.isEmpty) return null;
+  for (final agent in membership.agents) {
+    if (agent.role != TgcgRole.pollingUnitAgent) continue;
+    if (agent.agentId.toLowerCase() == normalized ||
+        (agent.registeredPhoneNumber ?? '').trim().toLowerCase() ==
+            normalized) {
+      return agent;
+    }
+  }
+  return null;
 }
 
 const _incidentCategories = <String>[

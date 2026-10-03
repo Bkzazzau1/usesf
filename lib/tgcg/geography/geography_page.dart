@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 
+import '../assignments/assignment_store.dart';
+import '../devices/managed_device_store.dart';
+import '../domain/permissions.dart';
 import '../field/field_operations_store.dart';
 import '../membership/membership_store.dart';
 import '../results/result_operations_store.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
 import 'geography_registry.dart';
+import 'kaduna_geography.dart';
+import 'polling_unit_verification_service.dart';
 
 class GeographyPage extends StatefulWidget {
   const GeographyPage({super.key});
@@ -17,7 +22,10 @@ class GeographyPage extends StatefulWidget {
 class _GeographyPageState extends State<GeographyPage> {
   final List<GeographicScope> path = [];
   final TextEditingController searchController = TextEditingController();
+  final PollingUnitVerificationService verificationService =
+      const PollingUnitVerificationService();
   String query = '';
+  String? verifyingPollingUnitId;
 
   @override
   void didChangeDependencies() {
@@ -35,10 +43,22 @@ class _GeographyPageState extends State<GeographyPage> {
 
   @override
   Widget build(BuildContext context) {
+    final session = TgcgSession.of(context);
     final membership = MembershipOperations.of(context);
+    final assignments = Assignments.of(context);
+    final devices = ManagedDevices.of(context);
     final field = FieldOperations.of(context);
     final results = ResultOperations.of(context);
     final registry = membership.geography;
+    final canVerifyPollingUnit =
+        TgcgPermissionPolicy.allows(
+          session.role!,
+          TgcgCapability.manageMembership,
+        ) ||
+        TgcgPermissionPolicy.allows(
+          session.role!,
+          TgcgCapability.manageAgentAssignments,
+        );
     final scope = path.last;
     final children = registry.childScopes(scope);
     final units = registry.pollingUnitsWithin(scope);
@@ -70,6 +90,7 @@ class _GeographyPageState extends State<GeographyPage> {
     final visibleUnits = units.where((unit) {
       if (needle.isEmpty) return true;
       return unit.code.toLowerCase().contains(needle) ||
+          unit.displayCode.toLowerCase().contains(needle) ||
           unit.scope.label.toLowerCase().contains(needle);
     }).toList(growable: false);
 
@@ -106,10 +127,17 @@ class _GeographyPageState extends State<GeographyPage> {
           verifiedResults: verifiedResults,
         ),
         const SizedBox(height: 16),
+        _PollingUnitRegistrySummary(
+          registry: registry,
+          membership: membership,
+        ),
+        const SizedBox(height: 16),
         _CoverageHero(
           scope: scope,
           children: children,
           membership: membership,
+          assignments: assignments,
+          devices: devices,
           field: field,
           results: results,
           onOpen: (child) => setState(() {
@@ -125,8 +153,16 @@ class _GeographyPageState extends State<GeographyPage> {
           children: visibleChildren,
           units: visibleUnits,
           membership: membership,
+          assignments: assignments,
           field: field,
           results: results,
+          canVerifyCoordinates: canVerifyPollingUnit,
+          verifyingPollingUnitId: verifyingPollingUnitId,
+          onVerifyPollingUnit: (unit) => _verifyPollingUnit(
+            membership,
+            session,
+            unit,
+          ),
           onQueryChanged: (value) => setState(() => query = value),
           onOpenChild: (child) => setState(() {
             path.add(child);
@@ -141,6 +177,51 @@ class _GeographyPageState extends State<GeographyPage> {
         ),
       ],
     );
+  }
+
+  Future<void> _verifyPollingUnit(
+    MembershipOperationsController membership,
+    TgcgSessionController session,
+    CanonicalPollingUnit unit,
+  ) async {
+    if (verifyingPollingUnitId != null) return;
+    setState(() => verifyingPollingUnitId = unit.code);
+    try {
+      final fix = await verificationService.captureCurrentFix();
+      final actorId =
+          session.accessId.isEmpty ? session.operatorName : session.accessId;
+      final updated = await membership.verifyPollingUnitCoordinate(
+        pollingUnitId: unit.code,
+        latitude: fix.latitude,
+        longitude: fix.longitude,
+        accuracyMeters: fix.accuracyMeters,
+        verifiedBy: actorId,
+        verifiedAt: fix.capturedAt,
+      );
+      if (!mounted) return;
+
+      final distance = updated.referenceToVerifiedDistanceMeters;
+      final message = updated.coordinateStatus ==
+              PollingUnitCoordinateStatus.needsReview
+          ? 'GPS captured at ±${fix.accuracyMeters.toStringAsFixed(1)} m. '
+              'Reference difference ${distance?.toStringAsFixed(0) ?? '—'} m; review required.'
+          : 'Polling unit GPS verified at ±${fix.accuracyMeters.toStringAsFixed(1)} m accuracy.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } on StateError catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('GPS verification failed: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => verifyingPollingUnitId = null);
+    }
   }
 }
 
@@ -234,11 +315,93 @@ class _MetricGrid extends StatelessWidget {
       );
 }
 
+class _PollingUnitRegistrySummary extends StatelessWidget {
+  const _PollingUnitRegistrySummary({
+    required this.registry,
+    required this.membership,
+  });
+
+  final GeographyRegistry registry;
+  final MembershipOperationsController membership;
+
+  @override
+  Widget build(BuildContext context) => TgcgSectionCard(
+        title: 'Polling Unit Master Registry',
+        subtitle:
+            'Canonical polling-unit identity, coordinate readiness and member linkage. Reference and field-verified coordinates remain separate.',
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final columns = constraints.maxWidth >= 980
+                ? 5
+                : constraints.maxWidth >= 620
+                    ? 3
+                    : 2;
+            const gap = 10.0;
+            final width =
+                (constraints.maxWidth - gap * (columns - 1)) / columns;
+            return Wrap(
+              spacing: gap,
+              runSpacing: gap,
+              children: [
+                TgcgMetricCard(
+                  width: width,
+                  label: 'Registry loaded',
+                  value: '${registry.pollingUnits.length}',
+                  detail: 'of $kadunaPollingUnitCount statewide target',
+                  icon: Icons.how_to_vote_outlined,
+                  tone: TgcgMetricTone.info,
+                ),
+                TgcgMetricCard(
+                  width: width,
+                  label: 'Coordinates ready',
+                  value: '${registry.coordinateReadyCount}',
+                  detail: 'Reference or field coordinate',
+                  icon: Icons.gps_fixed_rounded,
+                  tone: TgcgMetricTone.success,
+                ),
+                TgcgMetricCard(
+                  width: width,
+                  label: 'Field verified',
+                  value: '${registry.fieldVerifiedCoordinateCount}',
+                  detail: 'Verified on location',
+                  icon: Icons.verified_outlined,
+                  tone: TgcgMetricTone.success,
+                ),
+                TgcgMetricCard(
+                  width: width,
+                  label: 'Needs review',
+                  value: '${registry.coordinateReviewCount}',
+                  detail: 'Reference/GPS mismatch',
+                  icon: Icons.rule_folder_outlined,
+                  tone: registry.coordinateReviewCount == 0
+                      ? TgcgMetricTone.neutral
+                      : TgcgMetricTone.warning,
+                ),
+                TgcgMetricCard(
+                  width: width,
+                  label: 'Members PU-linked',
+                  value: '${membership.membersWithHomePollingUnit}',
+                  detail:
+                      '${membership.membersWithoutHomePollingUnit} members pending',
+                  icon: Icons.person_pin_circle_outlined,
+                  tone: membership.membersWithoutHomePollingUnit == 0
+                      ? TgcgMetricTone.success
+                      : TgcgMetricTone.warning,
+                ),
+              ],
+            );
+          },
+        ),
+      );
+}
+
 class _CoverageHero extends StatelessWidget {
   const _CoverageHero({
     required this.scope,
     required this.children,
     required this.membership,
+    required this.assignments,
+    required this.devices,
     required this.field,
     required this.results,
     required this.onOpen,
@@ -247,6 +410,8 @@ class _CoverageHero extends StatelessWidget {
   final GeographicScope scope;
   final List<GeographicScope> children;
   final MembershipOperationsController membership;
+  final AssignmentController assignments;
+  final ManagedDeviceController devices;
   final FieldOperationsController field;
   final ResultOperationsController results;
   final ValueChanged<GeographicScope> onOpen;
@@ -325,7 +490,17 @@ class _CoverageHero extends StatelessWidget {
                     runSpacing: gap,
                     children: children.map((child) {
                       final members = membership.memberCountForScope(child);
-                      final agents = membership.agentCountForScope(child);
+                      final activeAssignments = assignments
+                          .assignmentsForScope(child)
+                          .where((item) => !item.isTerminal)
+                          .toList(growable: false);
+                      final present = activeAssignments
+                          .where(
+                            (item) =>
+                                assignments.presenceFor(item) ==
+                                AssignmentPresence.insideGeofence,
+                          )
+                          .length;
                       final openIncidents = field
                           .incidentsForScope(child)
                           .where(
@@ -334,8 +509,6 @@ class _CoverageHero extends StatelessWidget {
                                 item.status != IncidentStatus.closed,
                           )
                           .length;
-                      final resultCount =
-                          results.submissionsForScope(child).length;
 
                       return SizedBox(
                         width: width,
@@ -388,20 +561,20 @@ class _CoverageHero extends StatelessWidget {
                                       ),
                                       Expanded(
                                         child: _DarkMetric(
-                                          value: agents,
-                                          label: 'Agents',
+                                          value: activeAssignments.length,
+                                          label: 'Assigned',
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: _DarkMetric(
+                                          value: present,
+                                          label: 'Present',
                                         ),
                                       ),
                                       Expanded(
                                         child: _DarkMetric(
                                           value: openIncidents,
                                           label: 'Incidents',
-                                        ),
-                                      ),
-                                      Expanded(
-                                        child: _DarkMetric(
-                                          value: resultCount,
-                                          label: 'Results',
                                         ),
                                       ),
                                     ],
@@ -458,8 +631,12 @@ class _DirectoryPanel extends StatelessWidget {
     required this.children,
     required this.units,
     required this.membership,
+    required this.assignments,
     required this.field,
     required this.results,
+    required this.canVerifyCoordinates,
+    required this.verifyingPollingUnitId,
+    required this.onVerifyPollingUnit,
     required this.onQueryChanged,
     required this.onOpenChild,
   });
@@ -469,8 +646,12 @@ class _DirectoryPanel extends StatelessWidget {
   final List<GeographicScope> children;
   final List<CanonicalPollingUnit> units;
   final MembershipOperationsController membership;
+  final AssignmentController assignments;
   final FieldOperationsController field;
   final ResultOperationsController results;
+  final bool canVerifyCoordinates;
+  final String? verifyingPollingUnitId;
+  final ValueChanged<CanonicalPollingUnit> onVerifyPollingUnit;
   final ValueChanged<String> onQueryChanged;
   final ValueChanged<GeographicScope> onOpenChild;
 
@@ -510,12 +691,26 @@ class _DirectoryPanel extends StatelessWidget {
             else if (units.isNotEmpty)
               ...units.map((unit) {
                 final agents = membership.agentsForScope(unit.scope);
+                final members =
+                    membership.memberCountForPollingUnit(unit.code);
+                final unitAssignments = assignments
+                    .assignmentsForScope(unit.scope)
+                    .where((item) => !item.isTerminal)
+                    .toList(growable: false);
+                final atLocation = unitAssignments
+                    .where(
+                      (item) =>
+                          assignments.presenceFor(item) ==
+                          AssignmentPresence.insideGeofence,
+                    )
+                    .length;
                 final submissions = results.submissionsForScope(unit.scope);
                 final verified = submissions.any(
                   (item) => item.status == RecordStatus.verified,
                 );
                 return ListTile(
                   contentPadding: EdgeInsets.zero,
+                  onTap: () => _showPollingUnitRoster(context, unit),
                   leading: Container(
                     width: 38,
                     height: 38,
@@ -529,21 +724,81 @@ class _DirectoryPanel extends StatelessWidget {
                       size: 19,
                     ),
                   ),
-                  title: Text(
-                    unit.code,
-                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  title: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          unit.displayCode,
+                          style: const TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                      if (canVerifyCoordinates)
+                        IconButton(
+                          tooltip: unit.hasVerifiedCoordinate
+                              ? 'Re-verify polling-unit GPS'
+                              : 'Verify polling-unit GPS',
+                          onPressed: verifyingPollingUnitId == null
+                              ? () => onVerifyPollingUnit(unit)
+                              : null,
+                          icon: verifyingPollingUnitId == unit.code
+                              ? const SizedBox(
+                                  width: 17,
+                                  height: 17,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Icon(
+                                  unit.hasVerifiedCoordinate
+                                      ? Icons.gps_fixed_rounded
+                                      : Icons.add_location_alt_outlined,
+                                  size: 19,
+                                ),
+                        ),
+                    ],
                   ),
-                  subtitle: Text(unit.scope.label),
+                  subtitle: Text(
+                    unit.operationalLatitude == null
+                        ? unit.scope.label
+                        : '${unit.scope.label}\n'
+                            '${unit.operationalLatitude!.toStringAsFixed(6)}, '
+                            '${unit.operationalLongitude!.toStringAsFixed(6)}'
+                            '${unit.verificationAccuracyMeters == null ? '' : ' • ±${unit.verificationAccuracyMeters!.toStringAsFixed(1)} m'}',
+                  ),
+                  isThreeLine: unit.operationalLatitude != null,
                   trailing: Wrap(
                     spacing: 6,
                     children: [
+                      TgcgStatusPill(
+                        label: '$members MEMBER${members == 1 ? '' : 'S'}',
+                        color: TgcgColors.primary,
+                        compact: true,
+                      ),
                       TgcgStatusPill(
                         label: '${agents.length} AGENT${agents.length == 1 ? '' : 'S'}',
                         color: TgcgColors.info,
                         compact: true,
                       ),
                       TgcgStatusPill(
-                        label: verified ? 'VERIFIED' : 'AWAITING',
+                        label: '${unitAssignments.length} ASSIGNED',
+                        color: TgcgColors.primary,
+                        compact: true,
+                      ),
+                      TgcgStatusPill(
+                        label: '$atLocation AT LOCATION',
+                        color: atLocation == unitAssignments.length &&
+                                unitAssignments.isNotEmpty
+                            ? TgcgColors.success
+                            : TgcgColors.warning,
+                        compact: true,
+                      ),
+                      TgcgStatusPill(
+                        label: _coordinateStatusLabel(unit.coordinateStatus),
+                        color: _coordinateStatusColor(unit.coordinateStatus),
+                        compact: true,
+                      ),
+                      TgcgStatusPill(
+                        label: verified ? 'RESULT VERIFIED' : 'RESULT AWAITING',
                         color: verified
                             ? TgcgColors.success
                             : TgcgColors.warning,
@@ -562,7 +817,387 @@ class _DirectoryPanel extends StatelessWidget {
           ],
         ),
       );
+
+  Future<void> _showPollingUnitRoster(
+    BuildContext context,
+    CanonicalPollingUnit unit,
+  ) async {
+    final homeMembers = membership.membersForPollingUnit(unit.code);
+    final activeAssignments = assignments
+        .assignmentsForScope(unit.scope)
+        .where(
+          (item) =>
+              !item.isTerminal && item.targetPollingUnitId == unit.code,
+        )
+        .toList(growable: false);
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        insetPadding: const EdgeInsets.all(20),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: 880,
+            maxHeight: 760,
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(20, 18, 14, 16),
+                decoration: const BoxDecoration(
+                  gradient: TgcgGradients.navigation,
+                  borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(20),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.how_to_vote_outlined,
+                      color: TgcgColors.gold400,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            unit.displayCode,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            unit.scope.label,
+                            style: const TextStyle(
+                              color: TgcgColors.gold200,
+                              fontSize: 10.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Close',
+                      onPressed: () => Navigator.pop(dialogContext),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.all(18),
+                  children: [
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        TgcgStatusPill(
+                          label: '${homeMembers.length} HOME MEMBERS',
+                          color: TgcgColors.primary,
+                          compact: true,
+                        ),
+                        TgcgStatusPill(
+                          label: '${activeAssignments.length} ASSIGNED',
+                          color: TgcgColors.info,
+                          compact: true,
+                        ),
+                        TgcgStatusPill(
+                          label:
+                              '${activeAssignments.where((item) => assignments.presenceFor(item) == AssignmentPresence.insideGeofence).length} AT LOCATION',
+                          color: TgcgColors.success,
+                          compact: true,
+                        ),
+                        TgcgStatusPill(
+                          label: _coordinateStatusLabel(
+                            unit.coordinateStatus,
+                          ),
+                          color: _coordinateStatusColor(
+                            unit.coordinateStatus,
+                          ),
+                          compact: true,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _PollingUnitCoordinateCard(unit: unit),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'DEPLOYED MEMBERS',
+                      style: TextStyle(
+                        color: TgcgColors.primaryMid,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: .9,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (activeAssignments.isEmpty)
+                      const TgcgEmptyState(
+                        icon: Icons.person_off_outlined,
+                        title: 'No active deployment',
+                        message:
+                            'No member currently has an active assignment to this polling unit.',
+                      )
+                    else
+                      ...activeAssignments.map((assignment) {
+                        final member =
+                            membership.memberById(assignment.memberId);
+                        final device =
+                            devices.deviceForMember(assignment.memberId);
+                        final presence =
+                            assignments.presenceFor(assignment);
+                        final ping = assignment.lastLocation;
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 9),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: TgcgColors.surfaceRaised,
+                            borderRadius:
+                                BorderRadius.circular(TgcgRadius.md),
+                            border: Border.all(color: TgcgColors.border),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              CircleAvatar(
+                                backgroundColor: TgcgColors.primarySoft,
+                                child: Text(
+                                  (member?.fullName ??
+                                          assignment.memberId)
+                                      .substring(0, 1)
+                                      .toUpperCase(),
+                                  style: const TextStyle(
+                                    color: TgcgColors.primary,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 11),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      member?.fullName ??
+                                          assignment.memberId,
+                                      style: const TextStyle(
+                                        color: TgcgColors.ink,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      assignment.title,
+                                      style: const TextStyle(
+                                        color: TgcgColors.muted,
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                    if (ping != null) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'GPS ${ping.latitude.toStringAsFixed(6)}, '
+                                        '${ping.longitude.toStringAsFixed(6)} • '
+                                        '±${ping.accuracyMeters.toStringAsFixed(1)} m'
+                                        '${ping.distanceFromTargetMeters == null ? '' : ' • ${ping.distanceFromTargetMeters!.toStringAsFixed(0)} m from PU'}',
+                                        style: const TextStyle(
+                                          color: TgcgColors.muted,
+                                          fontSize: 9.3,
+                                        ),
+                                      ),
+                                    ],
+                                    const SizedBox(height: 7),
+                                    Wrap(
+                                      spacing: 6,
+                                      runSpacing: 6,
+                                      children: [
+                                        TgcgStatusPill(
+                                          label: assignment.status.name
+                                              .toUpperCase(),
+                                          color: presence ==
+                                                  AssignmentPresence
+                                                      .insideGeofence
+                                              ? TgcgColors.success
+                                              : TgcgColors.info,
+                                          compact: true,
+                                        ),
+                                        TgcgStatusPill(
+                                          label: _presenceLabelForRoster(
+                                            presence,
+                                          ),
+                                          color: _presenceColorForRoster(
+                                            presence,
+                                          ),
+                                          compact: true,
+                                        ),
+                                        TgcgStatusPill(
+                                          label: device == null
+                                              ? 'NO MANAGED PHONE'
+                                              : device.id,
+                                          color: device == null
+                                              ? TgcgColors.warning
+                                              : TgcgColors.info,
+                                          icon:
+                                              Icons.phone_android_outlined,
+                                          compact: true,
+                                        ),
+                                        if (assignment.evidence.isNotEmpty)
+                                          TgcgStatusPill(
+                                            label:
+                                                '${assignment.evidence.length} EVIDENCE',
+                                            color: TgcgColors.success,
+                                            icon: Icons.attachment_rounded,
+                                            compact: true,
+                                          ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'HOME MEMBERS',
+                      style: TextStyle(
+                        color: TgcgColors.primaryMid,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: .9,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (homeMembers.isEmpty)
+                      const Text(
+                        'No member currently has this polling unit as their home polling unit.',
+                        style: TextStyle(
+                          color: TgcgColors.muted,
+                          fontSize: 10.5,
+                        ),
+                      )
+                    else
+                      ...homeMembers.take(30).map(
+                            (member) => ListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              leading: const Icon(
+                                Icons.person_outline_rounded,
+                                color: TgcgColors.primary,
+                              ),
+                              title: Text(
+                                member.fullName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              subtitle: Text(
+                                member.membershipNumber ?? member.id,
+                              ),
+                            ),
+                          ),
+                    if (homeMembers.length > 30)
+                      Text(
+                        '+${homeMembers.length - 30} additional home members',
+                        style: const TextStyle(
+                          color: TgcgColors.muted,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
+
+class _PollingUnitCoordinateCard extends StatelessWidget {
+  const _PollingUnitCoordinateCard({required this.unit});
+
+  final CanonicalPollingUnit unit;
+
+  @override
+  Widget build(BuildContext context) {
+    final latitude = unit.operationalLatitude;
+    final longitude = unit.operationalLongitude;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [TgcgColors.navy50, TgcgColors.gold100],
+        ),
+        borderRadius: BorderRadius.circular(TgcgRadius.md),
+        border: Border.all(color: TgcgColors.gold200),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.gps_fixed_rounded,
+            color: TgcgColors.accentStrong,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              latitude == null || longitude == null
+                  ? 'Operational coordinate pending'
+                  : '${latitude.toStringAsFixed(6)}, '
+                      '${longitude.toStringAsFixed(6)}'
+                      '${unit.verificationAccuracyMeters == null ? '' : ' • ±${unit.verificationAccuracyMeters!.toStringAsFixed(1)} m'}',
+              style: const TextStyle(
+                color: TgcgColors.ink,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          Text(
+            '${unit.geofenceRadiusMeters.toStringAsFixed(0)} m geofence',
+            style: const TextStyle(
+              color: TgcgColors.muted,
+              fontSize: 9.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _presenceLabelForRoster(AssignmentPresence presence) =>
+    switch (presence) {
+      AssignmentPresence.unknown => 'GPS UNKNOWN',
+      AssignmentPresence.insideGeofence => 'AT LOCATION',
+      AssignmentPresence.outsideGeofence => 'OUTSIDE GEOFENCE',
+      AssignmentPresence.stale => 'GPS STALE',
+    };
+
+Color _presenceColorForRoster(AssignmentPresence presence) =>
+    switch (presence) {
+      AssignmentPresence.unknown => TgcgColors.muted,
+      AssignmentPresence.insideGeofence => TgcgColors.success,
+      AssignmentPresence.outsideGeofence => TgcgColors.warning,
+      AssignmentPresence.stale => TgcgColors.warning,
+    };
 
 class _AreaRow extends StatelessWidget {
   const _AreaRow({
@@ -762,6 +1397,22 @@ class _BreadcrumbBar extends StatelessWidget {
         ),
       );
 }
+
+String _coordinateStatusLabel(PollingUnitCoordinateStatus status) =>
+    switch (status) {
+      PollingUnitCoordinateStatus.missing => 'GPS PENDING',
+      PollingUnitCoordinateStatus.referenceOnly => 'REFERENCE GPS',
+      PollingUnitCoordinateStatus.fieldVerified => 'FIELD VERIFIED',
+      PollingUnitCoordinateStatus.needsReview => 'GPS REVIEW',
+    };
+
+Color _coordinateStatusColor(PollingUnitCoordinateStatus status) =>
+    switch (status) {
+      PollingUnitCoordinateStatus.missing => TgcgColors.muted,
+      PollingUnitCoordinateStatus.referenceOnly => TgcgColors.info,
+      PollingUnitCoordinateStatus.fieldVerified => TgcgColors.success,
+      PollingUnitCoordinateStatus.needsReview => TgcgColors.warning,
+    };
 
 String _shortLabel(GeographicScope scope) => switch (scope.level) {
       GeographyLevel.country => scope.country,

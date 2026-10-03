@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import '../domain/models.dart';
 import 'kaduna_geography.dart';
 
@@ -104,24 +106,190 @@ class CanonicalLga {
       );
 }
 
+enum PollingUnitCoordinateStatus {
+  missing,
+  referenceOnly,
+  fieldVerified,
+  needsReview,
+}
+
 class CanonicalPollingUnit {
   const CanonicalPollingUnit({
     required this.code,
     required this.scope,
+    this.officialCode,
     this.registeredVoters,
+    this.referenceLatitude,
+    this.referenceLongitude,
+    this.referenceSource,
+    this.verifiedLatitude,
+    this.verifiedLongitude,
+    this.verificationAccuracyMeters,
+    this.verifiedBy,
+    this.verifiedAt,
+    this.coordinateStatus = PollingUnitCoordinateStatus.missing,
+    this.geofenceRadiusMeters = 120,
   });
 
+  /// Internal stable USESF polling-unit identifier.
   final String code;
+
+  /// External/reference polling-unit code, when imported from an authoritative
+  /// source. This remains separate from [code] so imports can be reconciled
+  /// without changing internal relationships.
+  final String? officialCode;
   final GeographicScope scope;
   final int? registeredVoters;
+
+  /// Reference coordinates are imported and never silently overwritten by
+  /// field verification.
+  final double? referenceLatitude;
+  final double? referenceLongitude;
+  final String? referenceSource;
+
+  /// Field-verified coordinates are captured on location by an authorized
+  /// USESF device. They are kept separately for audit and reconciliation.
+  final double? verifiedLatitude;
+  final double? verifiedLongitude;
+  final double? verificationAccuracyMeters;
+  final String? verifiedBy;
+  final DateTime? verifiedAt;
+  final PollingUnitCoordinateStatus coordinateStatus;
+  final double geofenceRadiusMeters;
+
+  String get displayCode => officialCode?.trim().isNotEmpty == true
+      ? officialCode!.trim()
+      : code;
+
+  bool get hasReferenceCoordinate =>
+      referenceLatitude != null && referenceLongitude != null;
+
+  bool get hasVerifiedCoordinate =>
+      verifiedLatitude != null && verifiedLongitude != null;
+
+  double? get operationalLatitude =>
+      hasVerifiedCoordinate ? verifiedLatitude : referenceLatitude;
+
+  double? get operationalLongitude =>
+      hasVerifiedCoordinate ? verifiedLongitude : referenceLongitude;
+
+  double? get referenceToVerifiedDistanceMeters {
+    if (!hasReferenceCoordinate || !hasVerifiedCoordinate) return null;
+    return _distanceMeters(
+      referenceLatitude!,
+      referenceLongitude!,
+      verifiedLatitude!,
+      verifiedLongitude!,
+    );
+  }
+
+  CanonicalPollingUnit withReferenceCoordinate({
+    required double latitude,
+    required double longitude,
+    required String source,
+    String? externalCode,
+  }) =>
+      CanonicalPollingUnit(
+        code: code,
+        officialCode: externalCode ?? officialCode,
+        scope: scope,
+        registeredVoters: registeredVoters,
+        referenceLatitude: latitude,
+        referenceLongitude: longitude,
+        referenceSource: source,
+        verifiedLatitude: verifiedLatitude,
+        verifiedLongitude: verifiedLongitude,
+        verificationAccuracyMeters: verificationAccuracyMeters,
+        verifiedBy: verifiedBy,
+        verifiedAt: verifiedAt,
+        coordinateStatus: hasVerifiedCoordinate
+            ? coordinateStatus
+            : PollingUnitCoordinateStatus.referenceOnly,
+        geofenceRadiusMeters: geofenceRadiusMeters,
+      );
+
+  CanonicalPollingUnit withFieldVerification({
+    required double latitude,
+    required double longitude,
+    required double accuracyMeters,
+    required String verifiedBy,
+    required DateTime verifiedAt,
+    double reviewThresholdMeters = 150,
+  }) {
+    final difference = hasReferenceCoordinate
+        ? _distanceMeters(
+            referenceLatitude!,
+            referenceLongitude!,
+            latitude,
+            longitude,
+          )
+        : null;
+    final status = difference != null && difference > reviewThresholdMeters
+        ? PollingUnitCoordinateStatus.needsReview
+        : PollingUnitCoordinateStatus.fieldVerified;
+
+    return CanonicalPollingUnit(
+      code: code,
+      officialCode: officialCode,
+      scope: scope,
+      registeredVoters: registeredVoters,
+      referenceLatitude: referenceLatitude,
+      referenceLongitude: referenceLongitude,
+      referenceSource: referenceSource,
+      verifiedLatitude: latitude,
+      verifiedLongitude: longitude,
+      verificationAccuracyMeters: accuracyMeters,
+      verifiedBy: verifiedBy,
+      verifiedAt: verifiedAt.toUtc(),
+      coordinateStatus: status,
+      geofenceRadiusMeters: geofenceRadiusMeters,
+    );
+  }
+
+  CanonicalPollingUnit withGeofenceRadius(double radiusMeters) =>
+      CanonicalPollingUnit(
+        code: code,
+        officialCode: officialCode,
+        scope: scope,
+        registeredVoters: registeredVoters,
+        referenceLatitude: referenceLatitude,
+        referenceLongitude: referenceLongitude,
+        referenceSource: referenceSource,
+        verifiedLatitude: verifiedLatitude,
+        verifiedLongitude: verifiedLongitude,
+        verificationAccuracyMeters: verificationAccuracyMeters,
+        verifiedBy: verifiedBy,
+        verifiedAt: verifiedAt,
+        coordinateStatus: coordinateStatus,
+        geofenceRadiusMeters: radiusMeters,
+      );
+
+  static double _distanceMeters(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
+    const earthRadius = 6371000.0;
+    double radians(double degrees) => degrees * math.pi / 180;
+    final dLat = radians(lat2 - lat1);
+    final dLon = radians(lon2 - lon1);
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(radians(lat1)) *
+            math.cos(radians(lat2)) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
+    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return earthRadius * c;
+  }
 }
 
 class GeographyRegistry {
-  const GeographyRegistry({
+  GeographyRegistry({
     this.zones = const [],
     this.states = const [],
-    required this.pollingUnits,
-  });
+    required List<CanonicalPollingUnit> pollingUnits,
+  }) : pollingUnits = List<CanonicalPollingUnit>.of(pollingUnits);
 
   final List<CanonicalZone> zones;
   final List<CanonicalState> states;
@@ -137,10 +305,10 @@ class GeographyRegistry {
     zoneName: 'North West',
   );
 
-  factory GeographyRegistry.prototypeSeed() => const GeographyRegistry(
-        zones: [kadunaZone],
-        states: [kaduna],
-        pollingUnits: [
+  factory GeographyRegistry.prototypeSeed() => GeographyRegistry(
+        zones: const [kadunaZone],
+        states: const [kaduna],
+        pollingUnits: const [
           CanonicalPollingUnit(
             code: 'KD-KN-W01-PU001',
             registeredVoters: 481,
@@ -378,10 +546,126 @@ class GeographyRegistry {
   }
 
   CanonicalPollingUnit? pollingUnit(String id) {
+    final target = _normalizePollingUnitCode(id);
     for (final unit in pollingUnits) {
-      if (unit.code == id || unit.scope.pollingUnitId == id) return unit;
+      if (_normalizePollingUnitCode(unit.code) == target ||
+          _normalizePollingUnitCode(unit.scope.pollingUnitId ?? '') == target ||
+          _normalizePollingUnitCode(unit.officialCode ?? '') == target) {
+        return unit;
+      }
     }
     return null;
+  }
+
+  CanonicalPollingUnit? pollingUnitByOfficialCode(String code) {
+    final target = _normalizePollingUnitCode(code);
+    if (target.isEmpty) return null;
+    for (final unit in pollingUnits) {
+      if (_normalizePollingUnitCode(unit.officialCode ?? '') == target) {
+        return unit;
+      }
+    }
+    return null;
+  }
+
+  int get coordinateReadyCount => pollingUnits
+      .where((unit) => unit.operationalLatitude != null && unit.operationalLongitude != null)
+      .length;
+
+  int get fieldVerifiedCoordinateCount => pollingUnits
+      .where(
+        (unit) =>
+            unit.coordinateStatus == PollingUnitCoordinateStatus.fieldVerified,
+      )
+      .length;
+
+  int get coordinateReviewCount => pollingUnits
+      .where(
+        (unit) =>
+            unit.coordinateStatus == PollingUnitCoordinateStatus.needsReview,
+      )
+      .length;
+
+  CanonicalPollingUnit verifyPollingUnitCoordinate({
+    required String pollingUnitId,
+    required double latitude,
+    required double longitude,
+    required double accuracyMeters,
+    required String verifiedBy,
+    DateTime? verifiedAt,
+    double reviewThresholdMeters = 150,
+  }) {
+    final index = pollingUnits.indexWhere(
+      (unit) =>
+          _normalizePollingUnitCode(unit.code) ==
+              _normalizePollingUnitCode(pollingUnitId) ||
+          _normalizePollingUnitCode(unit.scope.pollingUnitId ?? '') ==
+              _normalizePollingUnitCode(pollingUnitId) ||
+          _normalizePollingUnitCode(unit.officialCode ?? '') ==
+              _normalizePollingUnitCode(pollingUnitId),
+    );
+    if (index < 0) {
+      throw ArgumentError('Unknown polling unit: $pollingUnitId');
+    }
+    final updated = pollingUnits[index].withFieldVerification(
+      latitude: latitude,
+      longitude: longitude,
+      accuracyMeters: accuracyMeters,
+      verifiedBy: verifiedBy,
+      verifiedAt: verifiedAt ?? DateTime.now().toUtc(),
+      reviewThresholdMeters: reviewThresholdMeters,
+    );
+    pollingUnits[index] = updated;
+    return updated;
+  }
+
+  CanonicalPollingUnit setPollingUnitReferenceCoordinate({
+    required String pollingUnitId,
+    required double latitude,
+    required double longitude,
+    required String source,
+    String? officialCode,
+  }) {
+    final index = pollingUnits.indexWhere(
+      (unit) =>
+          _normalizePollingUnitCode(unit.code) ==
+              _normalizePollingUnitCode(pollingUnitId) ||
+          _normalizePollingUnitCode(unit.scope.pollingUnitId ?? '') ==
+              _normalizePollingUnitCode(pollingUnitId) ||
+          _normalizePollingUnitCode(unit.officialCode ?? '') ==
+              _normalizePollingUnitCode(pollingUnitId),
+    );
+    if (index < 0) {
+      throw ArgumentError('Unknown polling unit: $pollingUnitId');
+    }
+    final updated = pollingUnits[index].withReferenceCoordinate(
+      latitude: latitude,
+      longitude: longitude,
+      source: source,
+      externalCode: officialCode,
+    );
+    pollingUnits[index] = updated;
+    return updated;
+  }
+
+  void replacePollingUnits(Iterable<CanonicalPollingUnit> units) {
+    final replacement = units.toList(growable: false);
+    final keys = <String>{};
+    for (final unit in replacement) {
+      final key = _normalizePollingUnitCode(unit.code);
+      if (key.isEmpty || !keys.add(key)) {
+        throw ArgumentError('Polling-unit registry contains a duplicate/empty code.');
+      }
+      if (unit.scope.stateId != kadunaStateId ||
+          unit.scope.level != GeographyLevel.pollingUnit) {
+        throw ArgumentError(
+          'Polling-unit registry may only contain Kaduna polling-unit scopes.',
+        );
+      }
+    }
+    pollingUnits
+      ..clear()
+      ..addAll(replacement);
   }
 
   List<CanonicalPollingUnit> pollingUnitsWithin(GeographicScope scope) =>
@@ -495,6 +779,9 @@ class GeographyRegistry {
     if (parent.level == GeographyLevel.ward) return true;
     return parent.pollingUnitId == child.pollingUnitId;
   }
+
+  static String _normalizePollingUnitCode(String value) =>
+      value.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
 
   static String _key(GeographicScope scope) => switch (scope.level) {
         GeographyLevel.country => scope.country,

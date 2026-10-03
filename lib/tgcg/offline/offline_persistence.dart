@@ -166,6 +166,29 @@ class OfflinePersistenceController extends ChangeNotifier {
     return decoded.cast<String, Object?>();
   }
 
+  Future<List<Map<String, Object?>>> readEntities({
+    required String entityType,
+  }) async {
+    await _ensureReady();
+    final records = await _database!.listEntities(entityType: entityType);
+    final decoded = <Map<String, Object?>>[];
+    for (final record in records) {
+      if (record.deleted) continue;
+      final clear = await _crypto.decrypt(
+        record.payload,
+        aad: _aad(record.entityType, record.entityId, record.version),
+      );
+      final value = jsonDecode(clear);
+      if (value is! Map<String, dynamic>) {
+        throw StateError(
+          'Offline entity payload for ${record.entityId} is not a JSON object.',
+        );
+      }
+      decoded.add(value.cast<String, Object?>());
+    }
+    return decoded;
+  }
+
   Future<Map<String, Object?>> payloadForOutbox(String outboxId) async {
     await _ensureReady();
     final stored = _storedOutbox
