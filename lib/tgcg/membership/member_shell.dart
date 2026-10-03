@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../assignments/assignment_store.dart';
+import '../devices/managed_device_store.dart';
 import '../geography/geography_registry.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
@@ -12,6 +14,8 @@ class MemberShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final session = TgcgSession.of(context);
     final membership = MembershipOperations.of(context);
+    final devices = ManagedDevices.of(context);
+    final assignments = Assignments.of(context);
     final member = membership.memberById(session.accessId);
 
     if (member == null) {
@@ -40,6 +44,8 @@ class MemberShell extends StatelessWidget {
 
     final homePu = membership.homePollingUnitForMember(member.id);
     final registration = membership.registrationScopeForMember(member.id);
+    final managedDevice = devices.deviceForMember(member.id);
+    final activeAssignments = assignments.activeAssignmentsForMember(member.id);
 
     return Scaffold(
       backgroundColor: TgcgColors.canvas,
@@ -106,16 +112,145 @@ class MemberShell extends StatelessWidget {
             },
           ),
           const SizedBox(height: 14),
-          const TgcgSectionCard(
+          TgcgSectionCard(
             title: 'Assignment centre',
             subtitle:
-                'Personal operational assignments will appear here when issued by an authorized coordinator.',
-            child: TgcgEmptyState(
+                'Your home polling unit remains permanent; temporary operational duties appear separately here.',
+            trailing: TgcgStatusPill(
+              label: '${activeAssignments.length} ACTIVE',
+              color: activeAssignments.isEmpty
+                  ? TgcgColors.muted
+                  : TgcgColors.info,
               icon: Icons.assignment_outlined,
-              title: 'No active assignment',
-              message:
-                  'The assignment engine will keep your home polling unit separate from any temporary duty location.',
+              compact: true,
             ),
+            child: activeAssignments.isEmpty
+                ? const TgcgEmptyState(
+                    icon: Icons.assignment_outlined,
+                    title: 'No active assignment',
+                    message:
+                        'An authorized coordinator can assign a duty without changing your home polling unit.',
+                  )
+                : Column(
+                    children: activeAssignments.map((assignment) {
+                      final presence = assignments.presenceFor(assignment);
+                      return Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 9),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: TgcgColors.surfaceRaised,
+                          borderRadius:
+                              BorderRadius.circular(TgcgRadius.md),
+                          border: Border.all(color: TgcgColors.border),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: TgcgColors.primarySoft,
+                                borderRadius:
+                                    BorderRadius.circular(TgcgRadius.sm),
+                              ),
+                              child: const Icon(
+                                Icons.assignment_turned_in_outlined,
+                                color: TgcgColors.primary,
+                              ),
+                            ),
+                            const SizedBox(width: 11),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    assignment.title,
+                                    style: const TextStyle(
+                                      color: TgcgColors.ink,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    assignment.targetScope.label,
+                                    style: const TextStyle(
+                                      color: TgcgColors.muted,
+                                      fontSize: 10.5,
+                                    ),
+                                  ),
+                                  if (assignment.instructions != null) ...[
+                                    const SizedBox(height: 5),
+                                    Text(
+                                      assignment.instructions!,
+                                      style: const TextStyle(
+                                        color: TgcgColors.muted,
+                                        fontSize: 10,
+                                        height: 1.35,
+                                      ),
+                                    ),
+                                  ],
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 6,
+                                    children: [
+                                      TgcgStatusPill(
+                                        label: _assignmentStatusLabel(
+                                          assignment.status,
+                                        ),
+                                        color: _assignmentStatusColor(
+                                          assignment.status,
+                                        ),
+                                        compact: true,
+                                      ),
+                                      TgcgStatusPill(
+                                        label: _presenceLabel(presence),
+                                        color: _presenceColor(presence),
+                                        compact: true,
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+          ),
+          const SizedBox(height: 14),
+          TgcgSectionCard(
+            title: 'Managed assignment phone',
+            subtitle:
+                'Organization-issued phones can be bound to members for assignment GPS, evidence and sync.',
+            child: managedDevice == null
+                ? const TgcgEmptyState(
+                    icon: Icons.phonelink_erase_outlined,
+                    title: 'No managed phone assigned',
+                    message:
+                        'A coordinator can bind an organization-issued phone before an operational assignment begins.',
+                  )
+                : Column(
+                    children: [
+                      _Detail(label: 'Device', value: managedDevice.label),
+                      _Detail(label: 'Device ID', value: managedDevice.id),
+                      _Detail(
+                        label: 'Status',
+                        value: managedDevice.status.name.toUpperCase(),
+                      ),
+                      _Detail(
+                        label: 'Last seen',
+                        value: managedDevice.lastSeenAt == null
+                            ? 'No heartbeat yet'
+                            : managedDevice.lastSeenAt!
+                                .toLocal()
+                                .toString(),
+                      ),
+                    ],
+                  ),
           ),
           const SizedBox(height: 14),
           TgcgSectionCard(
@@ -149,7 +284,7 @@ class MemberShell extends StatelessWidget {
                         ? 'Home polling unit has not been linked.'
                         : homePu.operationalLatitude == null
                             ? 'Home polling unit is linked, but its operational GPS coordinate is still pending.'
-                            : 'Home polling unit coordinate is available for future assignment geofencing.',
+                            : 'Home polling unit coordinate is available for assignment geofencing.',
                     style: const TextStyle(
                       color: TgcgColors.ink,
                       fontSize: 11,
@@ -278,6 +413,48 @@ class _Detail extends StatelessWidget {
         ),
       );
 }
+
+String _assignmentStatusLabel(AssignmentStatus status) => switch (status) {
+      AssignmentStatus.assigned => 'ASSIGNED',
+      AssignmentStatus.accepted => 'ACCEPTED',
+      AssignmentStatus.enRoute => 'EN ROUTE',
+      AssignmentStatus.checkedIn => 'CHECKED IN',
+      AssignmentStatus.active => 'ACTIVE',
+      AssignmentStatus.completed => 'COMPLETED',
+      AssignmentStatus.declined => 'DECLINED',
+      AssignmentStatus.reassigned => 'REASSIGNED',
+      AssignmentStatus.overdue => 'OVERDUE',
+      AssignmentStatus.gpsMismatch => 'GPS MISMATCH',
+      AssignmentStatus.cancelled => 'CANCELLED',
+    };
+
+Color _assignmentStatusColor(AssignmentStatus status) => switch (status) {
+      AssignmentStatus.completed => TgcgColors.success,
+      AssignmentStatus.checkedIn || AssignmentStatus.active =>
+        TgcgColors.success,
+      AssignmentStatus.enRoute || AssignmentStatus.accepted =>
+        TgcgColors.info,
+      AssignmentStatus.gpsMismatch ||
+      AssignmentStatus.overdue ||
+      AssignmentStatus.declined => TgcgColors.warning,
+      AssignmentStatus.cancelled => TgcgColors.muted,
+      AssignmentStatus.assigned || AssignmentStatus.reassigned =>
+        TgcgColors.primary,
+    };
+
+String _presenceLabel(AssignmentPresence presence) => switch (presence) {
+      AssignmentPresence.unknown => 'GPS UNKNOWN',
+      AssignmentPresence.insideGeofence => 'AT LOCATION',
+      AssignmentPresence.outsideGeofence => 'OUTSIDE GEOFENCE',
+      AssignmentPresence.stale => 'GPS STALE',
+    };
+
+Color _presenceColor(AssignmentPresence presence) => switch (presence) {
+      AssignmentPresence.unknown => TgcgColors.muted,
+      AssignmentPresence.insideGeofence => TgcgColors.success,
+      AssignmentPresence.outsideGeofence => TgcgColors.warning,
+      AssignmentPresence.stale => TgcgColors.warning,
+    };
 
 String _coordinateLabel(PollingUnitCoordinateStatus status) => switch (status) {
       PollingUnitCoordinateStatus.missing => 'GPS PENDING',
