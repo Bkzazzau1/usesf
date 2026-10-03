@@ -839,12 +839,183 @@ class _AssignmentList extends StatelessWidget {
                             ],
                           ),
                         ),
+                        if (canManage && !assignment.isTerminal)
+                          PopupMenuButton<_AssignmentMenuAction>(
+                            tooltip: 'Assignment actions',
+                            onSelected: (action) async {
+                              if (action == _AssignmentMenuAction.reassign) {
+                                await _reassign(context, assignment);
+                              } else if (action ==
+                                  _AssignmentMenuAction.cancel) {
+                                await _cancel(context, assignment);
+                              }
+                            },
+                            itemBuilder: (context) => const [
+                              PopupMenuItem(
+                                value: _AssignmentMenuAction.reassign,
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.swap_horiz_rounded, size: 18),
+                                    SizedBox(width: 8),
+                                    Text('Reassign'),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: _AssignmentMenuAction.cancel,
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.cancel_outlined, size: 18),
+                                    SizedBox(width: 8),
+                                    Text('Cancel assignment'),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                       ],
                     ),
                   );
                 }).toList(),
               ),
       );
+
+  Future<void> _reassign(
+    BuildContext context,
+    MemberAssignment assignment,
+  ) async {
+    final candidates = authorizedMembers
+        .where((member) => member.id != assignment.memberId)
+        .toList(growable: false);
+    if (candidates.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No other authorized member is available.'),
+        ),
+      );
+      return;
+    }
+
+    var selectedMemberId = candidates.first.id;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Reassign duty'),
+          content: SizedBox(
+            width: 520,
+            child: DropdownButtonFormField<String>(
+              initialValue: selectedMemberId,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'New member',
+                prefixIcon: Icon(Icons.person_search_outlined),
+              ),
+              items: candidates
+                  .map(
+                    (member) => DropdownMenuItem(
+                      value: member.id,
+                      child: Text(
+                        '${member.fullName} • ${member.membershipNumber ?? member.id}',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  setDialogState(() => selectedMemberId = value);
+                }
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Back'),
+            ),
+            FilledButton.icon(
+              onPressed: () async {
+                try {
+                  await controller.reassign(
+                    assignmentId: assignment.id,
+                    newMemberId: selectedMemberId,
+                    actorId: actorId,
+                    authorizedScope: authorizedScope,
+                  );
+                  if (dialogContext.mounted) {
+                    Navigator.pop(dialogContext, true);
+                  }
+                } on StateError catch (error) {
+                  if (!dialogContext.mounted) return;
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(content: Text(error.message)),
+                  );
+                }
+              },
+              icon: const Icon(Icons.swap_horiz_rounded),
+              label: const Text('Reassign'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Assignment reassigned.')),
+      );
+    }
+  }
+
+  Future<void> _cancel(
+    BuildContext context,
+    MemberAssignment assignment,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Cancel assignment?'),
+        content: Text(
+          'Cancel ${assignment.title} for ${assignment.targetScope.label}?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep assignment'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Cancel assignment'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await controller.transition(
+        assignmentId: assignment.id,
+        status: AssignmentStatus.cancelled,
+        actorId: actorId,
+        authorizedScope: authorizedScope,
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Assignment cancelled.')),
+      );
+    } on StateError catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    }
+  }
+}
+
+enum _AssignmentMenuAction {
+  reassign,
+  cancel,
 }
 
 class _DeviceRegistry extends StatelessWidget {
