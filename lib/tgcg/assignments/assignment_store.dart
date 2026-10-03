@@ -35,6 +35,34 @@ enum AssignmentPresence {
   stale,
 }
 
+class PollingUnitCoverageSnapshot {
+  const PollingUnitCoverageSnapshot({
+    required this.unit,
+    required this.activeAssignments,
+    required this.atLocation,
+    required this.enRoute,
+    required this.staleGps,
+    required this.gpsMismatch,
+    required this.minimumStaffing,
+  });
+
+  final CanonicalPollingUnit unit;
+  final int activeAssignments;
+  final int atLocation;
+  final int enRoute;
+  final int staleGps;
+  final int gpsMismatch;
+  final int minimumStaffing;
+
+  bool get isUnstaffed => activeAssignments == 0;
+  bool get isBelowMinimum => activeAssignments < minimumStaffing;
+  bool get hasPresenceGap =>
+      activeAssignments > 0 && atLocation < activeAssignments;
+  bool get hasGpsAlert => staleGps > 0 || gpsMismatch > 0;
+  bool get needsAttention =>
+      isBelowMinimum || hasPresenceGap || hasGpsAlert;
+}
+
 class AssignmentLocationPing {
   const AssignmentLocationPing({
     required this.latitude,
@@ -249,6 +277,75 @@ class AssignmentController extends ChangeNotifier {
   int get gpsMismatchCount => _assignments
       .where((item) => item.status == AssignmentStatus.gpsMismatch)
       .length;
+
+  List<PollingUnitCoverageSnapshot> coverageForScope(
+    GeographicScope scope, {
+    int minimumStaffing = 1,
+  }) {
+    final units = _membership.geography.pollingUnitsWithin(scope);
+    final activeByUnit = <String, List<MemberAssignment>>{};
+    for (final assignment in _assignments) {
+      if (assignment.isTerminal) continue;
+      activeByUnit
+          .putIfAbsent(assignment.targetPollingUnitId, () => <MemberAssignment>[])
+          .add(assignment);
+    }
+
+    final snapshots = <PollingUnitCoverageSnapshot>[];
+    for (final unit in units) {
+      final active = activeByUnit[unit.code] ?? const <MemberAssignment>[];
+      var atLocation = 0;
+      var enRoute = 0;
+      var staleGps = 0;
+      var gpsMismatch = 0;
+
+      for (final assignment in active) {
+        final presence = presenceFor(assignment);
+        if (presence == AssignmentPresence.insideGeofence) {
+          atLocation++;
+        } else if (presence == AssignmentPresence.stale) {
+          staleGps++;
+        }
+        if (assignment.status == AssignmentStatus.enRoute) {
+          enRoute++;
+        }
+        if (assignment.status == AssignmentStatus.gpsMismatch ||
+            presence == AssignmentPresence.outsideGeofence) {
+          gpsMismatch++;
+        }
+      }
+
+      snapshots.add(
+        PollingUnitCoverageSnapshot(
+          unit: unit,
+          activeAssignments: active.length,
+          atLocation: atLocation,
+          enRoute: enRoute,
+          staleGps: staleGps,
+          gpsMismatch: gpsMismatch,
+          minimumStaffing: minimumStaffing,
+        ),
+      );
+    }
+    return snapshots;
+  }
+
+  List<PollingUnitCoverageSnapshot> coverageGapsForScope(
+    GeographicScope scope, {
+    int minimumStaffing = 1,
+  }) =>
+      coverageForScope(
+        scope,
+        minimumStaffing: minimumStaffing,
+      ).where((item) => item.needsAttention).toList(growable: false);
+
+  int staffedPollingUnitCount(
+    GeographicScope scope, {
+    int minimumStaffing = 1,
+  }) =>
+      coverageForScope(scope, minimumStaffing: minimumStaffing)
+          .where((item) => !item.isBelowMinimum)
+          .length;
 
   Future<MemberAssignment> createAssignment({
     required String title,
