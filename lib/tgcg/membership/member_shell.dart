@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../assignments/assignment_location_service.dart';
 import '../assignments/assignment_store.dart';
 import '../devices/managed_device_store.dart';
+import '../evidence/device_evidence_service.dart';
 import '../geography/geography_registry.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
@@ -244,7 +245,14 @@ class _MemberAssignmentCard extends StatefulWidget {
 class _MemberAssignmentCardState extends State<_MemberAssignmentCard> {
   final AssignmentLocationService _location =
       const AssignmentLocationService();
+  final DeviceEvidenceService _evidenceService = DeviceEvidenceService();
   bool _busy = false;
+
+  @override
+  void dispose() {
+    _evidenceService.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -336,6 +344,14 @@ class _MemberAssignmentCardState extends State<_MemberAssignmentCard> {
                             icon: Icons.phone_android_outlined,
                             compact: true,
                           ),
+                        TgcgStatusPill(
+                          label: '${current.evidence.length} EVIDENCE',
+                          color: current.evidence.isEmpty
+                              ? TgcgColors.muted
+                              : TgcgColors.success,
+                          icon: Icons.attachment_rounded,
+                          compact: true,
+                        ),
                       ],
                     ),
                   ],
@@ -404,6 +420,37 @@ class _MemberAssignmentCardState extends State<_MemberAssignmentCard> {
               }).toList(),
             ),
           ],
+          if ((current.status == AssignmentStatus.checkedIn ||
+                  current.status == AssignmentStatus.active) &&
+              device != null) ...[
+            const SizedBox(height: 9),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _busy
+                      ? null
+                      : () => _captureEvidence(
+                            current,
+                            EvidenceType.photo,
+                          ),
+                  icon: const Icon(Icons.photo_camera_outlined, size: 17),
+                  label: const Text('Capture photo'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _busy
+                      ? null
+                      : () => _captureEvidence(
+                            current,
+                            EvidenceType.video,
+                          ),
+                  icon: const Icon(Icons.videocam_outlined, size: 17),
+                  label: const Text('Capture video'),
+                ),
+              ],
+            ),
+          ],
           if (device == null &&
               (current.status == AssignmentStatus.enRoute ||
                   current.status == AssignmentStatus.gpsMismatch ||
@@ -421,6 +468,70 @@ class _MemberAssignmentCardState extends State<_MemberAssignmentCard> {
         ],
       ),
     );
+  }
+
+  Future<void> _captureEvidence(
+    MemberAssignment assignment,
+    EvidenceType type,
+  ) async {
+    final device = widget.managedDevice;
+    if (device == null) return;
+    setState(() => _busy = true);
+    try {
+      final captured = switch (type) {
+        EvidenceType.photo => await _evidenceService.capturePhoto(),
+        EvidenceType.video => await _evidenceService.captureVideo(),
+        _ => null,
+      };
+      if (!mounted || captured == null) return;
+
+      final latest =
+          Assignments.of(context, listen: false).assignmentById(assignment.id) ??
+              assignment;
+      final ping = latest.lastLocation;
+      final evidence = EvidenceAttachment(
+        id: 'AEV-${DateTime.now().microsecondsSinceEpoch}',
+        type: captured.type,
+        fileName: captured.fileName,
+        createdAt: captured.createdAt,
+        uploaderId: widget.memberId,
+        contentHash: captured.contentHash,
+        mimeType: captured.mimeType,
+        sourceReference: captured.path,
+        latitude: captured.latitude ?? ping?.latitude,
+        longitude: captured.longitude ?? ping?.longitude,
+        caption:
+            'Captured during USESF assignment ${assignment.id} from managed device ${device.id}.',
+        origin: RecordOrigin.localEntry,
+      );
+
+      await Assignments.of(context, listen: false).attachEvidence(
+        assignmentId: assignment.id,
+        evidence: evidence,
+        actorId: widget.memberId,
+        deviceId: device.id,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${captured.type.name.toUpperCase()} evidence attached to the assignment.',
+          ),
+        ),
+      );
+    } on StateError catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Evidence capture failed: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _transition(
