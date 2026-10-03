@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../assignments/assignment_store.dart';
 import '../domain/permissions.dart';
 import '../field/field_operations_store.dart';
 import '../membership/membership_store.dart';
@@ -43,6 +44,7 @@ class _GeographyPageState extends State<GeographyPage> {
   Widget build(BuildContext context) {
     final session = TgcgSession.of(context);
     final membership = MembershipOperations.of(context);
+    final assignments = Assignments.of(context);
     final field = FieldOperations.of(context);
     final results = ResultOperations.of(context);
     final registry = membership.geography;
@@ -132,6 +134,7 @@ class _GeographyPageState extends State<GeographyPage> {
           scope: scope,
           children: children,
           membership: membership,
+          assignments: assignments,
           field: field,
           results: results,
           onOpen: (child) => setState(() {
@@ -393,6 +396,7 @@ class _CoverageHero extends StatelessWidget {
     required this.scope,
     required this.children,
     required this.membership,
+    required this.assignments,
     required this.field,
     required this.results,
     required this.onOpen,
@@ -401,6 +405,7 @@ class _CoverageHero extends StatelessWidget {
   final GeographicScope scope;
   final List<GeographicScope> children;
   final MembershipOperationsController membership;
+  final AssignmentController assignments;
   final FieldOperationsController field;
   final ResultOperationsController results;
   final ValueChanged<GeographicScope> onOpen;
@@ -672,6 +677,17 @@ class _DirectoryPanel extends StatelessWidget {
                 final agents = membership.agentsForScope(unit.scope);
                 final members =
                     membership.memberCountForPollingUnit(unit.code);
+                final unitAssignments = assignments
+                    .assignmentsForScope(unit.scope)
+                    .where((item) => !item.isTerminal)
+                    .toList(growable: false);
+                final atLocation = unitAssignments
+                    .where(
+                      (item) =>
+                          assignments.presenceFor(item) ==
+                          AssignmentPresence.insideGeofence,
+                    )
+                    .length;
                 final submissions = results.submissionsForScope(unit.scope);
                 final verified = submissions.any(
                   (item) => item.status == RecordStatus.verified,
@@ -744,6 +760,19 @@ class _DirectoryPanel extends StatelessWidget {
                       TgcgStatusPill(
                         label: '${agents.length} AGENT${agents.length == 1 ? '' : 'S'}',
                         color: TgcgColors.info,
+                        compact: true,
+                      ),
+                      TgcgStatusPill(
+                        label: '${unitAssignments.length} ASSIGNED',
+                        color: TgcgColors.primary,
+                        compact: true,
+                      ),
+                      TgcgStatusPill(
+                        label: '$atLocation AT LOCATION',
+                        color: atLocation == unitAssignments.length &&
+                                unitAssignments.isNotEmpty
+                            ? TgcgColors.success
+                            : TgcgColors.warning,
                         compact: true,
                       ),
                       TgcgStatusPill(
