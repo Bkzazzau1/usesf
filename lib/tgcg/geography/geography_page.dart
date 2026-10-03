@@ -6,6 +6,7 @@ import '../results/result_operations_store.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
 import 'geography_registry.dart';
+import 'kaduna_geography.dart';
 
 class GeographyPage extends StatefulWidget {
   const GeographyPage({super.key});
@@ -70,6 +71,7 @@ class _GeographyPageState extends State<GeographyPage> {
     final visibleUnits = units.where((unit) {
       if (needle.isEmpty) return true;
       return unit.code.toLowerCase().contains(needle) ||
+          unit.displayCode.toLowerCase().contains(needle) ||
           unit.scope.label.toLowerCase().contains(needle);
     }).toList(growable: false);
 
@@ -104,6 +106,11 @@ class _GeographyPageState extends State<GeographyPage> {
           openIncidents: openIncidents.length,
           submissions: submissions.length,
           verifiedResults: verifiedResults,
+        ),
+        const SizedBox(height: 16),
+        _PollingUnitRegistrySummary(
+          registry: registry,
+          membership: membership,
         ),
         const SizedBox(height: 16),
         _CoverageHero(
@@ -231,6 +238,86 @@ class _MetricGrid extends StatelessWidget {
             ],
           );
         },
+      );
+}
+
+class _PollingUnitRegistrySummary extends StatelessWidget {
+  const _PollingUnitRegistrySummary({
+    required this.registry,
+    required this.membership,
+  });
+
+  final GeographyRegistry registry;
+  final MembershipOperationsController membership;
+
+  @override
+  Widget build(BuildContext context) => TgcgSectionCard(
+        title: 'Polling Unit Master Registry',
+        subtitle:
+            'Canonical polling-unit identity, coordinate readiness and member linkage. Reference and field-verified coordinates remain separate.',
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final columns = constraints.maxWidth >= 980
+                ? 5
+                : constraints.maxWidth >= 620
+                    ? 3
+                    : 2;
+            const gap = 10.0;
+            final width =
+                (constraints.maxWidth - gap * (columns - 1)) / columns;
+            return Wrap(
+              spacing: gap,
+              runSpacing: gap,
+              children: [
+                TgcgMetricCard(
+                  width: width,
+                  label: 'Registry loaded',
+                  value: '${registry.pollingUnits.length}',
+                  detail: 'of $kadunaPollingUnitCount statewide target',
+                  icon: Icons.how_to_vote_outlined,
+                  tone: TgcgMetricTone.info,
+                ),
+                TgcgMetricCard(
+                  width: width,
+                  label: 'Coordinates ready',
+                  value: '${registry.coordinateReadyCount}',
+                  detail: 'Reference or field coordinate',
+                  icon: Icons.gps_fixed_rounded,
+                  tone: TgcgMetricTone.success,
+                ),
+                TgcgMetricCard(
+                  width: width,
+                  label: 'Field verified',
+                  value: '${registry.fieldVerifiedCoordinateCount}',
+                  detail: 'Verified on location',
+                  icon: Icons.verified_outlined,
+                  tone: TgcgMetricTone.success,
+                ),
+                TgcgMetricCard(
+                  width: width,
+                  label: 'Needs review',
+                  value: '${registry.coordinateReviewCount}',
+                  detail: 'Reference/GPS mismatch',
+                  icon: Icons.rule_folder_outlined,
+                  tone: registry.coordinateReviewCount == 0
+                      ? TgcgMetricTone.neutral
+                      : TgcgMetricTone.warning,
+                ),
+                TgcgMetricCard(
+                  width: width,
+                  label: 'Members PU-linked',
+                  value: '${membership.membersWithHomePollingUnit}',
+                  detail:
+                      '${membership.membersWithoutHomePollingUnit} members pending',
+                  icon: Icons.person_pin_circle_outlined,
+                  tone: membership.membersWithoutHomePollingUnit == 0
+                      ? TgcgMetricTone.success
+                      : TgcgMetricTone.warning,
+                ),
+              ],
+            );
+          },
+        ),
       );
 }
 
@@ -510,6 +597,8 @@ class _DirectoryPanel extends StatelessWidget {
             else if (units.isNotEmpty)
               ...units.map((unit) {
                 final agents = membership.agentsForScope(unit.scope);
+                final members =
+                    membership.memberCountForPollingUnit(unit.code);
                 final submissions = results.submissionsForScope(unit.scope);
                 final verified = submissions.any(
                   (item) => item.status == RecordStatus.verified,
@@ -530,20 +619,37 @@ class _DirectoryPanel extends StatelessWidget {
                     ),
                   ),
                   title: Text(
-                    unit.code,
+                    unit.displayCode,
                     style: const TextStyle(fontWeight: FontWeight.w900),
                   ),
-                  subtitle: Text(unit.scope.label),
+                  subtitle: Text(
+                    unit.operationalLatitude == null
+                        ? unit.scope.label
+                        : '${unit.scope.label}\n'
+                            '${unit.operationalLatitude!.toStringAsFixed(6)}, '
+                            '${unit.operationalLongitude!.toStringAsFixed(6)}',
+                  ),
+                  isThreeLine: unit.operationalLatitude != null,
                   trailing: Wrap(
                     spacing: 6,
                     children: [
+                      TgcgStatusPill(
+                        label: '$members MEMBER${members == 1 ? '' : 'S'}',
+                        color: TgcgColors.primary,
+                        compact: true,
+                      ),
                       TgcgStatusPill(
                         label: '${agents.length} AGENT${agents.length == 1 ? '' : 'S'}',
                         color: TgcgColors.info,
                         compact: true,
                       ),
                       TgcgStatusPill(
-                        label: verified ? 'VERIFIED' : 'AWAITING',
+                        label: _coordinateStatusLabel(unit.coordinateStatus),
+                        color: _coordinateStatusColor(unit.coordinateStatus),
+                        compact: true,
+                      ),
+                      TgcgStatusPill(
+                        label: verified ? 'RESULT VERIFIED' : 'RESULT AWAITING',
                         color: verified
                             ? TgcgColors.success
                             : TgcgColors.warning,
@@ -762,6 +868,22 @@ class _BreadcrumbBar extends StatelessWidget {
         ),
       );
 }
+
+String _coordinateStatusLabel(PollingUnitCoordinateStatus status) =>
+    switch (status) {
+      PollingUnitCoordinateStatus.missing => 'GPS PENDING',
+      PollingUnitCoordinateStatus.referenceOnly => 'REFERENCE GPS',
+      PollingUnitCoordinateStatus.fieldVerified => 'FIELD VERIFIED',
+      PollingUnitCoordinateStatus.needsReview => 'GPS REVIEW',
+    };
+
+Color _coordinateStatusColor(PollingUnitCoordinateStatus status) =>
+    switch (status) {
+      PollingUnitCoordinateStatus.missing => TgcgColors.muted,
+      PollingUnitCoordinateStatus.referenceOnly => TgcgColors.info,
+      PollingUnitCoordinateStatus.fieldVerified => TgcgColors.success,
+      PollingUnitCoordinateStatus.needsReview => TgcgColors.warning,
+    };
 
 String _shortLabel(GeographicScope scope) => switch (scope.level) {
       GeographyLevel.country => scope.country,
