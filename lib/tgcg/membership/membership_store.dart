@@ -9,6 +9,7 @@ import '../domain/models.dart';
 import '../geography/geography_registry.dart';
 import '../offline/offline_payloads.dart';
 import '../offline/offline_persistence.dart';
+import '../sync/sync_models.dart';
 
 enum MemberPollingUnitLinkSource {
   pvc,
@@ -360,6 +361,132 @@ class MembershipOperationsController extends ChangeNotifier {
   GeographyRegistry get geography => _geography;
   List<TgcgMember> get members => List.unmodifiable(_members);
   List<AccreditedAgent> get agents => List.unmodifiable(_agents);
+
+  Future<void> hydrateFromOffline() async {
+    final memberRows = await _persistence.readEntities(
+      entityType: 'usesf_member',
+    );
+    final coordinateRows = await _persistence.readEntities(
+      entityType: 'polling_unit_coordinate',
+    );
+
+    var changed = false;
+
+    for (final row in memberRows) {
+      final id = row['id']?.toString();
+      final fullName = row['fullName']?.toString();
+      final phoneNumber = row['phoneNumber']?.toString();
+      final createdAt =
+          DateTime.tryParse(row['createdAt']?.toString() ?? '')?.toUtc();
+      final status = _recordStatus(row['status']);
+      if (id == null ||
+          fullName == null ||
+          phoneNumber == null ||
+          createdAt == null ||
+          status == null) {
+        continue;
+      }
+
+      final origin = _recordOrigin(row['origin']) ?? RecordOrigin.localEntry;
+      final member = TgcgMember(
+        id: id,
+        fullName: fullName,
+        phoneNumber: phoneNumber,
+        email: _nullableText(row['email']),
+        membershipNumber: _nullableText(row['membershipNumber']),
+        createdAt: createdAt,
+        status: status,
+        origin: origin,
+      );
+      final scope =
+          geographicScopeFromJson(row['registrationScope']) ??
+              GeographicScope.kaduna;
+
+      final index = _members.indexWhere((item) => item.id == id);
+      if (index < 0) {
+        _members.add(member);
+      } else {
+        _members[index] = member;
+      }
+      _memberScopes[id] = scope;
+
+      final homeRaw = row['homePollingUnit'];
+      if (homeRaw is Map) {
+        final home = homeRaw.map(
+          (key, value) => MapEntry(key.toString(), value),
+        );
+        final pollingUnitId = home['pollingUnitId']?.toString();
+        final linkedAt =
+            DateTime.tryParse(home['linkedAt']?.toString() ?? '')?.toUtc();
+        final source = _linkSource(home['source']);
+        if (pollingUnitId != null &&
+            linkedAt != null &&
+            source != null &&
+            _geography.pollingUnit(pollingUnitId) != null) {
+          _memberPollingUnits[id] = MemberPollingUnitLink(
+            memberId: id,
+            pollingUnitId: pollingUnitId,
+            linkedAt: linkedAt,
+            source: source,
+            pvcPollingUnitCode:
+                _nullableText(home['pvcPollingUnitCode']),
+            linkedBy: _nullableText(home['linkedBy']),
+          );
+        }
+      }
+      changed = true;
+    }
+
+    for (final row in coordinateRows) {
+      final pollingUnitId = row['pollingUnitId']?.toString();
+      if (pollingUnitId == null ||
+          _geography.pollingUnit(pollingUnitId) == null) {
+        continue;
+      }
+
+      final referenceLatitude = _number(row['referenceLatitude']);
+      final referenceLongitude = _number(row['referenceLongitude']);
+      final referenceSource = _nullableText(row['referenceSource']);
+      if (referenceLatitude != null &&
+          referenceLongitude != null &&
+          referenceSource != null) {
+        _geography.setPollingUnitReferenceCoordinate(
+          pollingUnitId: pollingUnitId,
+          latitude: referenceLatitude,
+          longitude: referenceLongitude,
+          source: referenceSource,
+          officialCode: _nullableText(row['officialCode']),
+        );
+      }
+
+      final verifiedLatitude = _number(row['verifiedLatitude']);
+      final verifiedLongitude = _number(row['verifiedLongitude']);
+      final accuracy = _number(row['verificationAccuracyMeters']);
+      final verifiedBy = _nullableText(row['verifiedBy']);
+      final verifiedAt =
+          DateTime.tryParse(row['verifiedAt']?.toString() ?? '')?.toUtc();
+      if (verifiedLatitude != null &&
+          verifiedLongitude != null &&
+          accuracy != null &&
+          verifiedBy != null &&
+          verifiedAt != null) {
+        _geography.verifyPollingUnitCoordinate(
+          pollingUnitId: pollingUnitId,
+          latitude: verifiedLatitude,
+          longitude: verifiedLongitude,
+          accuracyMeters: accuracy,
+          verifiedBy: verifiedBy,
+          verifiedAt: verifiedAt,
+        );
+      }
+      changed = true;
+    }
+
+    if (changed) {
+      _members.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      notifyListeners();
+    }
+  }
 
   TgcgMember? memberById(String id) {
     for (final member in _members) {
@@ -791,6 +918,97 @@ class MembershipOperationsController extends ChangeNotifier {
       origin: current.origin,
     );
     notifyListeners();
+  }
+
+  Future<void> _persistMemberState(
+    TgcgMember member,
+    GeographicScope scope,
+    MemberPollingUnitLink? homeLink,
+  ) =>
+      _persistence.persistMutation(
+        entityType: 'usesf_member',
+        entityId: member.id,
+        mutationType: SyncMutationType.upsert,
+        scopeKey: scopeStorageKey(scope),
+        ownerId: member.id,
+        payload: {
+          'id': member.id,
+          'fullName': member.fullName,
+          'phoneNumber': member.phoneNumber,
+          'email': member.email,
+          'membershipNumber': member.membershipNumber,
+          'createdAt': member.createdAt.toIso8601String(),
+          'status': member.status.name,
+          'origin': member.origin.name,
+          'registrationScope': geographicScopeToJson(scope),
+          'homePollingUnit': homeLink == null
+              ? null
+              : {
+                  'pollingUnitId': homeLink.pollingUnitId,
+                  'linkedAt': homeLink.linkedAt.toIso8601String(),
+                  'source': homeLink.source.name,
+                  'pvcPollingUnitCode': homeLink.pvcPollingUnitCode,
+                  'linkedBy': homeLink.linkedBy,
+                },
+        },
+      );
+
+  Future<void> _persistPollingUnitCoordinate(
+    CanonicalPollingUnit unit,
+  ) =>
+      _persistence.persistMutation(
+        entityType: 'polling_unit_coordinate',
+        entityId: unit.code,
+        mutationType: SyncMutationType.upsert,
+        scopeKey: scopeStorageKey(unit.scope),
+        payload: {
+          'pollingUnitId': unit.code,
+          'officialCode': unit.officialCode,
+          'referenceLatitude': unit.referenceLatitude,
+          'referenceLongitude': unit.referenceLongitude,
+          'referenceSource': unit.referenceSource,
+          'verifiedLatitude': unit.verifiedLatitude,
+          'verifiedLongitude': unit.verifiedLongitude,
+          'verificationAccuracyMeters': unit.verificationAccuracyMeters,
+          'verifiedBy': unit.verifiedBy,
+          'verifiedAt': unit.verifiedAt?.toIso8601String(),
+          'coordinateStatus': unit.coordinateStatus.name,
+          'geofenceRadiusMeters': unit.geofenceRadiusMeters,
+        },
+      );
+
+  static RecordStatus? _recordStatus(Object? value) {
+    final name = value?.toString();
+    for (final item in RecordStatus.values) {
+      if (item.name == name) return item;
+    }
+    return null;
+  }
+
+  static RecordOrigin? _recordOrigin(Object? value) {
+    final name = value?.toString();
+    for (final item in RecordOrigin.values) {
+      if (item.name == name) return item;
+    }
+    return null;
+  }
+
+  static MemberPollingUnitLinkSource? _linkSource(Object? value) {
+    final name = value?.toString();
+    for (final item in MemberPollingUnitLinkSource.values) {
+      if (item.name == name) return item;
+    }
+    return null;
+  }
+
+  static String? _nullableText(Object? value) {
+    final text = value?.toString().trim();
+    return text == null || text.isEmpty ? null : text;
+  }
+
+  static double? _number(Object? value) {
+    if (value is num) return value.toDouble();
+    return value == null ? null : double.tryParse(value.toString());
   }
 
   static String _pinCredentialKey(String memberId) =>
