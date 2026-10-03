@@ -21,11 +21,36 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     final membership = MembershipOperations.of(context);
     final devices = ManagedDevices.of(context);
     final assignments = Assignments.of(context);
-    final canManage = TgcgPermissionPolicy.may(
+    final canManageAssignments = TgcgPermissionPolicy.may(
       session.role!,
       session.scope,
       TgcgCapability.manageAgentAssignments,
     );
+    final canManageDevices = TgcgPermissionPolicy.may(
+      session.role!,
+      session.scope,
+      TgcgCapability.manageDevices,
+    );
+    final authorizedUnits = membership.geography.pollingUnits
+        .where(
+          (unit) =>
+              TgcgPermissionPolicy.scopeAllows(session.scope, unit.scope),
+        )
+        .toList(growable: false);
+    final authorizedMembers = membership.members
+        .where((member) {
+          final scope = membership.registrationScopeForMember(member.id);
+          return scope != null &&
+              TgcgPermissionPolicy.scopeAllows(session.scope, scope);
+        })
+        .toList(growable: false);
+    final authorizedMemberIds =
+        authorizedMembers.map((member) => member.id).toSet();
+    final visibleDevices = devices.devices.where((device) {
+      if (canManageDevices) return true;
+      final memberId = device.assignedMemberId;
+      return memberId != null && authorizedMemberIds.contains(memberId);
+    }).toList(growable: false);
     final visible = assignments.assignmentsForScope(session.scope);
     final coverage = assignments.coverageForScope(session.scope);
     final gaps = coverage.where((item) => item.needsAttention).toList();
@@ -40,13 +65,15 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
           title: 'Assignment Control Centre',
           subtitle:
               '${session.scope.label}: assign members to polling units, bind managed phones and monitor assignment presence without changing home polling-unit records.',
-          trailing: canManage
+          trailing: canManageAssignments
               ? FilledButton.icon(
                   onPressed: () => _createAssignment(
                     context,
                     membership,
                     assignments,
                     session,
+                    authorizedMembers,
+                    authorizedUnits,
                   ),
                   icon: const Icon(Icons.add_task_rounded),
                   label: const Text('New assignment'),
@@ -105,9 +132,9 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                 TgcgMetricCard(
                   width: width,
                   label: 'Managed phones',
-                  value: '${devices.devices.length}',
+                  value: '${visibleDevices.length}',
                   detail:
-                      '${devices.assignedCount} assigned • ${devices.availableCount} available',
+                      '${visibleDevices.where((item) => item.status == ManagedDeviceStatus.assigned).length} assigned • ${visibleDevices.where((item) => item.status == ManagedDeviceStatus.available).length} available',
                   icon: Icons.phone_android_rounded,
                   tone: TgcgMetricTone.neutral,
                 ),
@@ -130,14 +157,16 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
         const SizedBox(height: 16),
         _DeviceRegistry(
           devices: devices,
+          visibleDevices: visibleDevices,
           membership: membership,
-          canManage: canManage,
+          canManage: canManageDevices,
           onRegister: () => _registerDevice(context, devices, session),
           onAssign: () => _assignDevice(
             context,
             devices,
             membership,
             session,
+            authorizedMembers,
           ),
         ),
       ],
