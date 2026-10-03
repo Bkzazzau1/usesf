@@ -814,7 +814,7 @@ class _LiveMeetingStage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        color: const Color(0xFF040D21),
+        color: TgcgColors.navy950,
         child: SafeArea(
           child: Column(
             children: [
@@ -841,7 +841,7 @@ class _LiveMeetingStage extends StatelessWidget {
                           Text(
                             '${meeting.participants.length} participants • ${meeting.id}',
                             style: const TextStyle(
-                              color: Color(0xFF9AA2B5),
+                              color: TgcgColors.gold200,
                               fontSize: 9.5,
                             ),
                           ),
@@ -898,8 +898,10 @@ class _LiveMeetingStage extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.fromLTRB(16, 13, 16, 16),
                 decoration: const BoxDecoration(
-                  color: Color(0xFF08132E),
-                  border: Border(top: BorderSide(color: Color(0xFF182646))),
+                  color: TgcgColors.navy900,
+                  border: Border(
+                    top: BorderSide(color: TgcgColors.gold700),
+                  ),
                 ),
                 child: Wrap(
                   alignment: WrapAlignment.center,
@@ -974,10 +976,10 @@ class _ParticipantTile extends StatelessWidget {
         width: width,
         height: 250,
         decoration: BoxDecoration(
-          color: const Color(0xFF0C1B3D),
+          color: TgcgColors.navy800,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: presenting ? TgcgColors.accent : const Color(0xFF1D2D51),
+            color: presenting ? TgcgColors.gold400 : TgcgColors.navy700,
             width: presenting ? 2 : 1,
           ),
         ),
@@ -1006,7 +1008,7 @@ class _ParticipantTile extends StatelessWidget {
                         Text(
                           participant.role,
                           style: const TextStyle(
-                            color: Color(0xFFA6ACBC),
+                            color: TgcgColors.gold200,
                             fontSize: 9.5,
                           ),
                         ),
@@ -1014,7 +1016,7 @@ class _ParticipantTile extends StatelessWidget {
                     )
                   : const Icon(
                       Icons.videocam_off_rounded,
-                      color: Color(0xFF6E778C),
+                      color: const Color(0xFF8695AB),
                       size: 52,
                     ),
             ),
@@ -1085,12 +1087,12 @@ class _CallControl extends StatelessWidget {
         ? TgcgColors.danger
         : active
             ? Colors.white
-            : const Color(0xFFB1B7C4);
+            : const Color(0xFFD5DEEA);
     final background = danger
         ? TgcgColors.danger
         : active
-            ? const Color(0xFF2B395B)
-            : const Color(0xFF111F40);
+            ? TgcgColors.navy700
+            : TgcgColors.navy800;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
@@ -1136,14 +1138,15 @@ class _MeetingAvatar extends StatelessWidget {
       width: size,
       height: size,
       alignment: Alignment.center,
-      decoration: const BoxDecoration(
-        color: TgcgColors.primarySoft,
+      decoration: BoxDecoration(
+        color: TgcgColors.accentSoft,
         shape: BoxShape.circle,
+        border: Border.all(color: TgcgColors.gold200),
       ),
       child: Text(
         initials,
         style: TextStyle(
-          color: TgcgColors.primary,
+          color: TgcgColors.primaryDark,
           fontSize: size * .28,
           fontWeight: FontWeight.w900,
         ),

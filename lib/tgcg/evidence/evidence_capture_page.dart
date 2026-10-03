@@ -231,13 +231,35 @@ class _CaptureAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-        color: active ? TgcgColors.danger.withValues(alpha: .08) : TgcgColors.surfaceSoft,
-        borderRadius: BorderRadius.circular(16),
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(TgcgRadius.md),
         child: InkWell(
           onTap: enabled ? onTap : null,
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
+          borderRadius: BorderRadius.circular(TgcgRadius.md),
+          child: Container(
             padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              gradient: active
+                  ? LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        TgcgColors.surface,
+                        TgcgColors.danger.withValues(alpha: .05),
+                      ],
+                    )
+                  : const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [TgcgColors.surface, TgcgColors.navy50],
+                    ),
+              borderRadius: BorderRadius.circular(TgcgRadius.md),
+              border: Border.all(
+                color: active
+                    ? TgcgColors.danger.withValues(alpha: .24)
+                    : TgcgColors.border,
+              ),
+            ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [

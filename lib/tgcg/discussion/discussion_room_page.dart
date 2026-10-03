@@ -554,11 +554,7 @@ class _SocialPostCard extends StatelessWidget {
                 height: 178,
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [TgcgColors.primaryDark, TgcgColors.primary],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  gradient: TgcgGradients.navigation,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Center(
@@ -730,9 +726,7 @@ class _ProfileCard extends StatelessWidget {
             Container(
               height: 72,
               decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [TgcgColors.primaryDark, TgcgColors.primary],
-                ),
+                gradient: TgcgGradients.navigation,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
               ),
             ),
@@ -847,10 +841,11 @@ class _SpaceRow extends StatelessWidget {
               width: 34,
               height: 34,
               decoration: BoxDecoration(
-                color: TgcgColors.primarySoft,
+                color: TgcgColors.accent.withValues(alpha: .10),
                 borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: TgcgColors.gold200),
               ),
-              child: Icon(icon, color: TgcgColors.primary, size: 17),
+              child: Icon(icon, color: TgcgColors.accentStrong, size: 17),
             ),
             const SizedBox(width: 9),
             Expanded(
@@ -893,14 +888,14 @@ class _Avatar extends StatelessWidget {
       height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: TgcgColors.primarySoft,
+        color: TgcgColors.accentSoft,
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 2),
+        border: Border.all(color: TgcgColors.gold200, width: 2),
       ),
       child: Text(
         initials,
         style: TextStyle(
-          color: TgcgColors.primary,
+          color: TgcgColors.primaryDark,
           fontSize: size * .28,
           fontWeight: FontWeight.w900,
         ),

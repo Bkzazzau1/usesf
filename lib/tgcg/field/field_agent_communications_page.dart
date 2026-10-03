@@ -122,10 +122,11 @@ class _Header extends StatelessWidget {
         margin: const EdgeInsets.fromLTRB(14, 14, 14, 10),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [TgcgColors.primaryDark, TgcgColors.primary],
+          gradient: TgcgGradients.navigation,
+          borderRadius: BorderRadius.circular(TgcgRadius.xl),
+          border: Border.all(
+            color: TgcgColors.accent.withValues(alpha: .18),
           ),
-          borderRadius: BorderRadius.circular(22),
         ),
         child: Row(
           children: [
@@ -161,7 +162,7 @@ class _Header extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: Color(0xFFC6CCD9),
+                      color: TgcgColors.gold200,
                       fontSize: 10.5,
                       fontWeight: FontWeight.w700,
                     ),
@@ -219,17 +220,19 @@ class _RoomSelector extends StatelessWidget {
                     ? Icons.groups_2_outlined
                     : Icons.hub_outlined,
                 size: 16,
-                color: active ? Colors.white : TgcgColors.primary,
+                color: active ? TgcgColors.primaryDark : TgcgColors.primary,
               ),
               label: Text(room.name),
               labelStyle: TextStyle(
-                color: active ? Colors.white : TgcgColors.ink,
+                color: active ? TgcgColors.primaryDark : TgcgColors.ink,
                 fontSize: 10,
                 fontWeight: FontWeight.w800,
               ),
-              selectedColor: TgcgColors.primary,
+              selectedColor: TgcgColors.accentSoft,
               backgroundColor: TgcgColors.surface,
-              side: const BorderSide(color: TgcgColors.border),
+              side: BorderSide(
+                color: active ? TgcgColors.gold400 : TgcgColors.border,
+              ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -326,7 +329,14 @@ class _MessageBubble extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.fromLTRB(13, 10, 13, 8),
           decoration: BoxDecoration(
-            color: mine ? TgcgColors.primary : TgcgColors.surface,
+            gradient: mine
+                ? const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [TgcgColors.navy800, TgcgColors.navy700],
+                  )
+                : null,
+            color: mine ? null : TgcgColors.surface,
             borderRadius: BorderRadius.only(
               topLeft: const Radius.circular(16),
               topRight: const Radius.circular(16),

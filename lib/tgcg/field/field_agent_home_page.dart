@@ -254,12 +254,12 @@ class _DutyHeader extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [TgcgColors.primaryDark, TgcgColors.primary],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+          gradient: TgcgGradients.navigation,
+          borderRadius: BorderRadius.circular(TgcgRadius.xl),
+          border: Border.all(
+            color: TgcgColors.accent.withValues(alpha: .18),
           ),
-          borderRadius: BorderRadius.circular(22),
+          boxShadow: TgcgShadows.soft,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -286,7 +286,7 @@ class _DutyHeader extends StatelessWidget {
                       Text(
                         agent.agentId,
                         style: const TextStyle(
-                          color: Color(0xFFBCC2D1),
+                          color: TgcgColors.gold200,
                           fontSize: 10.5,
                           fontWeight: FontWeight.w700,
                         ),
@@ -327,7 +327,7 @@ class _DutyHeader extends StatelessWidget {
             Text(
               agent.scope.label,
               style: const TextStyle(
-                color: Color(0xFFBBC1D2),
+                color: TgcgColors.gold200,
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
               ),

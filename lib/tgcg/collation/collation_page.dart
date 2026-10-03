@@ -226,15 +226,12 @@ class _CompletionHero extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: TgcgColors.primaryDark,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x18000000),
-            blurRadius: 24,
-            offset: Offset(0, 8),
-          ),
-        ],
+        gradient: TgcgGradients.navigation,
+        borderRadius: BorderRadius.circular(TgcgRadius.xl),
+        border: Border.all(
+          color: TgcgColors.accent.withValues(alpha: .18),
+        ),
+        boxShadow: TgcgShadows.elevated,
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -244,7 +241,7 @@ class _CompletionHero extends StatelessWidget {
               const Text(
                 'VERIFIED COVERAGE',
                 style: TextStyle(
-                  color: Color(0xFF9BA9CB),
+                  color: TgcgColors.gold200,
                   fontSize: 10,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 1.1,
@@ -264,7 +261,7 @@ class _CompletionHero extends StatelessWidget {
               Text(
                 '${summary.verifiedPollingUnitCount} of ${summary.expectedPollingUnitCount} canonical polling units are included in this verified-only snapshot.',
                 style: const TextStyle(
-                  color: Color(0xFFD1D6E2),
+                  color: TgcgColors.gold200,
                   fontSize: 12,
                   height: 1.45,
                 ),
@@ -371,13 +368,15 @@ class _DarkRule extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 15, color: const Color(0xFF9BA9CB)),
+            const Icon(Icons.circle, size: 5, color: TgcgColors.gold400),
+            const SizedBox(width: 3),
+            Icon(icon, size: 15, color: TgcgColors.gold200),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
                 text,
                 style: const TextStyle(
-                  color: Color(0xFFD1D6E2),
+                  color: TgcgColors.gold200,
                   fontSize: 10.5,
                   height: 1.35,
                 ),

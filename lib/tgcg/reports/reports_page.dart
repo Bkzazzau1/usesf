@@ -492,14 +492,23 @@ class _CataloguePanel extends StatelessWidget {
                   duration: const Duration(milliseconds: 160),
                   padding: const EdgeInsets.all(13),
                   decoration: BoxDecoration(
-                    color: selected
-                        ? tone.withValues(alpha: .065)
-                        : TgcgColors.surfaceSoft,
-                    borderRadius: BorderRadius.circular(15),
+                    gradient: selected
+                        ? LinearGradient(
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                            colors: [
+                              TgcgColors.surface,
+                              tone.withValues(alpha: .05),
+                            ],
+                          )
+                        : null,
+                    color: selected ? null : TgcgColors.surfaceSoft,
+                    borderRadius: BorderRadius.circular(TgcgRadius.md),
                     border: Border.all(
                       color: selected
-                          ? tone.withValues(alpha: .25)
+                          ? tone.withValues(alpha: .32)
                           : TgcgColors.border,
+                      width: selected ? 1.4 : 1,
                     ),
                   ),
                   child: Row(
@@ -509,7 +518,10 @@ class _CataloguePanel extends StatelessWidget {
                         height: 39,
                         decoration: BoxDecoration(
                           color: tone.withValues(alpha: .09),
-                          borderRadius: BorderRadius.circular(11),
+                          borderRadius: BorderRadius.circular(TgcgRadius.sm),
+                          border: Border.all(
+                            color: tone.withValues(alpha: .10),
+                          ),
                         ),
                         child: Icon(item.icon, color: tone, size: 20),
                       ),
@@ -585,10 +597,12 @@ class _ReportPreviewPanel extends StatelessWidget {
             padding: const EdgeInsets.all(22),
             decoration: BoxDecoration(
               gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
                 colors: [
-                  TgcgColors.primaryDark,
-                  TgcgColors.primary,
-                  tone.withValues(alpha: .88),
+                  TgcgColors.navy950,
+                  TgcgColors.navy800,
+                  Color.lerp(TgcgColors.navy700, tone, .28)!,
                 ],
               ),
               borderRadius: const BorderRadius.vertical(
@@ -606,8 +620,11 @@ class _ReportPreviewPanel extends StatelessWidget {
                           width: 45,
                           height: 45,
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: .11),
-                            borderRadius: BorderRadius.circular(13),
+                            color: TgcgColors.accent.withValues(alpha: .12),
+                            borderRadius: BorderRadius.circular(TgcgRadius.sm),
+                            border: Border.all(
+                              color: TgcgColors.accent.withValues(alpha: .18),
+                            ),
                           ),
                           child: Icon(
                             descriptor.icon,

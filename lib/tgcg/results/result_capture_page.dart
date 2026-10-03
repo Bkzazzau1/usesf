@@ -569,13 +569,21 @@ class _WorkflowRail extends StatelessWidget {
             width: width,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: step.done
-                  ? step.color.withValues(alpha: .07)
-                  : TgcgColors.surfaceSoft,
-              borderRadius: BorderRadius.circular(14),
+              gradient: step.done
+                  ? LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        TgcgColors.surface,
+                        step.color.withValues(alpha: .045),
+                      ],
+                    )
+                  : null,
+              color: step.done ? null : TgcgColors.surfaceSoft,
+              borderRadius: BorderRadius.circular(TgcgRadius.md),
               border: Border.all(
                 color: step.done
-                    ? step.color.withValues(alpha: .20)
+                    ? step.color.withValues(alpha: .22)
                     : TgcgColors.border,
               ),
             ),
@@ -629,9 +637,20 @@ class _EvidencePanel extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: TgcgColors.surfaceSoft,
-          borderRadius: BorderRadius.circular(17),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [TgcgColors.surface, TgcgColors.navy50],
+          ),
+          borderRadius: BorderRadius.circular(TgcgRadius.lg),
           border: Border.all(color: TgcgColors.border),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x0706162D),
+              blurRadius: 18,
+              offset: Offset(0, 6),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -654,9 +673,13 @@ class _EvidencePanel extends StatelessWidget {
               height: 210,
               width: double.infinity,
               decoration: BoxDecoration(
-                color: const Color(0xFFEEEFF2),
-                borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: TgcgColors.border),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [TgcgColors.gold100, TgcgColors.navy50],
+                ),
+                borderRadius: BorderRadius.circular(TgcgRadius.md),
+                border: Border.all(color: TgcgColors.gold200),
               ),
               child: attachForm
                   ? const Center(child: _FormPlaceholder())
@@ -770,9 +793,20 @@ class _EntryPanel extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: TgcgColors.surfaceSoft,
-          borderRadius: BorderRadius.circular(17),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [TgcgColors.surface, TgcgColors.navy50],
+          ),
+          borderRadius: BorderRadius.circular(TgcgRadius.lg),
           border: Border.all(color: TgcgColors.border),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x0706162D),
+              blurRadius: 18,
+              offset: Offset(0, 6),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

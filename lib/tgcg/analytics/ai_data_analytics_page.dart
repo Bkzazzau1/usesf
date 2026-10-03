@@ -288,17 +288,17 @@ class _FocusSelector extends StatelessWidget {
       avatar: Icon(
         icon,
         size: 17,
-        color: active ? Colors.white : TgcgColors.primary,
+        color: active ? TgcgColors.primaryDark : TgcgColors.primary,
       ),
       label: Text(label),
       labelStyle: TextStyle(
-        color: active ? Colors.white : TgcgColors.ink,
+        color: active ? TgcgColors.primaryDark : TgcgColors.ink,
         fontWeight: FontWeight.w800,
       ),
-      selectedColor: TgcgColors.primary,
+      selectedColor: TgcgColors.accentSoft,
       backgroundColor: TgcgColors.surfaceSoft,
       side: BorderSide(
-        color: active ? TgcgColors.primary : TgcgColors.border,
+        color: active ? TgcgColors.gold400 : TgcgColors.border,
       ),
       showCheckmark: false,
     );
@@ -430,9 +430,18 @@ class _InsightCard extends StatelessWidget {
         constraints: const BoxConstraints(minHeight: 150),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: TgcgColors.surfaceSoft,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: TgcgColors.border),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              TgcgColors.surface,
+              item.color.withValues(alpha: .035),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(TgcgRadius.md),
+          border: Border.all(
+            color: item.color.withValues(alpha: .14),
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -442,7 +451,10 @@ class _InsightCard extends StatelessWidget {
               height: 36,
               decoration: BoxDecoration(
                 color: item.color.withValues(alpha: .10),
-                borderRadius: BorderRadius.circular(11),
+                borderRadius: BorderRadius.circular(TgcgRadius.sm),
+                border: Border.all(
+                  color: item.color.withValues(alpha: .10),
+                ),
               ),
               child: Icon(item.icon, size: 19, color: item.color),
             ),

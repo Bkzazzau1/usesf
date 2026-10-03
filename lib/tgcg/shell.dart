@@ -69,8 +69,16 @@ class _TgcgShellState extends State<TgcgShell> {
               ? null
               : AppBar(
                   elevation: 0,
-                  backgroundColor: TgcgColors.surface,
+                  backgroundColor: Colors.transparent,
                   surfaceTintColor: Colors.transparent,
+                  flexibleSpace: Container(
+                    decoration: const BoxDecoration(
+                      gradient: TgcgGradients.commandBar,
+                      border: Border(
+                        bottom: BorderSide(color: TgcgColors.gold200),
+                      ),
+                    ),
+                  ),
                   title: const _CompactBrand(),
                   actions: [
                     const _CompactSync(),
@@ -95,7 +103,7 @@ class _TgcgShellState extends State<TgcgShell> {
           drawer: desktop
               ? null
               : Drawer(
-                  backgroundColor: TgcgColors.primaryDark,
+                  backgroundColor: Colors.transparent,
                   child: _Navigation(
                     destinations: destinations,
                     selectedModule: selectedModule,
@@ -109,7 +117,7 @@ class _TgcgShellState extends State<TgcgShell> {
               ? Row(
                   children: [
                     SizedBox(
-                      width: 272,
+                      width: 284,
                       child: _Navigation(
                         destinations: destinations,
                         selectedModule: selectedModule,
@@ -215,13 +223,26 @@ class _Navigation extends StatelessWidget {
   Widget build(BuildContext context) {
     final session = TgcgSession.of(context);
     return Container(
-      color: TgcgColors.primaryDark,
+      decoration: const BoxDecoration(
+        gradient: TgcgGradients.navigation,
+        border: Border(
+          right: BorderSide(color: Color(0x332B527D)),
+        ),
+      ),
       child: SafeArea(
         child: Column(
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(18, 18, 18, 12),
-              child: _Brand(),
+            Container(
+              margin: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: .035),
+                borderRadius: BorderRadius.circular(TgcgRadius.md),
+                border: Border.all(
+                  color: TgcgColors.accent.withValues(alpha: .16),
+                ),
+              ),
+              child: const _Brand(),
             ),
             Expanded(
               child: ListView(
@@ -234,7 +255,7 @@ class _Navigation extends StatelessWidget {
                         child: Text(
                           _groupLabel(group),
                           style: const TextStyle(
-                            color: Color(0xFF8C94A6),
+                            color: TgcgColors.gold200,
                             fontSize: 9.5,
                             fontWeight: FontWeight.w900,
                             letterSpacing: 1.1,
@@ -275,30 +296,60 @@ class _NavTile extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(bottom: 3),
         child: Material(
-          color: active ? const Color(0xFF111F40) : Colors.transparent,
-          borderRadius: BorderRadius.circular(11),
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(TgcgRadius.sm),
           child: InkWell(
-            borderRadius: BorderRadius.circular(11),
+            borderRadius: BorderRadius.circular(TgcgRadius.sm),
             onTap: onTap,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(11),
-                border: active
-                    ? const Border(left: BorderSide(color: TgcgColors.accent, width: 3))
+                gradient: active
+                    ? LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [
+                          TgcgColors.accent.withValues(alpha: .18),
+                          Colors.white.withValues(alpha: .035),
+                        ],
+                      )
                     : null,
+                borderRadius: BorderRadius.circular(TgcgRadius.sm),
+                border: Border.all(
+                  color: active
+                      ? TgcgColors.accent.withValues(alpha: .24)
+                      : Colors.transparent,
+                ),
               ),
               child: Row(
                 children: [
-                  Icon(item.icon, size: 19, color: active ? TgcgColors.accent : const Color(0xFFA8AEBC)),
-                  const SizedBox(width: 11),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    width: 3,
+                    height: active ? 22 : 10,
+                    decoration: BoxDecoration(
+                      color: active ? TgcgColors.accent : Colors.transparent,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+                  const SizedBox(width: 9),
+                  Icon(
+                    item.icon,
+                    size: 19,
+                    color: active
+                        ? TgcgColors.gold400
+                        : const Color(0xFFAAB8CC),
+                  ),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       item.label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: active ? Colors.white : const Color(0xFFB7BCC8),
+                        color: active ? Colors.white : const Color(0xFFD3DCE9),
                         fontSize: 12,
                         fontWeight: active ? FontWeight.w900 : FontWeight.w700,
                       ),
@@ -320,9 +371,11 @@ class _OperatorCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(11),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: .055),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white.withValues(alpha: .08)),
+          color: Colors.white.withValues(alpha: .045),
+          borderRadius: BorderRadius.circular(TgcgRadius.md),
+          border: Border.all(
+            color: TgcgColors.accent.withValues(alpha: .14),
+          ),
         ),
         child: Column(
           children: [
@@ -332,8 +385,11 @@ class _OperatorCard extends StatelessWidget {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: TgcgColors.accent.withValues(alpha: .16),
-                    borderRadius: BorderRadius.circular(11),
+                    color: TgcgColors.accent.withValues(alpha: .14),
+                    borderRadius: BorderRadius.circular(TgcgRadius.sm),
+                    border: Border.all(
+                      color: TgcgColors.accent.withValues(alpha: .18),
+                    ),
                   ),
                   child: const Icon(Icons.person_outline_rounded, color: TgcgColors.accent, size: 19),
                 ),
@@ -407,8 +463,15 @@ class _CommandBar extends StatelessWidget {
       height: 68,
       padding: const EdgeInsets.symmetric(horizontal: 22),
       decoration: const BoxDecoration(
-        color: TgcgColors.surface,
+        gradient: TgcgGradients.commandBar,
         border: Border(bottom: BorderSide(color: TgcgColors.border)),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x0806162D),
+            blurRadius: 18,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: [
@@ -464,8 +527,16 @@ class _CommandBar extends StatelessWidget {
             child: Container(
               width: 36,
               height: 36,
-              decoration: BoxDecoration(color: TgcgColors.primarySoft, borderRadius: BorderRadius.circular(11)),
-              child: const Icon(Icons.person_outline_rounded, color: TgcgColors.primary, size: 19),
+              decoration: BoxDecoration(
+                gradient: TgcgGradients.goldWash,
+                borderRadius: BorderRadius.circular(TgcgRadius.sm),
+                border: Border.all(color: TgcgColors.gold200),
+              ),
+              child: const Icon(
+                Icons.person_outline_rounded,
+                color: TgcgColors.primaryDark,
+                size: 19,
+              ),
             ),
           ),
         ],
@@ -506,7 +577,15 @@ class _Brand extends StatelessWidget {
                   style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: .7, fontSize: 14),
                 ),
                 SizedBox(height: 2),
-                Text('Engagement & Sensitization Forum', style: TextStyle(color: Color(0xFF8C94A6), fontSize: 9.5)),
+                Text(
+                  'Engagement & Sensitization Forum',
+                  style: TextStyle(
+                    color: TgcgColors.gold200,
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: .15,
+                  ),
+                ),
               ],
             ),
           ),

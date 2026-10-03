@@ -125,7 +125,7 @@ Future<void> showPresentationTour(
             Container(
               padding: const EdgeInsets.fromLTRB(20, 18, 12, 16),
               decoration: const BoxDecoration(
-                color: TgcgColors.primaryDark,
+                gradient: TgcgGradients.navigation,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
               ),
               child: Row(
@@ -148,7 +148,7 @@ Future<void> showPresentationTour(
                         Text(
                           'Recommended flow for the USESF demonstration',
                           style: TextStyle(
-                            color: Color(0xFFB7BDCC),
+                            color: TgcgColors.gold200,
                             fontSize: 10.5,
                           ),
                         ),
@@ -218,13 +218,14 @@ Future<void> showPresentationTour(
                                 height: 42,
                                 alignment: Alignment.center,
                                 decoration: BoxDecoration(
-                                  color: TgcgColors.primarySoft,
-                                  borderRadius: BorderRadius.circular(13),
+                                  color: TgcgColors.accentSoft,
+                                  borderRadius: BorderRadius.circular(TgcgRadius.sm),
+                                  border: Border.all(color: TgcgColors.gold200),
                                 ),
                                 child: Text(
                                   '${step.number}',
                                   style: const TextStyle(
-                                    color: TgcgColors.primary,
+                                    color: TgcgColors.primaryDark,
                                     fontSize: 16,
                                     fontWeight: FontWeight.w900,
                                   ),
@@ -235,11 +236,15 @@ Future<void> showPresentationTour(
                                 width: 34,
                                 height: 34,
                                 decoration: BoxDecoration(
-                                  color: TgcgColors.surfaceSoft,
+                                  color: TgcgColors.navy50,
                                   borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: TgcgColors.border),
                                 ),
-                                child: Icon(step.icon,
-                                    size: 18, color: TgcgColors.primary),
+                                child: Icon(
+                                  step.icon,
+                                  size: 18,
+                                  color: TgcgColors.accentStrong,
+                                ),
                               ),
                               const SizedBox(width: 10),
                               Expanded(

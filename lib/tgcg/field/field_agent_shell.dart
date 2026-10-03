@@ -118,8 +118,16 @@ class _FieldAgentShellState extends State<FieldAgentShell> {
     required bool allowHome,
   }) => AppBar(
         elevation: 0,
-        backgroundColor: TgcgColors.surface,
+        backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: TgcgGradients.commandBar,
+            border: Border(
+              bottom: BorderSide(color: TgcgColors.gold200),
+            ),
+          ),
+        ),
         titleSpacing: 14,
         title: Row(
           children: [

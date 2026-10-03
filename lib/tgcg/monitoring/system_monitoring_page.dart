@@ -133,8 +133,13 @@ class _HealthRow extends StatelessWidget {
               width: 38,
               height: 38,
               decoration: BoxDecoration(
-                color: (healthy ? TgcgColors.success : TgcgColors.warning).withValues(alpha: .10),
-                borderRadius: BorderRadius.circular(11),
+                color: (healthy ? TgcgColors.success : TgcgColors.warning)
+                    .withValues(alpha: .09),
+                borderRadius: BorderRadius.circular(TgcgRadius.sm),
+                border: Border.all(
+                  color: (healthy ? TgcgColors.success : TgcgColors.warning)
+                      .withValues(alpha: .12),
+                ),
               ),
               child: Icon(healthy ? Icons.check_circle_outline_rounded : Icons.warning_amber_rounded, color: healthy ? TgcgColors.success : TgcgColors.warning, size: 19),
             ),
@@ -178,7 +183,7 @@ class _ActivityPanel extends StatelessWidget {
         children: values.map((item) => Padding(
           padding: const EdgeInsets.symmetric(vertical: 7),
           child: Row(children: [
-            Icon(item.$3, color: TgcgColors.primary, size: 19),
+            Icon(item.$3, color: TgcgColors.accentStrong, size: 19),
             const SizedBox(width: 10),
             Expanded(child: Text(item.$1, style: const TextStyle(fontWeight: FontWeight.w800))),
             Text('${item.$2}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),

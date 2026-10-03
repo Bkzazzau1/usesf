@@ -551,8 +551,12 @@ class _CaptureReadinessBanner extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: TgcgColors.primaryDark,
-          borderRadius: BorderRadius.circular(18),
+          gradient: TgcgGradients.navigation,
+          borderRadius: BorderRadius.circular(TgcgRadius.lg),
+          border: Border.all(
+            color: TgcgColors.accent.withValues(alpha: .18),
+          ),
+          boxShadow: TgcgShadows.soft,
         ),
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -582,7 +586,7 @@ class _CaptureReadinessBanner extends StatelessWidget {
                 Text(
                   'Photo, video, audio and coordinates are never fabricated. A record explicitly shows when capture data is unavailable.',
                   style: TextStyle(
-                    color: Color(0xFFB7BDCB),
+                    color: TgcgColors.gold200,
                     fontSize: 10.5,
                     height: 1.4,
                   ),
@@ -635,12 +639,12 @@ class _DarkPill extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: const Color(0xFFBEC4D1), size: 15),
+            Icon(icon, color: TgcgColors.gold200, size: 15),
             const SizedBox(width: 5),
             Text(
               label,
               style: const TextStyle(
-                color: Color(0xFFBEC4D1),
+                color: TgcgColors.gold200,
                 fontSize: 9,
                 fontWeight: FontWeight.w900,
               ),

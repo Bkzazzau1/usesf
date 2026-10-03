@@ -179,6 +179,7 @@ class _TgcgAppState extends State<TgcgApp> {
       brightness: Brightness.light,
       primary: TgcgColors.primary,
       secondary: TgcgColors.accent,
+      tertiary: TgcgColors.primaryMid,
       surface: TgcgColors.surface,
       error: TgcgColors.danger,
     );
@@ -186,8 +187,10 @@ class _TgcgAppState extends State<TgcgApp> {
     return ThemeData(
       useMaterial3: true,
       scaffoldBackgroundColor: TgcgColors.canvas,
+      canvasColor: TgcgColors.canvas,
       colorScheme: scheme,
       fontFamily: 'Roboto',
+      splashFactory: InkSparkle.splashFactory,
       textTheme: const TextTheme(
         headlineLarge: TextStyle(
           color: TgcgColors.ink,
@@ -210,13 +213,28 @@ class _TgcgAppState extends State<TgcgApp> {
         bodyLarge: TextStyle(color: TgcgColors.ink),
         bodyMedium: TextStyle(color: TgcgColors.ink),
       ),
+      appBarTheme: const AppBarTheme(
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        backgroundColor: TgcgColors.surface,
+        surfaceTintColor: Colors.transparent,
+        foregroundColor: TgcgColors.primaryDark,
+        centerTitle: false,
+        iconTheme: IconThemeData(color: TgcgColors.primaryDark),
+        titleTextStyle: TextStyle(
+          color: TgcgColors.primaryDark,
+          fontSize: 16,
+          fontWeight: FontWeight.w900,
+          letterSpacing: -.2,
+        ),
+      ),
       cardTheme: CardThemeData(
         elevation: 0,
         color: TgcgColors.surface,
         surfaceTintColor: Colors.transparent,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(TgcgRadius.lg),
           side: const BorderSide(color: TgcgColors.border),
         ),
       ),
@@ -227,21 +245,21 @@ class _TgcgAppState extends State<TgcgApp> {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: TgcgColors.surface,
+        fillColor: TgcgColors.surfaceRaised,
         contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
         labelStyle: const TextStyle(color: TgcgColors.muted, fontSize: 12),
         hintStyle: const TextStyle(color: Color(0xFF979BA4), fontSize: 12),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(13),
+          borderRadius: BorderRadius.circular(TgcgRadius.sm),
           borderSide: const BorderSide(color: TgcgColors.border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(13),
+          borderRadius: BorderRadius.circular(TgcgRadius.sm),
           borderSide: const BorderSide(color: TgcgColors.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(13),
-          borderSide: const BorderSide(color: TgcgColors.primary, width: 1.4),
+          borderRadius: BorderRadius.circular(TgcgRadius.sm),
+          borderSide: const BorderSide(color: TgcgColors.primaryMid, width: 1.6),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -249,16 +267,17 @@ class _TgcgAppState extends State<TgcgApp> {
           backgroundColor: TgcgColors.primary,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          textStyle: const TextStyle(fontWeight: FontWeight.w800),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TgcgRadius.sm)),
+          textStyle: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: .1),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: TgcgColors.primary,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-          side: const BorderSide(color: TgcgColors.border),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          backgroundColor: TgcgColors.surface,
+          side: const BorderSide(color: TgcgColors.borderStrong),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TgcgRadius.sm)),
           textStyle: const TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
@@ -268,10 +287,139 @@ class _TgcgAppState extends State<TgcgApp> {
           textStyle: const TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
-      snackBarTheme: const SnackBarThemeData(
+      checkboxTheme: CheckboxThemeData(
+        fillColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? TgcgColors.accent
+              : Colors.transparent,
+        ),
+        checkColor: const WidgetStatePropertyAll(TgcgColors.primaryDark),
+        side: const BorderSide(color: TgcgColors.borderStrong, width: 1.4),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+      ),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(
+        color: TgcgColors.accent,
+        linearTrackColor: TgcgColors.primarySoft,
+      ),
+      drawerTheme: const DrawerThemeData(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        height: 70,
+        elevation: 0,
+        backgroundColor: TgcgColors.surface,
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: TgcgColors.accentSoft,
+        indicatorShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(TgcgRadius.md),
+          side: const BorderSide(color: TgcgColors.gold200),
+        ),
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            color: states.contains(WidgetState.selected)
+                ? TgcgColors.primaryDark
+                : TgcgColors.muted,
+          ),
+        ),
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (states) => TextStyle(
+            color: states.contains(WidgetState.selected)
+                ? TgcgColors.primaryDark
+                : TgcgColors.muted,
+            fontSize: 10.5,
+            fontWeight: states.contains(WidgetState.selected)
+                ? FontWeight.w900
+                : FontWeight.w700,
+          ),
+        ),
+      ),
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        backgroundColor: TgcgColors.accent,
+        foregroundColor: TgcgColors.primaryDark,
+        elevation: 2,
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: TgcgColors.navy50,
+        selectedColor: TgcgColors.accentSoft,
+        disabledColor: TgcgColors.surfaceSoft,
+        side: const BorderSide(color: TgcgColors.border),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(999),
+        ),
+        labelStyle: const TextStyle(
+          color: TgcgColors.primaryDark,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w800,
+        ),
+        secondaryLabelStyle: const TextStyle(
+          color: TgcgColors.primaryDark,
+          fontWeight: FontWeight.w900,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      ),
+      tabBarTheme: const TabBarThemeData(
+        labelColor: TgcgColors.primaryDark,
+        unselectedLabelColor: TgcgColors.muted,
+        indicatorColor: TgcgColors.accent,
+        dividerColor: TgcgColors.border,
+        labelStyle: TextStyle(fontWeight: FontWeight.w900),
+        unselectedLabelStyle: TextStyle(fontWeight: FontWeight.w700),
+      ),
+      dataTableTheme: DataTableThemeData(
+        headingRowColor: const WidgetStatePropertyAll(TgcgColors.navy50),
+        dataRowColor: const WidgetStatePropertyAll(TgcgColors.surface),
+        dividerThickness: 1,
+        headingTextStyle: const TextStyle(
+          color: TgcgColors.primaryDark,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w900,
+          letterSpacing: .2,
+        ),
+        dataTextStyle: const TextStyle(
+          color: TgcgColors.ink,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w600,
+        ),
+        decoration: BoxDecoration(
+          border: Border.all(color: TgcgColors.border),
+          borderRadius: BorderRadius.circular(TgcgRadius.md),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: TgcgColors.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(TgcgRadius.xl),
+          side: const BorderSide(color: TgcgColors.border),
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: TgcgColors.surface,
+        surfaceTintColor: Colors.transparent,
+        modalBackgroundColor: Colors.transparent,
+        showDragHandle: true,
+        dragHandleColor: TgcgColors.gold400,
+      ),
+      tooltipTheme: TooltipThemeData(
+        decoration: BoxDecoration(
+          color: TgcgColors.primaryDark,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: TgcgColors.accent.withValues(alpha: .18)),
+        ),
+        textStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: TgcgColors.primaryDark,
-        contentTextStyle: TextStyle(color: Colors.white),
+        contentTextStyle: const TextStyle(color: Colors.white),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(TgcgRadius.sm),
+        ),
       ),
     );
   }

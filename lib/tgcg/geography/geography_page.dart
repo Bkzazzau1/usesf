@@ -255,8 +255,12 @@ class _CoverageHero extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: TgcgColors.primaryDark,
-          borderRadius: BorderRadius.circular(20),
+          gradient: TgcgGradients.navigation,
+          borderRadius: BorderRadius.circular(TgcgRadius.lg),
+          border: Border.all(
+            color: TgcgColors.accent.withValues(alpha: .20),
+          ),
+          boxShadow: TgcgShadows.soft,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -267,8 +271,11 @@ class _CoverageHero extends StatelessWidget {
                   width: 42,
                   height: 42,
                   decoration: BoxDecoration(
-                    color: TgcgColors.accent.withValues(alpha: .14),
-                    borderRadius: BorderRadius.circular(13),
+                    color: TgcgColors.accent.withValues(alpha: .12),
+                    borderRadius: BorderRadius.circular(TgcgRadius.sm),
+                    border: Border.all(
+                      color: TgcgColors.accent.withValues(alpha: .18),
+                    ),
                   ),
                   child: const Icon(
                     Icons.public_rounded,
@@ -292,7 +299,7 @@ class _CoverageHero extends StatelessWidget {
                       Text(
                         _coverageSubtitle(scope.level, children.length),
                         style: const TextStyle(
-                          color: Color(0xFFAEB4C3),
+                          color: TgcgColors.gold200,
                           fontSize: 10.5,
                         ),
                       ),
@@ -333,10 +340,10 @@ class _CoverageHero extends StatelessWidget {
                       return SizedBox(
                         width: width,
                         child: Material(
-                          color: Colors.white.withValues(alpha: .055),
-                          borderRadius: BorderRadius.circular(15),
+                          color: Colors.white.withValues(alpha: .045),
+                          borderRadius: BorderRadius.circular(TgcgRadius.md),
                           child: InkWell(
-                            borderRadius: BorderRadius.circular(15),
+                            borderRadius: BorderRadius.circular(TgcgRadius.md),
                             onTap: () => onOpen(child),
                             child: Padding(
                               padding: const EdgeInsets.all(14),
@@ -365,7 +372,7 @@ class _CoverageHero extends StatelessWidget {
                                       ),
                                       const Icon(
                                         Icons.chevron_right_rounded,
-                                        color: Color(0xFF9AA2B4),
+                                        color: TgcgColors.gold200,
                                         size: 18,
                                       ),
                                     ],
@@ -583,8 +590,12 @@ class _AreaRow extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: TgcgColors.surfaceSoft,
-              borderRadius: BorderRadius.circular(13),
+              gradient: const LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [TgcgColors.surface, TgcgColors.navy50],
+              ),
+              borderRadius: BorderRadius.circular(TgcgRadius.sm),
               border: Border.all(color: TgcgColors.border),
             ),
             child: Row(
@@ -593,12 +604,13 @@ class _AreaRow extends StatelessWidget {
                   width: 38,
                   height: 38,
                   decoration: BoxDecoration(
-                    color: TgcgColors.primarySoft,
-                    borderRadius: BorderRadius.circular(11),
+                    color: TgcgColors.accent.withValues(alpha: .10),
+                    borderRadius: BorderRadius.circular(TgcgRadius.sm),
+                    border: Border.all(color: TgcgColors.gold200),
                   ),
                   child: Icon(
                     _scopeIcon(scope.level),
-                    color: TgcgColors.primary,
+                    color: TgcgColors.accentStrong,
                     size: 19,
                   ),
                 ),

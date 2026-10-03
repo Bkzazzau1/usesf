@@ -51,6 +51,7 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+        backgroundColor: TgcgColors.canvas,
         body: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
@@ -92,12 +93,12 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
         margin: EdgeInsets.all(compact ? 0 : 18),
         padding: EdgeInsets.all(compact ? 24 : 42),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(30),
-          gradient: const LinearGradient(
-            colors: [Color(0xFF0B1F4B), Color(0xFF17377A)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+          borderRadius: BorderRadius.circular(TgcgRadius.hero),
+          gradient: TgcgGradients.brand,
+          border: Border.all(
+            color: TgcgColors.accent.withValues(alpha: .22),
           ),
+          boxShadow: TgcgShadows.elevated,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -122,7 +123,19 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, box) => Center(
-                    child: TgcgLogo(size: box.biggest.shortestSide),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: TgcgColors.accent.withValues(alpha: .16),
+                            blurRadius: 60,
+                            spreadRadius: 8,
+                          ),
+                        ],
+                      ),
+                      child: TgcgLogo(size: box.biggest.shortestSide),
+                    ),
                   ),
                 ),
               ),
@@ -172,13 +185,21 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
         margin: compact ? EdgeInsets.zero : const EdgeInsets.fromLTRB(18, 18, 18, 84),
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(30),
+          borderRadius: BorderRadius.circular(TgcgRadius.hero),
           gradient: const RadialGradient(
-            center: Alignment(0, -.35),
-            radius: .95,
-            colors: [TgcgColors.accentSoft, TgcgColors.canvas],
+            center: Alignment(0, -.42),
+            radius: 1.05,
+            colors: [
+              Color(0xFFFFF8E7),
+              TgcgColors.surface,
+              TgcgColors.navy100,
+            ],
+            stops: [0, .52, 1],
           ),
-          border: Border.all(color: TgcgColors.border),
+          border: Border.all(
+            color: TgcgColors.gold200,
+          ),
+          boxShadow: TgcgShadows.soft,
         ),
         child: Stack(
           fit: StackFit.expand,
@@ -189,7 +210,7 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
                 'assets/brand/governor.png',
                 fit: BoxFit.contain,
                 alignment: Alignment.bottomCenter,
-                filterQuality: FilterQuality.medium,
+                filterQuality: FilterQuality.high,
                 semanticLabel: 'Senator Uba Sani, Executive Governor of Kaduna State',
               ),
             ),
@@ -244,6 +265,7 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
                         backgroundColor: TgcgColors.accent,
                         foregroundColor: TgcgColors.primaryDark,
                         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+                        side: const BorderSide(color: TgcgColors.gold400),
                       ),
                       icon: const Icon(Icons.login_rounded, size: 18),
                       label: const Text('Sign in'),
@@ -455,14 +477,23 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
                   constraints: const BoxConstraints(minHeight: 94),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: active ? const Color(0xFFE6EAF2) : Colors.white,
-                    borderRadius: BorderRadius.circular(14),
+                    color: active ? TgcgColors.accentSoft : Colors.white,
+                    borderRadius: BorderRadius.circular(TgcgRadius.md),
                     border: Border.all(
                       color: active
-                          ? TgcgApp.primary
-                          : const Color(0xFFDCDFE6),
-                      width: active ? 1.5 : 1,
+                          ? TgcgColors.accent
+                          : TgcgColors.border,
+                      width: active ? 1.6 : 1,
                     ),
+                    boxShadow: active
+                        ? const [
+                            BoxShadow(
+                              color: Color(0x12A97812),
+                              blurRadius: 16,
+                              offset: Offset(0, 5),
+                            ),
+                          ]
+                        : null,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -471,14 +502,14 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
                         children: [
                           Icon(
                             roleIcon(role),
-                            color: active ? TgcgApp.primary : TgcgApp.muted,
+                            color: active ? TgcgColors.primaryDark : TgcgApp.muted,
                             size: 21,
                           ),
                           const Spacer(),
                           if (active)
                             const Icon(
                               Icons.check_circle_rounded,
-                              color: TgcgApp.primary,
+                              color: TgcgColors.accentStrong,
                               size: 18,
                             ),
                         ],
@@ -489,7 +520,7 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: active ? TgcgApp.primary : TgcgApp.ink,
+                          color: active ? TgcgColors.primaryDark : TgcgApp.ink,
                           fontSize: 11.5,
                           height: 1.15,
                           fontWeight: FontWeight.w900,
@@ -518,7 +549,7 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: TgcgApp.primary, width: 1.5),
+          borderSide: const BorderSide(color: TgcgColors.accentStrong, width: 1.6),
         ),
       );
 }
@@ -533,9 +564,11 @@ class _Stat extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: .1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white12),
+          color: TgcgColors.accent.withValues(alpha: .08),
+          borderRadius: BorderRadius.circular(TgcgRadius.sm),
+          border: Border.all(
+            color: TgcgColors.accent.withValues(alpha: .16),
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -550,7 +583,11 @@ class _Stat extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               label,
-              style: const TextStyle(color: Colors.white60, fontSize: 11),
+              style: const TextStyle(
+                color: TgcgColors.gold200,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),

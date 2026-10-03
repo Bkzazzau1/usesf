@@ -177,19 +177,12 @@ class _Hero extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [TgcgColors.primaryDark, TgcgColors.primary],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          gradient: TgcgGradients.navigation,
           borderRadius: BorderRadius.circular(26),
-          boxShadow: [
-            BoxShadow(
-              color: TgcgColors.primary.withValues(alpha: .14),
-              blurRadius: 24,
-              offset: const Offset(0, 12),
-            ),
-          ],
+          border: Border.all(
+            color: TgcgColors.accent.withValues(alpha: .22),
+          ),
+          boxShadow: TgcgShadows.elevated,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -200,9 +193,11 @@ class _Hero extends StatelessWidget {
                   width: 54,
                   height: 54,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: .12),
+                    color: TgcgColors.accent.withValues(alpha: .10),
                     borderRadius: BorderRadius.circular(17),
-                    border: Border.all(color: Colors.white.withValues(alpha: .14)),
+                    border: Border.all(
+                      color: TgcgColors.accent.withValues(alpha: .20),
+                    ),
                   ),
                   child: const Center(child: TgcgLogo(size: 42)),
                 ),
@@ -225,7 +220,7 @@ class _Hero extends StatelessWidget {
                       Text(
                         '${agent.agentId} • Polling Unit Agent',
                         style: const TextStyle(
-                          color: Color(0xFFC7CCD8),
+                          color: TgcgColors.gold200,
                           fontSize: 10.5,
                           fontWeight: FontWeight.w700,
                         ),
@@ -240,7 +235,9 @@ class _Hero extends StatelessWidget {
                         ? TgcgColors.success.withValues(alpha: .18)
                         : Colors.white.withValues(alpha: .11),
                     borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: Colors.white.withValues(alpha: .14)),
+                    border: Border.all(
+                      color: TgcgColors.accent.withValues(alpha: .18),
+                    ),
                   ),
                   child: Text(
                     checkedIn
@@ -272,7 +269,7 @@ class _Hero extends StatelessWidget {
             Text(
               '${agent.scope.pollingUnitName ?? 'Polling Unit'} • ${agent.scope.wardName ?? ''} • ${agent.scope.lgaName ?? ''}',
               style: const TextStyle(
-                color: Color(0xFFC5CAD7),
+                color: TgcgColors.gold200,
                 fontSize: 11.5,
                 fontWeight: FontWeight.w700,
               ),
@@ -319,9 +316,11 @@ class _HeroStat extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(11),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: .08),
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: Colors.white.withValues(alpha: .10)),
+          color: Colors.white.withValues(alpha: .065),
+          borderRadius: BorderRadius.circular(TgcgRadius.md),
+          border: Border.all(
+            color: TgcgColors.accent.withValues(alpha: .14),
+          ),
         ),
         child: Row(
           children: [
@@ -333,7 +332,7 @@ class _HeroStat extends StatelessWidget {
                 children: [
                   Text(label,
                       style: const TextStyle(
-                        color: Color(0xFFBCC2D1),
+                        color: TgcgColors.gold200,
                         fontSize: 8.5,
                         fontWeight: FontWeight.w700,
                       )),
@@ -363,9 +362,20 @@ class _AssignmentStrip extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: TgcgColors.surface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: TgcgColors.border),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [TgcgColors.surface, TgcgColors.gold100],
+          ),
+          borderRadius: BorderRadius.circular(TgcgRadius.lg),
+          border: Border.all(color: TgcgColors.gold200),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x0806162D),
+              blurRadius: 18,
+              offset: Offset(0, 6),
+            ),
+          ],
         ),
         child: Row(
           children: [
@@ -373,11 +383,15 @@ class _AssignmentStrip extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: TgcgColors.primarySoft,
-                borderRadius: BorderRadius.circular(12),
+                color: TgcgColors.accent.withValues(alpha: .12),
+                borderRadius: BorderRadius.circular(TgcgRadius.sm),
+                border: Border.all(color: TgcgColors.gold200),
               ),
-              child: const Icon(Icons.location_on_outlined,
-                  color: TgcgColors.primary, size: 20),
+              child: const Icon(
+                Icons.location_on_outlined,
+                color: TgcgColors.accentStrong,
+                size: 20,
+              ),
             ),
             const SizedBox(width: 11),
             Expanded(
@@ -549,16 +563,33 @@ class _ActionTile extends StatelessWidget {
         width: width,
         height: 122,
         child: Material(
-          color: TgcgColors.surface,
-          borderRadius: BorderRadius.circular(18),
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(TgcgRadius.lg),
           child: InkWell(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(TgcgRadius.lg),
             onTap: onTap,
             child: Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: TgcgColors.border),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    TgcgColors.surface,
+                    tone.withValues(alpha: .035),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(TgcgRadius.lg),
+                border: Border.all(
+                  color: tone.withValues(alpha: .15),
+                ),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x0806162D),
+                    blurRadius: 16,
+                    offset: Offset(0, 5),
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -568,7 +599,10 @@ class _ActionTile extends StatelessWidget {
                     height: 38,
                     decoration: BoxDecoration(
                       color: tone.withValues(alpha: .10),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(TgcgRadius.sm),
+                      border: Border.all(
+                        color: tone.withValues(alpha: .10),
+                      ),
                     ),
                     child: Icon(icon, color: tone, size: 20),
                   ),
@@ -730,10 +764,10 @@ class _CoordinationButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-        color: TgcgColors.surfaceSoft,
-        borderRadius: BorderRadius.circular(15),
+        color: TgcgColors.navy50,
+        borderRadius: BorderRadius.circular(TgcgRadius.md),
         child: InkWell(
-          borderRadius: BorderRadius.circular(15),
+          borderRadius: BorderRadius.circular(TgcgRadius.md),
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.all(13),
