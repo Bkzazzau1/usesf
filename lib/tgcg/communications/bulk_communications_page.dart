@@ -530,8 +530,12 @@ class _ContactRow extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 9),
       padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
-        color: TgcgColors.surfaceSoft,
-        borderRadius: BorderRadius.circular(15),
+        gradient: const LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [TgcgColors.surface, TgcgColors.navy50],
+        ),
+        borderRadius: BorderRadius.circular(TgcgRadius.md),
         border: Border.all(color: TgcgColors.border),
       ),
       child: Row(
@@ -542,7 +546,7 @@ class _ContactRow extends StatelessWidget {
             decoration: BoxDecoration(
               color: contact.preference.suppressed
                   ? TgcgColors.danger.withValues(alpha: .08)
-                  : TgcgColors.primarySoft,
+                  : TgcgColors.accentSoft,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
@@ -551,7 +555,7 @@ class _ContactRow extends StatelessWidget {
                   : Icons.person_outline_rounded,
               color: contact.preference.suppressed
                   ? TgcgColors.danger
-                  : TgcgColors.primary,
+                  : TgcgColors.accentStrong,
             ),
           ),
           const SizedBox(width: 11),
