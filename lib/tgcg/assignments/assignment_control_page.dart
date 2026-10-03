@@ -66,17 +66,33 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
           subtitle:
               '${session.scope.label}: assign members to polling units, bind managed phones and monitor assignment presence without changing home polling-unit records.',
           trailing: canManageAssignments
-              ? FilledButton.icon(
-                  onPressed: () => _createAssignment(
-                    context,
-                    membership,
-                    assignments,
-                    session,
-                    authorizedMembers,
-                    authorizedUnits,
-                  ),
-                  icon: const Icon(Icons.add_task_rounded),
-                  label: const Text('New assignment'),
+              ? Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () => _setStaffingRequirement(
+                        context,
+                        assignments,
+                        session,
+                        authorizedUnits,
+                      ),
+                      icon: const Icon(Icons.groups_2_outlined),
+                      label: const Text('Staffing needs'),
+                    ),
+                    FilledButton.icon(
+                      onPressed: () => _createAssignment(
+                        context,
+                        membership,
+                        assignments,
+                        session,
+                        authorizedMembers,
+                        authorizedUnits,
+                      ),
+                      icon: const Icon(Icons.add_task_rounded),
+                      label: const Text('New assignment'),
+                    ),
+                  ],
                 )
               : null,
         ),
@@ -176,6 +192,200 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
         ),
       ],
     );
+  }
+
+  Future<void> _setStaffingRequirement(
+    BuildContext context,
+    AssignmentController assignments,
+    TgcgSessionController session,
+    List<CanonicalPollingUnit> authorizedUnits,
+  ) async {
+    if (authorizedUnits.isEmpty) return;
+
+    final lgaIds = authorizedUnits
+        .map((unit) => unit.scope.lgaId)
+        .whereType<String>()
+        .toSet();
+    var lgaId = authorizedUnits.first.scope.lgaId!;
+    var units = authorizedUnits
+        .where((unit) => unit.scope.lgaId == lgaId)
+        .toList(growable: false);
+    var pollingUnitId = units.first.code;
+    var minimum = assignments.minimumStaffingFor(pollingUnitId);
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Polling-unit staffing need'),
+          content: SizedBox(
+            width: 620,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: lgaId,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'LGA',
+                    prefixIcon: Icon(Icons.location_city_outlined),
+                  ),
+                  items: authorizedUnits
+                      .map((unit) => unit.scope)
+                      .where((scope) => scope.lgaId != null)
+                      .fold<Map<String, String>>(
+                        <String, String>{},
+                        (map, scope) {
+                          if (lgaIds.contains(scope.lgaId)) {
+                            map[scope.lgaId!] = scope.lgaName ?? scope.lgaId!;
+                          }
+                          return map;
+                        },
+                      )
+                      .entries
+                      .map(
+                        (entry) => DropdownMenuItem(
+                          value: entry.key,
+                          child: Text(entry.value),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setDialogState(() {
+                      lgaId = value;
+                      units = authorizedUnits
+                          .where((unit) => unit.scope.lgaId == lgaId)
+                          .toList(growable: false);
+                      pollingUnitId = units.first.code;
+                      minimum =
+                          assignments.minimumStaffingFor(pollingUnitId);
+                    });
+                  },
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  key: ValueKey('staffing-pu-$lgaId-$pollingUnitId'),
+                  initialValue: pollingUnitId,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Polling unit',
+                    prefixIcon: Icon(Icons.how_to_vote_outlined),
+                  ),
+                  items: units
+                      .map(
+                        (unit) => DropdownMenuItem(
+                          value: unit.code,
+                          child: Text(
+                            '${unit.displayCode} • ${unit.scope.pollingUnitName ?? unit.scope.label}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setDialogState(() {
+                      pollingUnitId = value;
+                      minimum =
+                          assignments.minimumStaffingFor(pollingUnitId);
+                    });
+                  },
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Required personnel',
+                        style: TextStyle(
+                          color: TgcgColors.ink,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: minimum > 0
+                          ? () => setDialogState(() => minimum--)
+                          : null,
+                      icon: const Icon(Icons.remove_circle_outline),
+                    ),
+                    Container(
+                      width: 62,
+                      alignment: Alignment.center,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 9,
+                      ),
+                      decoration: BoxDecoration(
+                        color: TgcgColors.navy50,
+                        borderRadius:
+                            BorderRadius.circular(TgcgRadius.sm),
+                        border: Border.all(color: TgcgColors.border),
+                      ),
+                      child: Text(
+                        '$minimum',
+                        style: const TextStyle(
+                          color: TgcgColors.primary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: minimum < 100
+                          ? () => setDialogState(() => minimum++)
+                          : null,
+                      icon: const Icon(Icons.add_circle_outline),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Coverage gaps compare active assignments and fresh GPS presence against this requirement.',
+                  style: TextStyle(
+                    color: TgcgColors.muted,
+                    fontSize: 10.5,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton.icon(
+              onPressed: () async {
+                await assignments.setMinimumStaffing(
+                  pollingUnitId: pollingUnitId,
+                  minimumStaffing: minimum,
+                  actorId: session.accessId.isEmpty
+                      ? session.operatorName
+                      : session.accessId,
+                  authorizedScope: session.scope,
+                );
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext, true);
+                }
+              },
+              icon: const Icon(Icons.save_outlined),
+              label: const Text('Save requirement'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (saved == true && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Polling-unit staffing requirement updated.'),
+        ),
+      );
+    }
   }
 
   Future<void> _createAssignment(
@@ -683,7 +893,7 @@ class _CoverageGapPanel extends StatelessWidget {
                         const SizedBox(width: 8),
                         TgcgStatusPill(
                           label:
-                              '${snapshot.activeAssignments} ASSIGNED',
+                              '${snapshot.activeAssignments} / ${snapshot.minimumStaffing} REQUIRED',
                           color: snapshot.isBelowMinimum
                               ? TgcgColors.warning
                               : TgcgColors.info,
