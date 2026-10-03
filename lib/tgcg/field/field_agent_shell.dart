@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../assignments/assignment_tracking_store.dart';
 import '../discussion/discussion_room_page.dart';
 import '../evidence/evidence_capture_page.dart';
 import '../membership/membership_store.dart';
@@ -196,7 +197,10 @@ class _FieldAgentShellState extends State<FieldAgentShell> {
             ),
           IconButton(
             tooltip: 'Sign out',
-            onPressed: session.signOut,
+            onPressed: () async {
+              await AssignmentTracking.of(context, listen: false).stop();
+              session.signOut();
+            },
             icon: const Icon(Icons.logout_rounded),
           ),
           const SizedBox(width: 4),
