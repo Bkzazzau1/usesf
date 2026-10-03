@@ -319,18 +319,30 @@ class _PriorityItem extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 9),
       child: Material(
-        color: selected ? color.withValues(alpha: .06) : TgcgColors.surfaceSoft,
-        borderRadius: BorderRadius.circular(14),
+        color: selected ? color.withValues(alpha: .07) : TgcgColors.surfaceSoft,
+        borderRadius: BorderRadius.circular(TgcgRadius.md),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(TgcgRadius.md),
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(TgcgRadius.md),
               border: Border.all(
-                color: selected ? color.withValues(alpha: .45) : TgcgColors.border,
+                color: selected
+                    ? color.withValues(alpha: .55)
+                    : TgcgColors.border,
+                width: selected ? 1.4 : 1,
               ),
+              boxShadow: selected
+                  ? const [
+                      BoxShadow(
+                        color: Color(0x0D06162D),
+                        blurRadius: 14,
+                        offset: Offset(0, 5),
+                      ),
+                    ]
+                  : null,
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -339,8 +351,11 @@ class _PriorityItem extends StatelessWidget {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: color.withValues(alpha: .1),
-                    borderRadius: BorderRadius.circular(11),
+                    color: color.withValues(alpha: .10),
+                    borderRadius: BorderRadius.circular(TgcgRadius.sm),
+                    border: Border.all(
+                      color: color.withValues(alpha: .12),
+                    ),
                   ),
                   child: Icon(Icons.crisis_alert_outlined, color: color, size: 19),
                 ),
@@ -430,8 +445,18 @@ class _CommandMap extends StatelessWidget {
               height: 430,
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
-                color: TgcgColors.primaryDark,
-                borderRadius: BorderRadius.circular(18),
+                gradient: TgcgGradients.navigation,
+                borderRadius: BorderRadius.circular(TgcgRadius.lg),
+                border: Border.all(
+                  color: TgcgColors.accent.withValues(alpha: .18),
+                ),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x1606162D),
+                    blurRadius: 22,
+                    offset: Offset(0, 8),
+                  ),
+                ],
               ),
               child: LayoutBuilder(
                 builder: (context, constraints) {
