@@ -471,11 +471,11 @@ class _DispatchRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-        color: selected ? TgcgColors.primarySoft : Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
+        color: selected ? TgcgColors.accentSoft : Colors.transparent,
+        borderRadius: BorderRadius.circular(TgcgRadius.sm),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(TgcgRadius.sm),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
             child: Row(
