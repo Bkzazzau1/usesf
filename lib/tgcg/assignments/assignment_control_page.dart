@@ -64,9 +64,9 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
       children: [
         TgcgPageHeader(
           eyebrow: 'FIELD DEPLOYMENT',
-          title: 'Assignment Control Centre',
+          title: 'Jobs & Assignment Control',
           subtitle:
-              '${session.scope.label}: assign members to polling units, bind managed phones and monitor assignment presence without changing home polling-unit records.',
+              '${session.scope.label}: any registered member can receive an authorized job or temporary field assignment. The assignment is tracked separately and never changes the member\'s permanent home polling unit.',
           trailing: canManageAssignments
               ? Wrap(
                   spacing: 8,
@@ -115,7 +115,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
               children: [
                 TgcgMetricCard(
                   width: width,
-                  label: 'Assignments',
+                  label: 'Jobs / assignments',
                   value: '${visible.length}',
                   detail: 'Within current scope',
                   icon: Icons.assignment_outlined,
@@ -123,9 +123,9 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                 ),
                 TgcgMetricCard(
                   width: width,
-                  label: 'Active',
+                  label: 'Active jobs',
                   value: '${visible.where((item) => !item.isTerminal).length}',
-                  detail: 'Open deployment tasks',
+                  detail: 'Open duties and deployments',
                   icon: Icons.play_circle_outline_rounded,
                   tone: TgcgMetricTone.success,
                 ),
@@ -423,14 +423,14 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
         .toList(growable: false);
     String? pollingUnitId = units.isEmpty ? null : units.first.code;
     var priority = AssignmentPriority.normal;
-    final title = TextEditingController(text: 'Polling Unit Field Assignment');
+    final title = TextEditingController(text: 'Field Duty Assignment');
     final instructions = TextEditingController();
 
     final created = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Create member assignment'),
+          title: const Text('Assign a job to a member'),
           content: SizedBox(
             width: 680,
             child: SingleChildScrollView(
@@ -495,7 +495,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                     initialValue: pollingUnitId,
                     isExpanded: true,
                     decoration: const InputDecoration(
-                      labelText: 'Target polling unit',
+                      labelText: 'Operational polling unit',
                       prefixIcon: Icon(Icons.how_to_vote_outlined),
                     ),
                     items: units
@@ -532,7 +532,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                   TextField(
                     controller: title,
                     decoration:
-                        const InputDecoration(labelText: 'Assignment title'),
+                        const InputDecoration(labelText: 'Job / assignment title'),
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -580,7 +580,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                       }
                     },
               icon: const Icon(Icons.assignment_turned_in_outlined),
-              label: const Text('Assign member'),
+              label: const Text('Create assignment'),
             ),
           ],
         ),
@@ -591,7 +591,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     instructions.dispose();
     if (created == true && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Assignment created and queued for sync.')),
+        const SnackBar(content: Text('Member assignment created and queued for sync.')),
       );
     }
   }
