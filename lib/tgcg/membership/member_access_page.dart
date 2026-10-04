@@ -3,9 +3,8 @@ import 'package:flutter/material.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
 import 'membership_store.dart';
-import 'pvc_recognition_service.dart';
 
-enum _MemberAccessMethod { phone, email, pvc }
+enum _MemberAccessMethod { phone, email, vin }
 
 class MemberAccessPage extends StatefulWidget {
   const MemberAccessPage({super.key});
@@ -16,19 +15,17 @@ class MemberAccessPage extends StatefulWidget {
 
 class _MemberAccessPageState extends State<MemberAccessPage> {
   final _identifier = TextEditingController();
-  final _pin = TextEditingController();
-  final _recognizer = PvcRecognitionService();
+  final _password = TextEditingController();
 
-  _MemberAccessMethod _method = _MemberAccessMethod.phone;
+  _MemberAccessMethod _method = _MemberAccessMethod.vin;
   TgcgMember? _member;
-  PvcRecognitionResult? _pvcScan;
   bool _busy = false;
   String? _message;
 
   @override
   void dispose() {
     _identifier.dispose();
-    _pin.dispose();
+    _password.dispose();
     super.dispose();
   }
 
@@ -40,9 +37,7 @@ class _MemberAccessPageState extends State<MemberAccessPage> {
 
     return Scaffold(
       backgroundColor: TgcgColors.canvas,
-      appBar: AppBar(
-        title: const Text('Member Access'),
-      ),
+      appBar: AppBar(title: const Text('Member Access')),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -56,20 +51,25 @@ class _MemberAccessPageState extends State<MemberAccessPage> {
                     eyebrow: 'MEMBER AUTHENTICATION',
                     title: 'Sign in to USESF',
                     subtitle:
-                        'Find your USESF account with your PVC, phone number or email, then confirm your 6-digit member PIN.',
+                        'Use your PVC/VIN, phone number or email with your password. You do not need to scan the PVC again.',
                     trailing: TgcgStatusPill(
-                      label: 'SECURE MEMBER ACCESS',
+                      label: 'MEMBER FIRST',
                       color: TgcgColors.success,
                       icon: Icons.verified_user_outlined,
                     ),
                   ),
                   const SizedBox(height: 18),
                   TgcgSectionCard(
-                    title: 'Choose sign-in method',
+                    title: 'Sign-in identifier',
                     subtitle:
-                        'PVC is used only to find the enrolled USESF account. A PIN is still required.',
+                        'PVC/VIN remains available even if you have not added a phone number or email.',
                     child: SegmentedButton<_MemberAccessMethod>(
                       segments: const [
+                        ButtonSegment(
+                          value: _MemberAccessMethod.vin,
+                          icon: Icon(Icons.badge_outlined),
+                          label: Text('PVC / VIN'),
+                        ),
                         ButtonSegment(
                           value: _MemberAccessMethod.phone,
                           icon: Icon(Icons.phone_android_outlined),
@@ -80,11 +80,6 @@ class _MemberAccessPageState extends State<MemberAccessPage> {
                           icon: Icon(Icons.alternate_email_rounded),
                           label: Text('Email'),
                         ),
-                        ButtonSegment(
-                          value: _MemberAccessMethod.pvc,
-                          icon: Icon(Icons.credit_card_outlined),
-                          label: Text('PVC'),
-                        ),
                       ],
                       selected: {_method},
                       onSelectionChanged: _busy
@@ -92,9 +87,8 @@ class _MemberAccessPageState extends State<MemberAccessPage> {
                           : (selection) => setState(() {
                                 _method = selection.first;
                                 _member = null;
-                                _pvcScan = null;
                                 _identifier.clear();
-                                _pin.clear();
+                                _password.clear();
                                 _message = null;
                               }),
                     ),
@@ -102,85 +96,45 @@ class _MemberAccessPageState extends State<MemberAccessPage> {
                   const SizedBox(height: 14),
                   if (_member == null)
                     TgcgSectionCard(
-                      title: _method == _MemberAccessMethod.pvc
-                          ? 'Scan enrolled PVC'
-                          : 'Find your member account',
+                      title: 'Find your member account',
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          if (_method != _MemberAccessMethod.pvc)
-                            TextField(
-                              controller: _identifier,
-                              enabled: !_busy,
-                              keyboardType:
-                                  _method == _MemberAccessMethod.phone
-                                      ? TextInputType.phone
-                                      : TextInputType.emailAddress,
-                              onSubmitted: (_) => _identify(membership),
-                              decoration: InputDecoration(
-                                labelText: _method == _MemberAccessMethod.phone
-                                    ? 'Phone number'
-                                    : 'Email address',
-                                prefixIcon: Icon(
-                                  _method == _MemberAccessMethod.phone
-                                      ? Icons.phone_outlined
-                                      : Icons.email_outlined,
-                                ),
-                              ),
-                            )
-                          else
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                gradient: TgcgGradients.navigation,
-                                borderRadius:
-                                    BorderRadius.circular(TgcgRadius.lg),
-                                border:
-                                    Border.all(color: TgcgColors.gold200),
-                              ),
-                              child: Column(
-                                children: [
-                                  Icon(
-                                    _pvcScan == null
-                                        ? Icons.credit_card_rounded
-                                        : Icons.verified_outlined,
-                                    color: _pvcScan == null
-                                        ? TgcgColors.gold400
-                                        : TgcgColors.success,
-                                    size: 48,
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Text(
-                                    _pvcScan == null
-                                        ? 'Scan the PVC used during enrolment'
-                                        : 'PVC captured',
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                  if (_pvcScan?.pollingUnitCode != null) ...[
-                                    const SizedBox(height: 5),
-                                    Text(
-                                      'PU • ${_pvcScan!.pollingUnitCode}',
-                                      style: const TextStyle(
-                                        color: TgcgColors.gold200,
-                                        fontSize: 10.5,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                  ],
-                                ],
+                          TextField(
+                            controller: _identifier,
+                            enabled: !_busy,
+                            keyboardType: _method == _MemberAccessMethod.phone
+                                ? TextInputType.phone
+                                : _method == _MemberAccessMethod.email
+                                    ? TextInputType.emailAddress
+                                    : TextInputType.text,
+                            textCapitalization:
+                                _method == _MemberAccessMethod.vin
+                                    ? TextCapitalization.characters
+                                    : TextCapitalization.none,
+                            onSubmitted: (_) => _identify(membership),
+                            decoration: InputDecoration(
+                              labelText: switch (_method) {
+                                _MemberAccessMethod.phone => 'Phone number',
+                                _MemberAccessMethod.email => 'Email address',
+                                _MemberAccessMethod.vin => 'PVC / VIN',
+                              },
+                              prefixIcon: Icon(
+                                switch (_method) {
+                                  _MemberAccessMethod.phone =>
+                                    Icons.phone_outlined,
+                                  _MemberAccessMethod.email =>
+                                    Icons.email_outlined,
+                                  _MemberAccessMethod.vin =>
+                                    Icons.badge_outlined,
+                                },
                               ),
                             ),
+                          ),
                           const SizedBox(height: 12),
                           FilledButton.icon(
-                            onPressed: _busy
-                                ? null
-                                : _method == _MemberAccessMethod.pvc
-                                    ? () => _scanPvc(membership)
-                                    : () => _identify(membership),
+                            onPressed:
+                                _busy ? null : () => _identify(membership),
                             icon: _busy
                                 ? const SizedBox(
                                     width: 17,
@@ -189,16 +143,8 @@ class _MemberAccessPageState extends State<MemberAccessPage> {
                                       strokeWidth: 2,
                                     ),
                                   )
-                                : Icon(
-                                    _method == _MemberAccessMethod.pvc
-                                        ? Icons.document_scanner_outlined
-                                        : Icons.person_search_outlined,
-                                  ),
-                            label: Text(
-                              _method == _MemberAccessMethod.pvc
-                                  ? 'Scan PVC'
-                                  : 'Find account',
-                            ),
+                                : const Icon(Icons.person_search_outlined),
+                            label: const Text('Find account'),
                           ),
                         ],
                       ),
@@ -207,11 +153,16 @@ class _MemberAccessPageState extends State<MemberAccessPage> {
                     TgcgSectionCard(
                       title: 'Account found',
                       subtitle:
-                          'Confirm this is your USESF member profile before entering your PIN.',
-                      trailing: const TgcgStatusPill(
-                        label: 'ACCOUNT MATCHED',
-                        color: TgcgColors.success,
-                        icon: Icons.check_circle_outline_rounded,
+                          'Confirm the profile, then enter the member password.',
+                      trailing: TgcgStatusPill(
+                        label:
+                            _member!.isBlocked ? 'BLOCKED' : 'ACCOUNT MATCHED',
+                        color: _member!.isBlocked
+                            ? TgcgColors.danger
+                            : TgcgColors.success,
+                        icon: _member!.isBlocked
+                            ? Icons.block_rounded
+                            : Icons.check_circle_outline_rounded,
                         compact: true,
                       ),
                       child: Column(
@@ -232,9 +183,8 @@ class _MemberAccessPageState extends State<MemberAccessPage> {
                             ),
                             title: Text(
                               _member!.fullName,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w900,
-                              ),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w900),
                             ),
                             subtitle: Text(
                               _member!.membershipNumber ?? _member!.id,
@@ -262,28 +212,25 @@ class _MemberAccessPageState extends State<MemberAccessPage> {
                     ),
                     const SizedBox(height: 14),
                     TgcgSectionCard(
-                      title: 'Confirm member PIN',
+                      title: 'Enter password',
                       subtitle:
-                          'The PIN is checked against a salted derived credential; the raw PIN is not stored.',
+                          'Your member account remains the same even when roles and assignments change.',
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           TextField(
-                            controller: _pin,
-                            enabled: !_busy,
-                            keyboardType: TextInputType.number,
+                            controller: _password,
+                            enabled: !_busy && !_member!.isBlocked,
                             obscureText: true,
-                            maxLength: 6,
                             onSubmitted: (_) => _authenticate(membership),
                             decoration: const InputDecoration(
-                              labelText: '6-digit PIN',
-                              prefixIcon: Icon(Icons.pin_outlined),
-                              counterText: '',
+                              labelText: 'Password',
+                              prefixIcon: Icon(Icons.lock_outline_rounded),
                             ),
                           ),
                           const SizedBox(height: 10),
                           FilledButton.icon(
-                            onPressed: _busy
+                            onPressed: _busy || _member!.isBlocked
                                 ? null
                                 : () => _authenticate(membership),
                             icon: const Icon(Icons.login_rounded),
@@ -295,7 +242,7 @@ class _MemberAccessPageState extends State<MemberAccessPage> {
                                 ? null
                                 : () => setState(() {
                                       _member = null;
-                                      _pin.clear();
+                                      _password.clear();
                                       _message = null;
                                     }),
                             child: const Text('Use another account'),
@@ -337,58 +284,31 @@ class _MemberAccessPageState extends State<MemberAccessPage> {
   Future<void> _identify(MembershipOperationsController membership) async {
     final identifier = _identifier.text.trim();
     if (identifier.isEmpty) {
-      setState(() => _message = 'Enter your registered account identifier.');
+      setState(() => _message = 'Enter your account identifier.');
       return;
     }
+
     setState(() {
       _busy = true;
       _message = null;
     });
+
     try {
       final member = switch (_method) {
         _MemberAccessMethod.phone => membership.memberByPhone(identifier),
         _MemberAccessMethod.email => membership.memberByEmail(identifier),
-        _MemberAccessMethod.pvc => null,
+        _MemberAccessMethod.vin => await membership.memberByPvcVin(identifier),
       };
       if (!mounted) return;
       setState(() {
         _member = member;
         if (member == null) {
-          _message = 'No enrolled USESF member matched those details.';
+          _message = 'No registered USESF member matched those details.';
+        } else if (member.isBlocked) {
+          _message =
+              'This member account is blocked and cannot sign in. Contact the authorized support channel.';
         }
       });
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _scanPvc(MembershipOperationsController membership) async {
-    setState(() {
-      _busy = true;
-      _message = null;
-    });
-    try {
-      final scan = await _recognizer.captureAndRecognize();
-      if (!mounted || scan == null) return;
-      final voterId = scan.voterId;
-      final member = voterId == null
-          ? null
-          : await membership.memberByPvcCredential(voterId);
-      if (!mounted) return;
-      setState(() {
-        _pvcScan = scan;
-        _member = member;
-        if (voterId == null) {
-          _message =
-              'The PVC was captured, but the enrolled voter identifier could not be read. Try again or use phone/email.';
-        } else if (member == null) {
-          _message =
-              'This PVC did not match an enrolled USESF member credential.';
-        }
-      });
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => _message = 'PVC sign-in could not be completed: $error');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -398,19 +318,11 @@ class _MemberAccessPageState extends State<MemberAccessPage> {
     MembershipOperationsController membership,
   ) async {
     final member = _member;
-    if (member == null) return;
-    final hasPin = await membership.hasMemberPinCredential(member.id);
-    if (!mounted) return;
-    if (!hasPin) {
-      setState(() {
-        _message =
-            'This member does not yet have a sign-in PIN. Complete member credential setup at enrolment.';
-      });
-      return;
-    }
-    final pin = _pin.text.trim();
-    if (!RegExp(r'^\d{6}$').hasMatch(pin)) {
-      setState(() => _message = 'Enter the 6-digit member PIN.');
+    if (member == null || member.isBlocked) return;
+
+    final password = _password.text;
+    if (password.isEmpty) {
+      setState(() => _message = 'Enter your member password.');
       return;
     }
 
@@ -418,38 +330,42 @@ class _MemberAccessPageState extends State<MemberAccessPage> {
       _busy = true;
       _message = null;
     });
+
     try {
-      final valid = await membership.verifyMemberPin(
-        memberId: member.id,
-        pin: pin,
-      );
+      final hasCredential =
+          await membership.hasMemberPasswordCredential(member.id);
       if (!mounted) return;
-      if (!valid) {
-        setState(() => _message = 'The member PIN is incorrect.');
+      if (!hasCredential) {
+        setState(() {
+          _message =
+              'This member does not yet have a password. Complete member credential setup.';
+        });
         return;
       }
 
-      final session = TgcgSession.of(context, listen: false);
-      final approved = membership.approvedAccreditationForMember(member.id);
+      final valid = await membership.verifyMemberPassword(
+        memberId: member.id,
+        password: password,
+      );
+      if (!mounted) return;
+      if (!valid) {
+        setState(() => _message = 'The password is incorrect.');
+        return;
+      }
+
       final homePu = membership.homePollingUnitForMember(member.id);
       final registration =
-          membership.registrationScopeForMember(member.id) ?? GeographicScope.kaduna;
+          membership.registrationScopeForMember(member.id) ??
+              GeographicScope.kaduna;
 
-      if (approved != null) {
-        session.signIn(
-          role: approved.role,
-          operatorName: member.fullName,
-          accessId: approved.agentId,
-          scope: approved.scope,
-        );
-      } else {
-        session.signIn(
-          role: TgcgRole.member,
-          operatorName: member.fullName,
-          accessId: member.id,
-          scope: homePu?.scope ?? registration,
-        );
-      }
+      // Authentication always enters through the permanent member identity.
+      // Roles and assignments are resolved after sign-in.
+      TgcgSession.of(context, listen: false).signIn(
+        role: TgcgRole.member,
+        operatorName: member.fullName,
+        accessId: member.id,
+        scope: homePu?.scope ?? registration,
+      );
 
       if (!mounted) return;
       Navigator.of(context).popUntil((route) => route.isFirst);
