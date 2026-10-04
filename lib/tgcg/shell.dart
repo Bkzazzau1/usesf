@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'access/access_policy.dart';
 import 'ai/ai_verification_page.dart';
 import 'assignments/assignment_control_page.dart';
 import 'alerts/alert_center_page.dart';
@@ -18,6 +19,7 @@ import 'governance/role_assignment_page.dart';
 import 'media/media_intelligence_page.dart';
 import 'meeting/meeting_room_page.dart';
 import 'membership/member_operations_page.dart';
+import 'membership/member_shell.dart';
 import 'membership/pvc_enrollment_page.dart';
 import 'monitoring/system_monitoring_page.dart';
 import 'offline/offline_persistence.dart';
@@ -52,7 +54,10 @@ class _TgcgShellState extends State<TgcgShell> {
   @override
   Widget build(BuildContext context) {
     final session = TgcgSession.of(context);
-    final allowed = allowedModules(session.role!);
+    final capabilities = TgcgAccessPolicy.capabilities(context);
+    final allowed = session.role == TgcgRole.member
+        ? modulesForCapabilities(capabilities)
+        : allowedModules(session.role!);
     if (!allowed.contains(selectedModule)) {
       selectedModule = allowed.contains(TgcgModule.overview)
           ? TgcgModule.overview
@@ -148,8 +153,12 @@ class _TgcgShellState extends State<TgcgShell> {
     );
   }
 
-  Widget _pageFor(TgcgModule module) => switch (module) {
-        TgcgModule.overview => TgcgDashboardPage(onOpenModule: _select),
+  Widget _pageFor(TgcgModule module) {
+    final session = TgcgSession.of(context, listen: false);
+    return switch (module) {
+        TgcgModule.overview => session.role == TgcgRole.member
+            ? const MemberShell()
+            : TgcgDashboardPage(onOpenModule: _select),
         TgcgModule.accreditation => PvcEnrollmentPage(
             onOpenAssignments: () => _select(TgcgModule.assignmentControl),
           ),
@@ -178,6 +187,7 @@ class _TgcgShellState extends State<TgcgShell> {
         TgcgModule.reports => const ReportsPage(),
         TgcgModule.governance => const GovernancePage(),
       };
+  }
 }
 
 enum _NavGroup { command, fieldOperations, coordination, control }
