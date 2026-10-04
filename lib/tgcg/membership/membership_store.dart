@@ -850,6 +850,89 @@ class MembershipOperationsController extends ChangeNotifier {
     return _constantTimeEquals(credential.hash, actual);
   }
 
+  Future<TgcgMember> updateMemberContact({
+    required String memberId,
+    String? phoneNumber,
+    String? email,
+  }) async {
+    final index = _members.indexWhere((item) => item.id == memberId);
+    if (index < 0) throw ArgumentError('Unknown member: $memberId');
+    final current = _members[index];
+
+    final requestedEmail = email?.trim();
+    if (current.emailVerified &&
+        requestedEmail != null &&
+        requestedEmail.toLowerCase() !=
+            (current.email ?? '').trim().toLowerCase()) {
+      throw StateError(
+        'A verified email can only be changed by the backend System Admin.',
+      );
+    }
+
+    final updated = _copyMember(
+      current,
+      phoneNumber: phoneNumber?.trim() ?? current.phoneNumber,
+      email: requestedEmail == null || requestedEmail.isEmpty
+          ? current.email
+          : requestedEmail,
+    );
+    final scope = _memberScopes[memberId] ?? GeographicScope.kaduna;
+    await _persistMemberState(
+      updated,
+      scope,
+      _memberPollingUnits[memberId],
+    );
+    _members[index] = updated;
+    notifyListeners();
+    return updated;
+  }
+
+  Future<TgcgMember> markEmailVerified(String memberId) async {
+    final index = _members.indexWhere((item) => item.id == memberId);
+    if (index < 0) throw ArgumentError('Unknown member: $memberId');
+    final current = _members[index];
+    if ((current.email ?? '').trim().isEmpty) {
+      throw StateError('Add an email address before verification.');
+    }
+    final updated = _copyMember(current, emailVerified: true);
+    final scope = _memberScopes[memberId] ?? GeographicScope.kaduna;
+    await _persistMemberState(
+      updated,
+      scope,
+      _memberPollingUnits[memberId],
+    );
+    _members[index] = updated;
+    notifyListeners();
+    return updated;
+  }
+
+  /// Backend identity-review operation. A suspicious finding blocks the
+  /// account immediately; a later verified finding reactivates the same member.
+  Future<TgcgMember> setIdentityReview({
+    required String memberId,
+    required MemberIdentityReview review,
+  }) async {
+    final index = _members.indexWhere((item) => item.id == memberId);
+    if (index < 0) throw ArgumentError('Unknown member: $memberId');
+    final current = _members[index];
+    final updated = _copyMember(
+      current,
+      identityReview: review,
+      accountStatus: review == MemberIdentityReview.suspicious
+          ? MemberAccountStatus.blocked
+          : MemberAccountStatus.active,
+    );
+    final scope = _memberScopes[memberId] ?? GeographicScope.kaduna;
+    await _persistMemberState(
+      updated,
+      scope,
+      _memberPollingUnits[memberId],
+    );
+    _members[index] = updated;
+    notifyListeners();
+    return updated;
+  }
+
   GeographicScope? registrationScopeForMember(String memberId) =>
       _memberScopes[memberId];
 
@@ -1220,6 +1303,33 @@ class MembershipOperationsController extends ChangeNotifier {
           'coordinateStatus': unit.coordinateStatus.name,
           'geofenceRadiusMeters': unit.geofenceRadiusMeters,
         },
+      );
+
+  static TgcgMember _copyMember(
+    TgcgMember current, {
+    String? phoneNumber,
+    String? email,
+    bool? emailVerified,
+    String? pvcVin,
+    String? selfieReference,
+    MemberAccountStatus? accountStatus,
+    MemberIdentityReview? identityReview,
+    RecordStatus? status,
+  }) =>
+      TgcgMember(
+        id: current.id,
+        fullName: current.fullName,
+        phoneNumber: phoneNumber ?? current.phoneNumber,
+        email: email ?? current.email,
+        emailVerified: emailVerified ?? current.emailVerified,
+        membershipNumber: current.membershipNumber,
+        pvcVin: pvcVin ?? current.pvcVin,
+        selfieReference: selfieReference ?? current.selfieReference,
+        accountStatus: accountStatus ?? current.accountStatus,
+        identityReview: identityReview ?? current.identityReview,
+        createdAt: current.createdAt,
+        status: status ?? current.status,
+        origin: current.origin,
       );
 
   static TgcgRole? _role(Object? value) {
