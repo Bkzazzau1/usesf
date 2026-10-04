@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 
 import '../devices/managed_device_store.dart';
 import '../domain/models.dart';
+import '../domain/permissions.dart';
 import '../geography/geography_registry.dart';
 import '../membership/membership_store.dart';
 import '../offline/offline_payloads.dart';
@@ -27,6 +28,11 @@ enum AssignmentPriority {
   normal,
   high,
   critical,
+}
+
+enum AssignmentLocationMode {
+  none,
+  pollingUnit,
 }
 
 enum AssignmentPresence {
@@ -107,6 +113,7 @@ class MemberAssignment {
     required this.memberId,
     required this.targetPollingUnitId,
     required this.targetScope,
+    this.locationMode = AssignmentLocationMode.pollingUnit,
     required this.assignedBy,
     required this.assignedAt,
     required this.status,
@@ -122,14 +129,16 @@ class MemberAssignment {
     this.dueAt,
     this.lastLocation,
     this.requiredEvidence = const [],
+    this.grantedCapabilities = const {},
     this.evidence = const [],
   });
 
   final String id;
   final String title;
   final String memberId;
-  final String targetPollingUnitId;
+  final String? targetPollingUnitId;
   final GeographicScope targetScope;
+  final AssignmentLocationMode locationMode;
   final String assignedBy;
   final DateTime assignedAt;
   final AssignmentStatus status;
@@ -145,6 +154,7 @@ class MemberAssignment {
   final DateTime? dueAt;
   final AssignmentLocationPing? lastLocation;
   final List<EvidenceType> requiredEvidence;
+  final Set<TgcgCapability> grantedCapabilities;
   final List<EvidenceAttachment> evidence;
 
   bool get isTerminal =>
@@ -156,6 +166,7 @@ class MemberAssignment {
     String? memberId,
     String? targetPollingUnitId,
     GeographicScope? targetScope,
+    AssignmentLocationMode? locationMode,
     String? assignedBy,
     DateTime? assignedAt,
     AssignmentStatus? status,
@@ -172,6 +183,7 @@ class MemberAssignment {
     DateTime? dueAt,
     bool clearDueAt = false,
     AssignmentLocationPing? lastLocation,
+    Set<TgcgCapability>? grantedCapabilities,
     List<EvidenceAttachment>? evidence,
   }) =>
       MemberAssignment(
@@ -181,6 +193,7 @@ class MemberAssignment {
         targetPollingUnitId:
             targetPollingUnitId ?? this.targetPollingUnitId,
         targetScope: targetScope ?? this.targetScope,
+        locationMode: locationMode ?? this.locationMode,
         assignedBy: assignedBy ?? this.assignedBy,
         assignedAt: assignedAt ?? this.assignedAt,
         status: status ?? this.status,
@@ -196,6 +209,8 @@ class MemberAssignment {
         dueAt: clearDueAt ? null : dueAt ?? this.dueAt,
         lastLocation: lastLocation ?? this.lastLocation,
         requiredEvidence: requiredEvidence,
+        grantedCapabilities:
+            grantedCapabilities ?? this.grantedCapabilities,
         evidence: evidence ?? this.evidence,
       );
 }
@@ -253,7 +268,7 @@ class AssignmentController extends ChangeNotifier {
       final id = row['id']?.toString();
       final title = row['title']?.toString();
       final memberId = row['memberId']?.toString();
-      final pollingUnitId = row['targetPollingUnitId']?.toString();
+      final pollingUnitId = _clean(row['targetPollingUnitId']?.toString());
       final scope = geographicScopeFromJson(row['targetScope']);
       final assignedBy = row['assignedBy']?.toString();
       final assignedAt = _date(row['assignedAt']);
@@ -262,7 +277,6 @@ class AssignmentController extends ChangeNotifier {
       if (id == null ||
           title == null ||
           memberId == null ||
-          pollingUnitId == null ||
           scope == null ||
           assignedBy == null ||
           assignedAt == null ||
@@ -317,12 +331,26 @@ class AssignmentController extends ChangeNotifier {
         }
       }
 
+      final locationMode = _assignmentLocationMode(row['locationMode']) ??
+          (pollingUnitId == null
+              ? AssignmentLocationMode.none
+              : AssignmentLocationMode.pollingUnit);
+      final grantedCapabilities = <TgcgCapability>{};
+      final capabilitiesRaw = row['grantedCapabilities'];
+      if (capabilitiesRaw is List) {
+        for (final value in capabilitiesRaw) {
+          final capability = _capability(value);
+          if (capability != null) grantedCapabilities.add(capability);
+        }
+      }
+
       final restored = MemberAssignment(
         id: id,
         title: title,
         memberId: memberId,
         targetPollingUnitId: pollingUnitId,
         targetScope: scope,
+        locationMode: locationMode,
         assignedBy: assignedBy,
         assignedAt: assignedAt,
         status: status,
@@ -338,6 +366,7 @@ class AssignmentController extends ChangeNotifier {
         dueAt: _date(row['dueAt']),
         lastLocation: lastLocation,
         requiredEvidence: List.unmodifiable(requiredEvidence),
+        grantedCapabilities: Set.unmodifiable(grantedCapabilities),
         evidence: List.unmodifiable(evidence),
       );
 
@@ -421,6 +450,11 @@ class AssignmentController extends ChangeNotifier {
           .where((item) => !item.isTerminal)
           .toList(growable: false);
 
+  Set<TgcgCapability> activeAssignmentCapabilitiesForMember(String memberId) =>
+      activeAssignmentsForMember(memberId)
+          .expand((item) => item.grantedCapabilities)
+          .toSet();
+
   List<MemberAssignment> assignmentsForScope(GeographicScope scope) =>
       _assignments
           .where(
@@ -503,8 +537,13 @@ class AssignmentController extends ChangeNotifier {
     final activeByUnit = <String, List<MemberAssignment>>{};
     for (final assignment in _assignments) {
       if (assignment.isTerminal) continue;
+      final pollingUnitId = assignment.targetPollingUnitId;
+      if (assignment.locationMode != AssignmentLocationMode.pollingUnit ||
+          pollingUnitId == null) {
+        continue;
+      }
       activeByUnit
-          .putIfAbsent(assignment.targetPollingUnitId, () => <MemberAssignment>[])
+          .putIfAbsent(pollingUnitId, () => <MemberAssignment>[])
           .add(assignment);
     }
 
@@ -570,32 +609,38 @@ class AssignmentController extends ChangeNotifier {
   Future<MemberAssignment> createAssignment({
     required String title,
     required String memberId,
-    required String pollingUnitId,
+    String? pollingUnitId,
     required String assignedBy,
     GeographicScope? authorizedScope,
     AssignmentPriority priority = AssignmentPriority.normal,
     String? instructions,
     DateTime? dueAt,
     List<EvidenceType> requiredEvidence = const [],
+    Set<TgcgCapability> grantedCapabilities = const {},
   }) async {
     final member = _membership.memberById(memberId);
     if (member == null) {
       throw ArgumentError('Unknown USESF member: $memberId');
     }
-    final unit = _membership.geography.pollingUnit(pollingUnitId);
-    if (unit == null) {
+
+    final normalizedPollingUnitId = _clean(pollingUnitId);
+    final unit = normalizedPollingUnitId == null
+        ? null
+        : _membership.geography.pollingUnit(normalizedPollingUnitId);
+    if (normalizedPollingUnitId != null && unit == null) {
       throw ArgumentError(
-        'Assignments must target a canonical polling unit.',
+        'The selected polling unit is not in the canonical registry.',
       );
     }
-    if (authorizedScope != null &&
+    if (unit != null &&
+        authorizedScope != null &&
         !GeographyRegistry.scopeContains(authorizedScope, unit.scope)) {
       throw StateError(
         'The selected polling unit is outside the coordinator authorization scope.',
       );
     }
-    final memberScope =
-        _membership.registrationScopeForMember(memberId);
+
+    final memberScope = _membership.registrationScopeForMember(memberId);
     if (authorizedScope != null &&
         memberScope != null &&
         !GeographyRegistry.scopeContains(authorizedScope, memberScope)) {
@@ -603,24 +648,35 @@ class AssignmentController extends ChangeNotifier {
         'The selected member is outside the coordinator authorization scope.',
       );
     }
-    final existing = activeAssignmentsForMember(memberId);
-    final sameTarget = existing.any(
-      (item) => item.targetPollingUnitId == unit.code,
-    );
-    if (sameTarget) {
-      throw StateError(
-        'This member already has an active assignment for the selected polling unit.',
+
+    if (unit != null) {
+      final sameTarget = activeAssignmentsForMember(memberId).any(
+        (item) =>
+            item.locationMode == AssignmentLocationMode.pollingUnit &&
+            item.targetPollingUnitId == unit.code,
       );
+      if (sameTarget) {
+        throw StateError(
+          'This member already has an active assignment for the selected polling unit.',
+        );
+      }
     }
+
+    final assignmentScope =
+        unit?.scope ?? authorizedScope ?? memberScope ?? GeographicScope.kaduna;
+    final locationMode = unit == null
+        ? AssignmentLocationMode.none
+        : AssignmentLocationMode.pollingUnit;
 
     final now = DateTime.now().toUtc();
     final device = _devices.deviceForMember(memberId);
     final assignment = MemberAssignment(
       id: 'ASN-${now.microsecondsSinceEpoch}',
-      title: title.trim().isEmpty ? 'Field Assignment' : title.trim(),
+      title: title.trim().isEmpty ? 'Operational Assignment' : title.trim(),
       memberId: memberId,
-      targetPollingUnitId: unit.code,
-      targetScope: unit.scope,
+      targetPollingUnitId: unit?.code,
+      targetScope: assignmentScope,
+      locationMode: locationMode,
       assignedBy: assignedBy,
       assignedAt: now,
       status: AssignmentStatus.assigned,
@@ -629,6 +685,7 @@ class AssignmentController extends ChangeNotifier {
       deviceId: device?.id,
       dueAt: dueAt?.toUtc(),
       requiredEvidence: List.unmodifiable(requiredEvidence),
+      grantedCapabilities: Set.unmodifiable(grantedCapabilities),
       evidence: const [],
     );
     _assignments.insert(0, assignment);
@@ -636,8 +693,9 @@ class AssignmentController extends ChangeNotifier {
       assignment,
       action: 'assigned',
       actorId: assignedBy,
-      detail:
-          'Assigned to ${member.fullName} at ${unit.displayCode}.',
+      detail: unit == null
+          ? 'Assigned to ${member.fullName} as a location-flexible assignment.'
+          : 'Assigned to ${member.fullName} at ${unit.displayCode}.',
     );
     notifyListeners();
     await _persistAssignment(assignment);
@@ -741,6 +799,7 @@ class AssignmentController extends ChangeNotifier {
       memberId: newMemberId,
       targetPollingUnitId: current.targetPollingUnitId,
       targetScope: current.targetScope,
+      locationMode: current.locationMode,
       assignedBy: actorId,
       assignedAt: now,
       status: AssignmentStatus.assigned,
@@ -749,6 +808,7 @@ class AssignmentController extends ChangeNotifier {
       deviceId: device?.id,
       dueAt: current.dueAt,
       requiredEvidence: current.requiredEvidence,
+      grantedCapabilities: current.grantedCapabilities,
       evidence: current.evidence,
     );
     _assignments[index] = updated;
@@ -781,8 +841,9 @@ class AssignmentController extends ChangeNotifier {
     if (current.deviceId != null && current.deviceId != deviceId) {
       return;
     }
-    final unit =
-        _membership.geography.pollingUnit(current.targetPollingUnitId);
+    final unit = current.targetPollingUnitId == null
+        ? null
+        : _membership.geography.pollingUnit(current.targetPollingUnitId!);
     final distance = unit?.operationalLatitude == null ||
             unit?.operationalLongitude == null
         ? null
@@ -836,22 +897,27 @@ class AssignmentController extends ChangeNotifier {
         'This assignment is bound to a different managed device.',
       );
     }
-    final unit =
-        _membership.geography.pollingUnit(current.targetPollingUnitId);
-    if (unit == null ||
-        unit.operationalLatitude == null ||
-        unit.operationalLongitude == null) {
+    final unit = current.targetPollingUnitId == null
+        ? null
+        : _membership.geography.pollingUnit(current.targetPollingUnitId!);
+    if (current.locationMode == AssignmentLocationMode.pollingUnit &&
+        (unit == null ||
+            unit.operationalLatitude == null ||
+            unit.operationalLongitude == null)) {
       throw StateError(
         'The assigned polling unit does not yet have an operational GPS coordinate.',
       );
     }
 
-    final distance = _distanceMeters(
-      latitude,
-      longitude,
-      unit.operationalLatitude!,
-      unit.operationalLongitude!,
-    );
+    final distance = unit?.operationalLatitude == null ||
+            unit?.operationalLongitude == null
+        ? null
+        : _distanceMeters(
+            latitude,
+            longitude,
+            unit!.operationalLatitude!,
+            unit.operationalLongitude!,
+          );
     final ping = AssignmentLocationPing(
       latitude: latitude,
       longitude: longitude,
@@ -860,10 +926,10 @@ class AssignmentController extends ChangeNotifier {
       deviceId: deviceId,
       distanceFromTargetMeters: distance,
     );
-    final inside = distance <= unit.geofenceRadiusMeters;
-    final status = inside
-        ? AssignmentStatus.checkedIn
-        : AssignmentStatus.gpsMismatch;
+    final inside = current.locationMode == AssignmentLocationMode.none ||
+        (distance != null && distance <= unit!.geofenceRadiusMeters);
+    final status =
+        inside ? AssignmentStatus.checkedIn : AssignmentStatus.gpsMismatch;
     final updated = current.copyWith(
       status: status,
       checkedInAt: inside ? capturedAt.toUtc() : current.checkedInAt,
@@ -882,8 +948,9 @@ class AssignmentController extends ChangeNotifier {
       updated,
       action: inside ? 'checked_in' : 'gps_mismatch',
       actorId: actorId,
-      detail:
-          'Distance from assigned polling unit: ${distance.toStringAsFixed(1)} m; GPS accuracy ±${accuracyMeters.toStringAsFixed(1)} m.',
+      detail: current.locationMode == AssignmentLocationMode.none
+          ? 'GPS check-in captured for location-flexible assignment; accuracy ±${accuracyMeters.toStringAsFixed(1)} m.'
+          : 'Distance from assigned polling unit: ${distance!.toStringAsFixed(1)} m; GPS accuracy ±${accuracyMeters.toStringAsFixed(1)} m.',
     );
     notifyListeners();
     await _persistAssignment(updated);
@@ -959,8 +1026,13 @@ class AssignmentController extends ChangeNotifier {
     if (current.difference(ping.capturedAt).abs() > staleAfter) {
       return AssignmentPresence.stale;
     }
-    final unit =
-        _membership.geography.pollingUnit(assignment.targetPollingUnitId);
+    if (assignment.locationMode == AssignmentLocationMode.none) {
+      return AssignmentPresence.unknown;
+    }
+    final pollingUnitId = assignment.targetPollingUnitId;
+    final unit = pollingUnitId == null
+        ? null
+        : _membership.geography.pollingUnit(pollingUnitId);
     final distance = ping.distanceFromTargetMeters;
     if (unit == null || distance == null) {
       return AssignmentPresence.unknown;
@@ -1016,6 +1088,7 @@ class AssignmentController extends ChangeNotifier {
           'memberId': assignment.memberId,
           'targetPollingUnitId': assignment.targetPollingUnitId,
           'targetScope': geographicScopeToJson(assignment.targetScope),
+          'locationMode': assignment.locationMode.name,
           'assignedBy': assignment.assignedBy,
           'assignedAt': assignment.assignedAt.toIso8601String(),
           'status': assignment.status.name,
@@ -1031,6 +1104,8 @@ class AssignmentController extends ChangeNotifier {
           'dueAt': assignment.dueAt?.toIso8601String(),
           'requiredEvidence':
               assignment.requiredEvidence.map((item) => item.name).toList(),
+          'grantedCapabilities':
+              assignment.grantedCapabilities.map((item) => item.name).toList(),
           'evidence':
               assignment.evidence.map(evidenceToJson).toList(growable: false),
           'lastLocation': assignment.lastLocation == null
@@ -1048,6 +1123,22 @@ class AssignmentController extends ChangeNotifier {
                 },
         },
       );
+
+  static AssignmentLocationMode? _assignmentLocationMode(Object? value) {
+    final name = value?.toString();
+    for (final item in AssignmentLocationMode.values) {
+      if (item.name == name) return item;
+    }
+    return null;
+  }
+
+  static TgcgCapability? _capability(Object? value) {
+    final name = value?.toString();
+    for (final item in TgcgCapability.values) {
+      if (item.name == name) return item;
+    }
+    return null;
+  }
 
   static DateTime? _date(Object? value) {
     if (value == null) return null;
