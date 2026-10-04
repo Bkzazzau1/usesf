@@ -285,6 +285,383 @@ class MemberShell extends StatelessWidget {
   }
 }
 
+class _BlockedMemberScaffold extends StatelessWidget {
+  const _BlockedMemberScaffold({required this.member});
+
+  final TgcgMember member;
+
+  @override
+  Widget build(BuildContext context) {
+    final session = TgcgSession.of(context);
+    return Scaffold(
+      backgroundColor: TgcgColors.canvas,
+      appBar: AppBar(
+        title: const Text('Member Access'),
+        actions: [
+          IconButton(
+            tooltip: 'Sign out',
+            onPressed: () async {
+              await AssignmentTracking.of(context, listen: false).stop();
+              session.signOut();
+            },
+            icon: const Icon(Icons.logout_rounded),
+          ),
+        ],
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 620),
+            child: TgcgSectionCard(
+              title: 'Account blocked',
+              subtitle:
+                  'This member account has been blocked following internal identity review.',
+              child: Column(
+                children: [
+                  const Icon(
+                    Icons.block_rounded,
+                    size: 56,
+                    color: TgcgColors.danger,
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    member.fullName,
+                    style: const TextStyle(
+                      color: TgcgColors.ink,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 18,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    member.membershipNumber ?? member.id,
+                    style: const TextStyle(
+                      color: TgcgColors.muted,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Operational access is disabled. The same account, roles and history can be restored if the backend System Admin later clears the review.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: TgcgColors.muted,
+                      height: 1.45,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WaitingForAccessScaffold extends StatefulWidget {
+  const _WaitingForAccessScaffold({
+    required this.member,
+    required this.homePu,
+    required this.registration,
+  });
+
+  final TgcgMember member;
+  final CanonicalPollingUnit? homePu;
+  final GeographicScope? registration;
+
+  @override
+  State<_WaitingForAccessScaffold> createState() =>
+      _WaitingForAccessScaffoldState();
+}
+
+class _WaitingForAccessScaffoldState extends State<_WaitingForAccessScaffold> {
+  @override
+  Widget build(BuildContext context) {
+    final session = TgcgSession.of(context);
+    final member = widget.member;
+
+    return Scaffold(
+      backgroundColor: TgcgColors.canvas,
+      appBar: AppBar(
+        title: const Row(
+          children: [
+            TgcgLogo(size: 34),
+            SizedBox(width: 10),
+            Text('USESF Member'),
+          ],
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'Sign out',
+            onPressed: () async {
+              await AssignmentTracking.of(context, listen: false).stop();
+              session.signOut();
+            },
+            icon: const Icon(Icons.logout_rounded),
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 36),
+        children: [
+          TgcgPageHeader(
+            eyebrow: 'MEMBERSHIP ACTIVE',
+            title: member.fullName,
+            subtitle:
+                'Your member account is active. Operational access will appear automatically when an authorized coordinator assigns a role or an assignment.',
+            trailing: const TgcgStatusPill(
+              label: 'WAITING FOR ACCESS',
+              color: TgcgColors.info,
+              icon: Icons.hourglass_top_rounded,
+            ),
+          ),
+          const SizedBox(height: 16),
+          TgcgSectionCard(
+            title: 'Waiting for role or assignment',
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.assignment_ind_outlined,
+                  size: 54,
+                  color: TgcgColors.primary,
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'You are registered as a member, but you do not currently have an active role or assignment.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: TgcgColors.ink,
+                    fontWeight: FontWeight.w800,
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 7),
+                const Text(
+                  'No operational modules are available yet. You can maintain your own account details while you wait.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: TgcgColors.muted,
+                    fontSize: 11,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final profile = _ProfileCard(
+                memberId: member.membershipNumber ?? member.id,
+                pvcVin: member.pvcVin,
+                phone: member.phoneNumber,
+                email: member.email,
+                emailVerified: member.emailVerified,
+                location:
+                    widget.registration?.label ?? GeographicScope.kaduna.label,
+              );
+              final pollingUnit = _HomePollingUnitCard(unit: widget.homePu);
+              if (constraints.maxWidth < 760) {
+                return Column(
+                  children: [
+                    profile,
+                    const SizedBox(height: 14),
+                    pollingUnit,
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: profile),
+                  const SizedBox(width: 14),
+                  Expanded(child: pollingUnit),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 14),
+          TgcgSectionCard(
+            title: 'Account settings',
+            subtitle:
+                'PVC-derived electoral details are locked. You can update your phone, add an email and change your password.',
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _editContact,
+                  icon: const Icon(Icons.contact_phone_outlined),
+                  label: const Text('Phone & email'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _changePassword,
+                  icon: const Icon(Icons.password_rounded),
+                  label: const Text('Change password'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _editContact() async {
+    final member = widget.member;
+    final phone = TextEditingController(text: member.phoneNumber);
+    final email = TextEditingController(text: member.email ?? '');
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Update contact details'),
+        content: SizedBox(
+          width: 480,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: phone,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Phone number',
+                  helperText: 'Phone is optional and is not verified.',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: email,
+                enabled: !member.emailVerified,
+                keyboardType: TextInputType.emailAddress,
+                decoration: InputDecoration(
+                  labelText: 'Email address',
+                  helperText: member.emailVerified
+                      ? 'Verified email can only be changed by backend System Admin.'
+                      : 'Email can be verified later for password recovery.',
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (saved == true && mounted) {
+      try {
+        await MembershipOperations.of(context, listen: false)
+            .updateMemberContact(
+          memberId: member.id,
+          phoneNumber: phone.text,
+          email: email.text,
+        );
+      } on StateError catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(error.message)));
+        }
+      }
+    }
+    phone.dispose();
+    email.dispose();
+  }
+
+  Future<void> _changePassword() async {
+    final password = TextEditingController();
+    final confirm = TextEditingController();
+    String? error;
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Change password'),
+          content: SizedBox(
+            width: 480,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: password,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'New password',
+                    helperText: 'Use at least 8 characters.',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: confirm,
+                  obscureText: true,
+                  decoration:
+                      const InputDecoration(labelText: 'Confirm password'),
+                ),
+                if (error != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    error!,
+                    style: const TextStyle(
+                      color: TgcgColors.danger,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (password.text.length < 8) {
+                  setDialogState(
+                    () => error = 'Password must contain at least 8 characters.',
+                  );
+                  return;
+                }
+                if (password.text != confirm.text) {
+                  setDialogState(() => error = 'The passwords do not match.');
+                  return;
+                }
+                Navigator.of(dialogContext).pop(true);
+              },
+              child: const Text('Change password'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (saved == true && mounted) {
+      await MembershipOperations.of(context, listen: false).setMemberPassword(
+        memberId: widget.member.id,
+        password: password.text,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Password updated.')),
+        );
+      }
+    }
+    password.dispose();
+    confirm.dispose();
+  }
+}
+
 class _MemberAssignmentCard extends StatefulWidget {
   const _MemberAssignmentCard({
     required this.assignment,
