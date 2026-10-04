@@ -35,6 +35,8 @@ class RoleAssignmentRecord {
     required this.assignedBy,
     required this.assignedAt,
     required this.active,
+    this.revokedBy,
+    this.revokedAt,
   });
 
   final String id;
@@ -45,6 +47,8 @@ class RoleAssignmentRecord {
   final String assignedBy;
   final DateTime assignedAt;
   final bool active;
+  final String? revokedBy;
+  final DateTime? revokedAt;
 }
 
 class GovernanceOperationsController extends ChangeNotifier {
@@ -237,6 +241,11 @@ class GovernanceOperationsController extends ChangeNotifier {
   List<SyncOutboxItem> get pendingOutbox =>
       _outbox.where((item) => item.isPending).toList(growable: false);
 
+  List<RoleAssignmentRecord> activeRolesForMember(String memberId) =>
+      _roleAssignments
+          .where((item) => item.subjectId == memberId && item.active)
+          .toList(growable: false);
+
   RoleAssignmentRecord assignRole({
     required String subjectId,
     required String subjectName,
@@ -244,19 +253,12 @@ class GovernanceOperationsController extends ChangeNotifier {
     required GeographicScope scope,
     required String assignedBy,
   }) {
-    for (var i = 0; i < _roleAssignments.length; i++) {
-      final current = _roleAssignments[i];
-      if (current.subjectId == subjectId && current.active) {
-        _roleAssignments[i] = RoleAssignmentRecord(
-          id: current.id,
-          subjectId: current.subjectId,
-          subjectName: current.subjectName,
-          role: current.role,
-          scope: current.scope,
-          assignedBy: current.assignedBy,
-          assignedAt: current.assignedAt,
-          active: false,
-        );
+    for (final current in _roleAssignments) {
+      if (current.subjectId == subjectId &&
+          current.role == role &&
+          current.active &&
+          _sameScope(current.scope, scope)) {
+        return current;
       }
     }
 
@@ -282,11 +284,21 @@ class GovernanceOperationsController extends ChangeNotifier {
     return record;
   }
 
-  void revokeRole(String assignmentId, {required String actorId}) {
+  void revokeRole(
+    String assignmentId, {
+    required String actorId,
+    bool allowStateOverride = false,
+  }) {
     final index = _roleAssignments.indexWhere((item) => item.id == assignmentId);
     if (index < 0) return;
     final current = _roleAssignments[index];
     if (!current.active) return;
+    if (current.assignedBy != actorId && !allowStateOverride) {
+      throw StateError(
+        'Only the person who assigned this role, or the State Coordinator, can remove it.',
+      );
+    }
+    final now = DateTime.now().toUtc();
     _roleAssignments[index] = RoleAssignmentRecord(
       id: current.id,
       subjectId: current.subjectId,
@@ -296,6 +308,8 @@ class GovernanceOperationsController extends ChangeNotifier {
       assignedBy: current.assignedBy,
       assignedAt: current.assignedAt,
       active: false,
+      revokedBy: actorId,
+      revokedAt: now,
     );
     recordAudit(
       actorId: actorId,
@@ -396,6 +410,16 @@ class GovernanceOperationsController extends ChangeNotifier {
         lastAttemptAt: current.lastAttemptAt,
         lastError: lastError,
       );
+
+  static bool _sameScope(GeographicScope a, GeographicScope b) =>
+      a.level == b.level &&
+      a.country == b.country &&
+      a.zoneId == b.zoneId &&
+      a.stateId == b.stateId &&
+      a.senatorialDistrictId == b.senatorialDistrictId &&
+      a.lgaId == b.lgaId &&
+      a.wardId == b.wardId &&
+      a.pollingUnitId == b.pollingUnitId;
 
   static bool _overlaps(GeographicScope a, GeographicScope b) =>
       _within(a, b) || _within(b, a);

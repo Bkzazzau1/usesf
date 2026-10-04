@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../access/access_policy.dart';
 import '../domain/permissions.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
@@ -154,12 +155,12 @@ class _DiscussionRoomPageState extends State<DiscussionRoomPage> {
   @override
   Widget build(BuildContext context) {
     final session = TgcgSession.of(context);
-    final canPost = TgcgPermissionPolicy.allows(
-      session.role!,
+    final canPost = TgcgAccessPolicy.allows(
+      context,
       TgcgCapability.createDiscussionThread,
     );
-    final canComment = TgcgPermissionPolicy.allows(
-      session.role!,
+    final canComment = TgcgAccessPolicy.allows(
+      context,
       TgcgCapability.postDiscussionReply,
     );
 
@@ -176,7 +177,7 @@ class _DiscussionRoomPageState extends State<DiscussionRoomPage> {
           eyebrow: 'USESF COMMUNITY',
           title: 'Discussion Forum',
           subtitle:
-              '${session.scope.label}: internal social feed for updates, conversations and operational collaboration.',
+              'Combined authorized access: internal social feed for updates, conversations and operational collaboration.',
           trailing: TgcgStatusPill(
             label: '${posts.length} POSTS',
             color: TgcgColors.primary,

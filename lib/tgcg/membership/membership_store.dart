@@ -354,6 +354,7 @@ class MembershipOperationsController extends ChangeNotifier {
   final OfflinePersistenceController _persistence;
   final Map<String, String> _memberPvcCredentialHashes = {};
   final Map<String, _MemberPinCredential> _memberPinCredentials = {};
+  final Map<String, _MemberPinCredential> _memberPasswordCredentials = {};
   final FlutterSecureStorage _credentialStorage =
       const FlutterSecureStorage();
 
@@ -377,13 +378,12 @@ class MembershipOperationsController extends ChangeNotifier {
     for (final row in memberRows) {
       final id = row['id']?.toString();
       final fullName = row['fullName']?.toString();
-      final phoneNumber = row['phoneNumber']?.toString();
+      final phoneNumber = row['phoneNumber']?.toString() ?? '';
       final createdAt =
           DateTime.tryParse(row['createdAt']?.toString() ?? '')?.toUtc();
       final status = _recordStatus(row['status']);
       if (id == null ||
           fullName == null ||
-          phoneNumber == null ||
           createdAt == null ||
           status == null) {
         continue;
@@ -395,7 +395,14 @@ class MembershipOperationsController extends ChangeNotifier {
         fullName: fullName,
         phoneNumber: phoneNumber,
         email: _nullableText(row['email']),
+        emailVerified: row['emailVerified'] == true,
         membershipNumber: _nullableText(row['membershipNumber']),
+        pvcVin: _nullableText(row['pvcVin']),
+        selfieReference: _nullableText(row['selfieReference']),
+        accountStatus: _memberAccountStatus(row['accountStatus']) ??
+            MemberAccountStatus.active,
+        identityReview: _memberIdentityReview(row['identityReview']) ??
+            MemberIdentityReview.pending,
         createdAt: createdAt,
         status: status,
         origin: origin,
@@ -560,6 +567,18 @@ class MembershipOperationsController extends ChangeNotifier {
     return null;
   }
 
+  Future<TgcgMember?> memberByPvcVin(String pvcVin) async {
+    final target = _normalizePvcCredential(pvcVin);
+    if (target.isEmpty) return null;
+    for (final member in _members) {
+      final stored = member.pvcVin;
+      if (stored != null && _normalizePvcCredential(stored) == target) {
+        return member;
+      }
+    }
+    return memberByPvcCredential(pvcVin);
+  }
+
   AccreditedAgent? approvedAccreditationForMember(String memberId) {
     for (final agent in _agents) {
       if (agent.memberId == memberId &&
@@ -582,6 +601,18 @@ class MembershipOperationsController extends ChangeNotifier {
       key: _pinCredentialKey(memberId),
     );
     return stored != null && stored.trim().isNotEmpty;
+  }
+
+  Future<bool> hasMemberPasswordCredential(String memberId) async {
+    if (_memberPasswordCredentials.containsKey(memberId)) return true;
+    final stored = await _credentialStorage.read(
+      key: _passwordCredentialKey(memberId),
+    );
+    if (stored != null && stored.trim().isNotEmpty) return true;
+
+    // Development migration: existing 6-digit member PIN credentials remain
+    // usable until the member sets a normal password.
+    return hasMemberPinCredential(memberId);
   }
 
   Future<bool> hasPersistedPvcCredential(String memberId) async {
@@ -683,6 +714,81 @@ class MembershipOperationsController extends ChangeNotifier {
     notifyListeners();
   }
 
+
+  Future<void> setMemberPassword({
+    required String memberId,
+    required String password,
+  }) async {
+    if (memberById(memberId) == null) {
+      throw ArgumentError('Unknown member: $memberId');
+    }
+    if (password.length < 8) {
+      throw ArgumentError('Password must contain at least 8 characters.');
+    }
+    final random = Random.secure();
+    final saltBytes = List<int>.generate(
+      16,
+      (_) => random.nextInt(256),
+      growable: false,
+    );
+    final hash = await _derivePin(password, saltBytes);
+    final credential = _MemberPinCredential(
+      salt: base64UrlEncode(saltBytes),
+      hash: base64UrlEncode(hash),
+    );
+    _memberPasswordCredentials[memberId] = credential;
+    await _credentialStorage.write(
+      key: _passwordCredentialKey(memberId),
+      value: jsonEncode({
+        'salt': credential.salt,
+        'hash': credential.hash,
+      }),
+    );
+    notifyListeners();
+  }
+
+  Future<bool> verifyMemberPassword({
+    required String memberId,
+    required String password,
+  }) async {
+    if (password.isEmpty) return false;
+
+    var credential = _memberPasswordCredentials[memberId];
+    if (credential == null) {
+      final stored = await _credentialStorage.read(
+        key: _passwordCredentialKey(memberId),
+      );
+      if (stored != null && stored.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(stored);
+          if (decoded is Map &&
+              decoded['salt'] is String &&
+              decoded['hash'] is String) {
+            credential = _MemberPinCredential(
+              salt: decoded['salt'] as String,
+              hash: decoded['hash'] as String,
+            );
+            _memberPasswordCredentials[memberId] = credential;
+          }
+        } catch (_) {
+          return false;
+        }
+      }
+    }
+
+    if (credential != null) {
+      final salt = base64Url.decode(credential.salt);
+      final actual = base64UrlEncode(await _derivePin(password, salt));
+      return _constantTimeEquals(credential.hash, actual);
+    }
+
+    // Development migration path for accounts created before password login.
+    if (RegExp(r'^\d{6}$').hasMatch(password)) {
+      return verifyMemberPin(memberId: memberId, pin: password);
+    }
+    return false;
+  }
+
   Future<void> clearLocalCredentials() async {
     for (final member in _members) {
       final fingerprint = _memberPvcCredentialHashes[member.id] ??
@@ -700,9 +806,13 @@ class MembershipOperationsController extends ChangeNotifier {
       await _credentialStorage.delete(
         key: _pinCredentialKey(member.id),
       );
+      await _credentialStorage.delete(
+        key: _passwordCredentialKey(member.id),
+      );
     }
     _memberPvcCredentialHashes.clear();
     _memberPinCredentials.clear();
+    _memberPasswordCredentials.clear();
   }
 
   Future<bool> verifyMemberPin({
@@ -738,6 +848,89 @@ class MembershipOperationsController extends ChangeNotifier {
     final salt = base64Url.decode(credential.salt);
     final actual = base64UrlEncode(await _derivePin(pin, salt));
     return _constantTimeEquals(credential.hash, actual);
+  }
+
+  Future<TgcgMember> updateMemberContact({
+    required String memberId,
+    String? phoneNumber,
+    String? email,
+  }) async {
+    final index = _members.indexWhere((item) => item.id == memberId);
+    if (index < 0) throw ArgumentError('Unknown member: $memberId');
+    final current = _members[index];
+
+    final requestedEmail = email?.trim();
+    if (current.emailVerified &&
+        requestedEmail != null &&
+        requestedEmail.toLowerCase() !=
+            (current.email ?? '').trim().toLowerCase()) {
+      throw StateError(
+        'A verified email can only be changed by the backend System Admin.',
+      );
+    }
+
+    final updated = _copyMember(
+      current,
+      phoneNumber: phoneNumber?.trim() ?? current.phoneNumber,
+      email: requestedEmail == null || requestedEmail.isEmpty
+          ? current.email
+          : requestedEmail,
+    );
+    final scope = _memberScopes[memberId] ?? GeographicScope.kaduna;
+    await _persistMemberState(
+      updated,
+      scope,
+      _memberPollingUnits[memberId],
+    );
+    _members[index] = updated;
+    notifyListeners();
+    return updated;
+  }
+
+  Future<TgcgMember> markEmailVerified(String memberId) async {
+    final index = _members.indexWhere((item) => item.id == memberId);
+    if (index < 0) throw ArgumentError('Unknown member: $memberId');
+    final current = _members[index];
+    if ((current.email ?? '').trim().isEmpty) {
+      throw StateError('Add an email address before verification.');
+    }
+    final updated = _copyMember(current, emailVerified: true);
+    final scope = _memberScopes[memberId] ?? GeographicScope.kaduna;
+    await _persistMemberState(
+      updated,
+      scope,
+      _memberPollingUnits[memberId],
+    );
+    _members[index] = updated;
+    notifyListeners();
+    return updated;
+  }
+
+  /// Backend identity-review operation. A suspicious finding blocks the
+  /// account immediately; a later verified finding reactivates the same member.
+  Future<TgcgMember> setIdentityReview({
+    required String memberId,
+    required MemberIdentityReview review,
+  }) async {
+    final index = _members.indexWhere((item) => item.id == memberId);
+    if (index < 0) throw ArgumentError('Unknown member: $memberId');
+    final current = _members[index];
+    final updated = _copyMember(
+      current,
+      identityReview: review,
+      accountStatus: review == MemberIdentityReview.suspicious
+          ? MemberAccountStatus.blocked
+          : MemberAccountStatus.active,
+    );
+    final scope = _memberScopes[memberId] ?? GeographicScope.kaduna;
+    await _persistMemberState(
+      updated,
+      scope,
+      _memberPollingUnits[memberId],
+    );
+    _members[index] = updated;
+    notifyListeners();
+    return updated;
   }
 
   GeographicScope? registrationScopeForMember(String memberId) =>
@@ -802,13 +995,24 @@ class MembershipOperationsController extends ChangeNotifier {
 
   Future<TgcgMember> createMember({
     required String fullName,
-    required String phoneNumber,
+    String phoneNumber = '',
     String? email,
+    bool emailVerified = false,
+    String? pvcVin,
+    String? selfieReference,
     GeographicScope registrationScope = GeographicScope.kaduna,
     String? homePollingUnitId,
     String? pvcPollingUnitCode,
     String? linkedBy,
   }) async {
+    final normalizedVin = _normalizePvcCredential(pvcVin ?? '');
+    if (normalizedVin.isNotEmpty) {
+      final existing = await memberByPvcVin(normalizedVin);
+      if (existing != null) {
+        throw StateError('This PVC/VIN is already registered to a USESF member.');
+      }
+    }
+
     CanonicalPollingUnit? homePollingUnit;
     if (homePollingUnitId != null && homePollingUnitId.trim().isNotEmpty) {
       homePollingUnit = _geography.pollingUnit(homePollingUnitId);
@@ -824,8 +1028,14 @@ class MembershipOperationsController extends ChangeNotifier {
       fullName: fullName.trim(),
       phoneNumber: phoneNumber.trim(),
       email: email?.trim().isEmpty == true ? null : email?.trim(),
+      emailVerified: emailVerified,
       membershipNumber:
           'USESF-${(_members.length + 1).toString().padLeft(6, '0')}',
+      pvcVin: normalizedVin.isEmpty ? null : normalizedVin,
+      selfieReference:
+          selfieReference?.trim().isEmpty == true ? null : selfieReference?.trim(),
+      accountStatus: MemberAccountStatus.active,
+      identityReview: MemberIdentityReview.pending,
       createdAt: DateTime.now().toUtc(),
       status: RecordStatus.submitted,
       origin: RecordOrigin.localEntry,
@@ -1049,7 +1259,12 @@ class MembershipOperationsController extends ChangeNotifier {
           'fullName': member.fullName,
           'phoneNumber': member.phoneNumber,
           'email': member.email,
+          'emailVerified': member.emailVerified,
           'membershipNumber': member.membershipNumber,
+          'pvcVin': member.pvcVin,
+          'selfieReference': member.selfieReference,
+          'accountStatus': member.accountStatus.name,
+          'identityReview': member.identityReview.name,
           'createdAt': member.createdAt.toIso8601String(),
           'status': member.status.name,
           'origin': member.origin.name,
@@ -1090,6 +1305,33 @@ class MembershipOperationsController extends ChangeNotifier {
         },
       );
 
+  static TgcgMember _copyMember(
+    TgcgMember current, {
+    String? phoneNumber,
+    String? email,
+    bool? emailVerified,
+    String? pvcVin,
+    String? selfieReference,
+    MemberAccountStatus? accountStatus,
+    MemberIdentityReview? identityReview,
+    RecordStatus? status,
+  }) =>
+      TgcgMember(
+        id: current.id,
+        fullName: current.fullName,
+        phoneNumber: phoneNumber ?? current.phoneNumber,
+        email: email ?? current.email,
+        emailVerified: emailVerified ?? current.emailVerified,
+        membershipNumber: current.membershipNumber,
+        pvcVin: pvcVin ?? current.pvcVin,
+        selfieReference: selfieReference ?? current.selfieReference,
+        accountStatus: accountStatus ?? current.accountStatus,
+        identityReview: identityReview ?? current.identityReview,
+        createdAt: current.createdAt,
+        status: status ?? current.status,
+        origin: current.origin,
+      );
+
   static TgcgRole? _role(Object? value) {
     final name = value?.toString();
     for (final item in TgcgRole.values) {
@@ -1109,6 +1351,22 @@ class MembershipOperationsController extends ChangeNotifier {
   static RecordStatus? _recordStatus(Object? value) {
     final name = value?.toString();
     for (final item in RecordStatus.values) {
+      if (item.name == name) return item;
+    }
+    return null;
+  }
+
+  static MemberAccountStatus? _memberAccountStatus(Object? value) {
+    final name = value?.toString();
+    for (final item in MemberAccountStatus.values) {
+      if (item.name == name) return item;
+    }
+    return null;
+  }
+
+  static MemberIdentityReview? _memberIdentityReview(Object? value) {
+    final name = value?.toString();
+    for (final item in MemberIdentityReview.values) {
       if (item.name == name) return item;
     }
     return null;
@@ -1142,6 +1400,9 @@ class MembershipOperationsController extends ChangeNotifier {
 
   static String _pinCredentialKey(String memberId) =>
       'usesf.member.$memberId.pin';
+
+  static String _passwordCredentialKey(String memberId) =>
+      'usesf.member.$memberId.password';
 
   static String _pvcMemberFingerprintKey(String memberId) =>
       'usesf.member.$memberId.pvc_fingerprint';

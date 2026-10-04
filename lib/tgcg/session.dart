@@ -124,8 +124,19 @@ String roleLabel(TgcgRole role) => switch (role) {
       TgcgRole.stateCoordinator => 'State Coordinator',
       TgcgRole.lgaCoordinator => 'LGA Coordinator',
       TgcgRole.wardCoordinator => 'Ward Coordinator',
-      TgcgRole.member => 'Member',
+      TgcgRole.pollingUnitCoordinator => 'Polling Unit Coordinator',
       TgcgRole.pollingUnitAgent => 'Polling Unit Agent',
+      TgcgRole.mediaOfficer => 'Media Officer',
+      TgcgRole.womenMobilizationCoordinator => 'Women Mobilization Coordinator',
+      TgcgRole.youthMobilizationCoordinator => 'Youth Mobilization Coordinator',
+      TgcgRole.communicationsOfficer => 'Communications Officer',
+      TgcgRole.logisticsOfficer => 'Logistics Officer',
+      TgcgRole.monitoringEvaluationOfficer => 'Monitoring & Evaluation Officer',
+      TgcgRole.dataEvidenceOfficer => 'Data & Evidence Officer',
+      TgcgRole.transportCoordinator => 'Transport Coordinator',
+      TgcgRole.trainingOfficer => 'Training Officer',
+      TgcgRole.ictOfficer => 'ICT Officer',
+      TgcgRole.member => 'Member',
       TgcgRole.observer => 'Observer',
       TgcgRole.legalOfficer => 'Legal Officer',
       TgcgRole.technicalSupport => 'Technical Support',
@@ -143,15 +154,37 @@ String roleDescription(TgcgRole role) => switch (role) {
       TgcgRole.senatorialCoordinator =>
         'Coordination and operational monitoring across the LGAs of an assigned senatorial zone.',
       TgcgRole.stateCoordinator =>
-        'Kaduna State field network, accreditation, incidents and result verification.',
+        'Kaduna State member network, assignments, incidents and result verification.',
       TgcgRole.lgaCoordinator =>
-        'LGA field coordination, reporting, agent assignments and election-day operations.',
+        'LGA field coordination, reporting, member assignments and operational deployment.',
       TgcgRole.wardCoordinator =>
-        'Ward-level field monitoring, reporting and result submission support.',
-      TgcgRole.member =>
-        'Member profile, home polling-unit information and authorized assignment access.',
+        'Ward-level coordination, member roles, assignments and operational reporting.',
+      TgcgRole.pollingUnitCoordinator =>
+        'Polling-unit coordination, member assignments, presence and operational reporting.',
       TgcgRole.pollingUnitAgent =>
-        'Polling-unit check-in, incident reporting, evidence and result submission.',
+        'Polling-unit field duty, incident reporting, evidence and result submission.',
+      TgcgRole.mediaOfficer =>
+        'Media information, field updates, review, coordination and escalation within the assigned scope.',
+      TgcgRole.womenMobilizationCoordinator =>
+        'Women-focused coordination, meetings, communications and assigned operational activities.',
+      TgcgRole.youthMobilizationCoordinator =>
+        'Youth-focused coordination, meetings, communications and assigned operational activities.',
+      TgcgRole.communicationsOfficer =>
+        'Operational communications, discussion and meeting coordination.',
+      TgcgRole.logisticsOfficer =>
+        'Logistics coordination, location-aware operations and field communications.',
+      TgcgRole.monitoringEvaluationOfficer =>
+        'Monitoring, field reporting, evidence review and operational reporting.',
+      TgcgRole.dataEvidenceOfficer =>
+        'Data, evidence, audit and reporting responsibilities within the assigned scope.',
+      TgcgRole.transportCoordinator =>
+        'Transport coordination, geographic operations and field communications.',
+      TgcgRole.trainingOfficer =>
+        'Training coordination, discussion, communications and meeting support.',
+      TgcgRole.ictOfficer =>
+        'ICT support, system visibility and operational technical coordination.',
+      TgcgRole.member =>
+        'Registered member identity. Operational access is granted by roles or active assignments.',
       TgcgRole.observer =>
         'Observation, structured field reporting and evidence submission.',
       TgcgRole.legalOfficer =>
@@ -172,8 +205,19 @@ IconData roleIcon(TgcgRole role) => switch (role) {
       TgcgRole.stateCoordinator => Icons.map_rounded,
       TgcgRole.lgaCoordinator => Icons.location_city_rounded,
       TgcgRole.wardCoordinator => Icons.grid_view_rounded,
-      TgcgRole.member => Icons.person_pin_circle_rounded,
+      TgcgRole.pollingUnitCoordinator => Icons.place_rounded,
       TgcgRole.pollingUnitAgent => Icons.how_to_vote_rounded,
+      TgcgRole.mediaOfficer => Icons.campaign_outlined,
+      TgcgRole.womenMobilizationCoordinator => Icons.groups_2_outlined,
+      TgcgRole.youthMobilizationCoordinator => Icons.diversity_3_outlined,
+      TgcgRole.communicationsOfficer => Icons.forum_outlined,
+      TgcgRole.logisticsOfficer => Icons.inventory_2_outlined,
+      TgcgRole.monitoringEvaluationOfficer => Icons.monitoring_outlined,
+      TgcgRole.dataEvidenceOfficer => Icons.fact_check_outlined,
+      TgcgRole.transportCoordinator => Icons.local_shipping_outlined,
+      TgcgRole.trainingOfficer => Icons.school_outlined,
+      TgcgRole.ictOfficer => Icons.computer_outlined,
+      TgcgRole.member => Icons.person_pin_circle_rounded,
       TgcgRole.observer => Icons.visibility_rounded,
       TgcgRole.legalOfficer => Icons.gavel_rounded,
       TgcgRole.technicalSupport => Icons.support_agent_rounded,
@@ -187,19 +231,35 @@ Set<TgcgModule> allowedModules(TgcgRole role) {
   if (role == TgcgRole.securityOfficer) {
     return const {TgcgModule.securityResponse};
   }
+  return modulesForCapabilities(
+    TgcgPermissionPolicy.capabilitiesFor(role),
+    role: role,
+  );
+}
+
+Set<TgcgModule> modulesForCapabilities(
+  Set<TgcgCapability> capabilities, {
+  TgcgRole? role,
+}) {
+  if (role == TgcgRole.securityOfficer) {
+    return const {TgcgModule.securityResponse};
+  }
 
   final modules = <TgcgModule>{TgcgModule.overview};
+  bool has(TgcgCapability capability) => capabilities.contains(capability);
 
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.manageMembership) ||
-      TgcgPermissionPolicy.allows(role, TgcgCapability.accreditAgents) ||
-      TgcgPermissionPolicy.allows(role, TgcgCapability.manageAgentAssignments)) {
+  if (has(TgcgCapability.manageMembership) ||
+      has(TgcgCapability.accreditAgents)) {
     modules.add(TgcgModule.accreditation);
   }
   if (role == TgcgRole.stateAdministrator) {
     modules.add(TgcgModule.membershipNetwork);
+  }
+  if (has(TgcgCapability.manageRoleAssignments)) {
+    modules.add(TgcgModule.membershipNetwork);
     modules.add(TgcgModule.roleAssignment);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.viewGeography)) {
+  if (has(TgcgCapability.viewGeography)) {
     modules.add(TgcgModule.geography);
     if (role != TgcgRole.pollingUnitAgent && role != TgcgRole.observer) {
       modules.add(TgcgModule.liveOperations);
@@ -207,67 +267,64 @@ Set<TgcgModule> allowedModules(TgcgRole role) {
       modules.add(TgcgModule.alertCenter);
     }
   }
-  if (TgcgPermissionPolicy.allows(
-    role,
-    TgcgCapability.manageAgentAssignments,
-  )) {
+  if (has(TgcgCapability.manageAssignments) ||
+      has(TgcgCapability.manageAgentAssignments)) {
     modules.add(TgcgModule.assignmentControl);
   }
-
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.viewIncidents) ||
-      TgcgPermissionPolicy.allows(role, TgcgCapability.createIncident) ||
-      TgcgPermissionPolicy.allows(role, TgcgCapability.submitFieldReport)) {
+  if (has(TgcgCapability.viewIncidents) ||
+      has(TgcgCapability.createIncident) ||
+      has(TgcgCapability.submitFieldReport)) {
     modules.add(TgcgModule.fieldMonitoring);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.viewEvidence)) {
+  if (has(TgcgCapability.viewEvidence)) {
     modules.add(TgcgModule.evidenceCapture);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.viewSituationRoom)) {
+  if (has(TgcgCapability.viewSituationRoom)) {
     modules.add(TgcgModule.situationRoom);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.viewSituationRoom) &&
-      TgcgPermissionPolicy.allows(role, TgcgCapability.assignIncident)) {
+  if (has(TgcgCapability.viewSituationRoom) &&
+      has(TgcgCapability.assignIncident)) {
     modules.add(TgcgModule.securityResponse);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.submitElectionResult) ||
-      TgcgPermissionPolicy.allows(role, TgcgCapability.verifyElectionResult) ||
-      TgcgPermissionPolicy.allows(role, TgcgCapability.disputeElectionResult)) {
+  if (has(TgcgCapability.submitElectionResult) ||
+      has(TgcgCapability.verifyElectionResult) ||
+      has(TgcgCapability.disputeElectionResult)) {
     modules.add(TgcgModule.resultCapture);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.verifyElectionResult) ||
-      TgcgPermissionPolicy.allows(role, TgcgCapability.manageMembership) ||
-      TgcgPermissionPolicy.allows(role, TgcgCapability.manageEvidence)) {
+  if (has(TgcgCapability.verifyElectionResult) ||
+      has(TgcgCapability.manageMembership) ||
+      has(TgcgCapability.manageEvidence)) {
     modules.add(TgcgModule.aiVerification);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.viewCollation)) {
+  if (has(TgcgCapability.viewCollation)) {
     modules.add(TgcgModule.collation);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.viewMediaIntelligence)) {
+  if (has(TgcgCapability.viewMediaIntelligence)) {
     modules.add(TgcgModule.mediaIntelligence);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.viewCommunications)) {
+  if (has(TgcgCapability.viewCommunications)) {
     modules.add(TgcgModule.communications);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.sendBroadcast)) {
+  if (has(TgcgCapability.sendBroadcast)) {
     modules.add(TgcgModule.bulkCommunications);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.viewDiscussionRoom)) {
+  if (has(TgcgCapability.viewDiscussionRoom)) {
     modules.add(TgcgModule.discussionRoom);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.viewMeetingRoom)) {
+  if (has(TgcgCapability.viewMeetingRoom)) {
     modules.add(TgcgModule.meetingRoom);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.viewAudit) ||
-      TgcgPermissionPolicy.allows(role, TgcgCapability.manageSystemSettings) ||
-      TgcgPermissionPolicy.allows(role, TgcgCapability.viewSituationRoom)) {
+  if (has(TgcgCapability.viewAudit) ||
+      has(TgcgCapability.manageSystemSettings) ||
+      has(TgcgCapability.viewSituationRoom)) {
     modules.add(TgcgModule.systemMonitoring);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.exportReports)) {
+  if (has(TgcgCapability.exportReports)) {
     modules.add(TgcgModule.reports);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.viewAudit) ||
-      TgcgPermissionPolicy.allows(role, TgcgCapability.manageUsers) ||
-      TgcgPermissionPolicy.allows(role, TgcgCapability.manageSystemSettings)) {
+  if (has(TgcgCapability.viewAudit) ||
+      has(TgcgCapability.manageUsers) ||
+      has(TgcgCapability.manageSystemSettings)) {
     modules.add(TgcgModule.governance);
   }
 

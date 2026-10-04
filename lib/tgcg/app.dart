@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'access/effective_member_access.dart';
 import 'assignments/assignment_store.dart';
 import 'assignments/assignment_tracking_store.dart';
 import 'communications/bulk_communications_store.dart';
@@ -493,7 +494,21 @@ class _AuthenticationGate extends StatelessWidget {
       );
     }
     if (session.role == TgcgRole.member) {
-      return const MemberShell(key: ValueKey('member-shell'));
+      final membership = MembershipOperations.of(context);
+      final member = membership.memberById(session.accessId);
+      if (member == null || member.isBlocked) {
+        return const MemberShell(key: ValueKey('member-shell'));
+      }
+
+      final access = EffectiveMemberAccess.resolve(
+        memberId: member.id,
+        governance: GovernanceOperations.of(context),
+        assignments: Assignments.of(context),
+      );
+      if (!access.hasOperationalAccess) {
+        return const MemberShell(key: ValueKey('member-shell'));
+      }
+      return const TgcgShell(key: ValueKey('member-operational-shell'));
     }
     if (session.role == TgcgRole.pollingUnitAgent) {
       return const FieldAgentShell(key: ValueKey('field-agent-shell'));

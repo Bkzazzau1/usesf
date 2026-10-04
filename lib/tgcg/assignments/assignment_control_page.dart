@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../access/access_policy.dart';
 import '../devices/managed_device_store.dart';
 import '../domain/permissions.dart';
 import '../geography/geography_registry.dart';
@@ -23,27 +24,31 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     final membership = MembershipOperations.of(context);
     final devices = ManagedDevices.of(context);
     final assignments = Assignments.of(context);
-    final canManageAssignments = TgcgPermissionPolicy.may(
-      session.role!,
-      session.scope,
-      TgcgCapability.manageAgentAssignments,
+    final assignmentScopes = TgcgAccessPolicy.scopesFor(
+      context,
+      TgcgCapability.manageAssignments,
     );
-    final canManageDevices = TgcgPermissionPolicy.may(
-      session.role!,
-      session.scope,
+    final deviceScopes = TgcgAccessPolicy.scopesFor(
+      context,
       TgcgCapability.manageDevices,
     );
+    final canManageAssignments = assignmentScopes.isNotEmpty;
+    final canManageDevices = deviceScopes.isNotEmpty;
     final authorizedUnits = membership.geography.pollingUnits
         .where(
-          (unit) =>
-              TgcgPermissionPolicy.scopeAllows(session.scope, unit.scope),
+          (unit) => assignmentScopes.any(
+            (scope) => TgcgPermissionPolicy.scopeAllows(scope, unit.scope),
+          ),
         )
         .toList(growable: false);
     final authorizedMembers = membership.members
         .where((member) {
           final scope = membership.registrationScopeForMember(member.id);
           return scope != null &&
-              TgcgPermissionPolicy.scopeAllows(session.scope, scope);
+              assignmentScopes.any(
+                (authority) =>
+                    TgcgPermissionPolicy.scopeAllows(authority, scope),
+              );
         })
         .toList(growable: false);
     final authorizedMemberIds =
@@ -53,8 +58,23 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
       final memberId = device.assignedMemberId;
       return memberId != null && authorizedMemberIds.contains(memberId);
     }).toList(growable: false);
-    final visible = assignments.assignmentsForScope(session.scope);
-    final coverage = assignments.coverageForScope(session.scope);
+    final visible = assignments.assignments
+        .where(
+          (item) => assignmentScopes.any(
+            (scope) =>
+                TgcgPermissionPolicy.scopeAllows(scope, item.targetScope) ||
+                TgcgPermissionPolicy.scopeAllows(item.targetScope, scope),
+          ),
+        )
+        .toList()
+      ..sort((a, b) => b.assignedAt.compareTo(a.assignedAt));
+    final coverageByUnit = <String, PollingUnitCoverageSnapshot>{};
+    for (final scope in assignmentScopes) {
+      for (final snapshot in assignments.coverageForScope(scope)) {
+        coverageByUnit[snapshot.unit.code] = snapshot;
+      }
+    }
+    final coverage = coverageByUnit.values.toList(growable: false);
     final gaps = coverage.where((item) => item.needsAttention).toList();
     final staffed =
         coverage.where((item) => !item.isBelowMinimum).length;
@@ -64,9 +84,9 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
       children: [
         TgcgPageHeader(
           eyebrow: 'FIELD DEPLOYMENT',
-          title: 'Assignment Control Centre',
+          title: 'Jobs & Assignment Control',
           subtitle:
-              '${session.scope.label}: assign members to polling units, bind managed phones and monitor assignment presence without changing home polling-unit records.',
+              '${assignmentScopes.length} authorized scope${assignmentScopes.length == 1 ? '' : 's'}: any registered member inside your authority can receive a job or temporary field assignment without changing the member\'s permanent home polling unit.',
           trailing: canManageAssignments
               ? Wrap(
                   spacing: 8,
@@ -78,6 +98,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                         assignments,
                         session,
                         authorizedUnits,
+                        assignmentScopes,
                       ),
                       icon: const Icon(Icons.groups_2_outlined),
                       label: const Text('Staffing needs'),
@@ -90,6 +111,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                         session,
                         authorizedMembers,
                         authorizedUnits,
+                        assignmentScopes,
                       ),
                       icon: const Icon(Icons.add_task_rounded),
                       label: const Text('New assignment'),
@@ -115,7 +137,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
               children: [
                 TgcgMetricCard(
                   width: width,
-                  label: 'Assignments',
+                  label: 'Jobs / assignments',
                   value: '${visible.length}',
                   detail: 'Within current scope',
                   icon: Icons.assignment_outlined,
@@ -123,9 +145,9 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                 ),
                 TgcgMetricCard(
                   width: width,
-                  label: 'Active',
+                  label: 'Active jobs',
                   value: '${visible.where((item) => !item.isTerminal).length}',
-                  detail: 'Open deployment tasks',
+                  detail: 'Open duties and deployments',
                   icon: Icons.play_circle_outline_rounded,
                   tone: TgcgMetricTone.success,
                 ),
@@ -180,7 +202,9 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
           authorizedMembers: authorizedMembers,
           actorId:
               session.accessId.isEmpty ? session.operatorName : session.accessId,
-          authorizedScope: session.scope,
+          authorizedScope: assignmentScopes.isEmpty
+              ? session.scope
+              : assignmentScopes.first,
         ),
         const SizedBox(height: 16),
         _DeviceRegistry(
@@ -195,6 +219,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
             membership,
             session,
             authorizedMembers,
+            deviceScopes,
           ),
         ),
       ],
@@ -206,6 +231,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     AssignmentController assignments,
     TgcgSessionController session,
     List<CanonicalPollingUnit> authorizedUnits,
+    List<GeographicScope> assignmentScopes,
   ) async {
     if (authorizedUnits.isEmpty) return;
 
@@ -372,7 +398,11 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                   actorId: session.accessId.isEmpty
                       ? session.operatorName
                       : session.accessId,
-                  authorizedScope: session.scope,
+                  authorizedScope: _scopeCovering(
+                        assignmentScopes,
+                        _scopeForUnit(authorizedUnits, pollingUnitId),
+                      ) ??
+                      session.scope,
                 );
                 if (dialogContext.mounted) {
                   Navigator.pop(dialogContext, true);
@@ -402,8 +432,9 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     TgcgSessionController session,
     List<TgcgMember> authorizedMembers,
     List<CanonicalPollingUnit> authorizedUnits,
+    List<GeographicScope> assignmentScopes,
   ) async {
-    if (authorizedMembers.isEmpty || authorizedUnits.isEmpty) {
+    if (authorizedMembers.isEmpty) {
       return;
     }
 
@@ -415,22 +446,34 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     final authorizedLgas = membership.geography.lgas
         .where((lga) => authorizedLgaIds.contains(lga.id))
         .toList(growable: false);
-    if (authorizedLgas.isEmpty) return;
 
-    var lgaId = authorizedLgas.first.id;
-    var units = authorizedUnits
-        .where((unit) => unit.scope.lgaId == lgaId)
-        .toList(growable: false);
+    String? lgaId =
+        authorizedLgas.isEmpty ? null : authorizedLgas.first.id;
+    var units = lgaId == null
+        ? const <CanonicalPollingUnit>[]
+        : authorizedUnits
+            .where((unit) => unit.scope.lgaId == lgaId)
+            .toList(growable: false);
     String? pollingUnitId = units.isEmpty ? null : units.first.code;
+    var locationBound = authorizedLgas.isNotEmpty;
     var priority = AssignmentPriority.normal;
-    final title = TextEditingController(text: 'Polling Unit Field Assignment');
+    final selectedCapabilities = <TgcgCapability>{};
+    final capabilityRole = TgcgAccessPolicy.roleFor(
+          context,
+          TgcgCapability.manageAssignments,
+          listen: false,
+        ) ??
+        session.role!;
+    final availableCapabilities =
+        _assignmentGrantOptionsFor(capabilityRole);
+    final title = TextEditingController(text: 'Field Duty Assignment');
     final instructions = TextEditingController();
 
     final created = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Create member assignment'),
+          title: const Text('Assign a job to a member'),
           content: SizedBox(
             width: 680,
             child: SingleChildScrollView(
@@ -461,6 +504,22 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                       }
                     },
                   ),
+                  const SizedBox(height: 12),
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    value: locationBound,
+                    onChanged: (value) => setDialogState(() {
+                      locationBound = value;
+                    }),
+                    title: const Text(
+                      'Tie this assignment to a polling unit',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    subtitle: const Text(
+                      'Turn this off for special or location-flexible assignments. GPS is still required when work is captured or submitted.',
+                    ),
+                  ),
+                  if (locationBound) ...[
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     initialValue: lgaId,
@@ -495,7 +554,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                     initialValue: pollingUnitId,
                     isExpanded: true,
                     decoration: const InputDecoration(
-                      labelText: 'Target polling unit',
+                      labelText: 'Operational polling unit',
                       prefixIcon: Icon(Icons.how_to_vote_outlined),
                     ),
                     items: units
@@ -512,6 +571,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                     onChanged: (value) =>
                         setDialogState(() => pollingUnitId = value),
                   ),
+                  ],
                   const SizedBox(height: 12),
                   DropdownButtonFormField<AssignmentPriority>(
                     initialValue: priority,
@@ -532,7 +592,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                   TextField(
                     controller: title,
                     decoration:
-                        const InputDecoration(labelText: 'Assignment title'),
+                        const InputDecoration(labelText: 'Job / assignment title'),
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -544,6 +604,42 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                       alignLabelWithHint: true,
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  ExpansionTile(
+                    tilePadding: EdgeInsets.zero,
+                    childrenPadding: const EdgeInsets.only(bottom: 8),
+                    title: const Text(
+                      'Temporary app access',
+                      style: TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                    subtitle: const Text(
+                      'Choose only the tools this assignment needs. Access disappears automatically when the assignment closes.',
+                    ),
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: availableCapabilities.map((capability) {
+                            final selected =
+                                selectedCapabilities.contains(capability);
+                            return FilterChip(
+                              selected: selected,
+                              label: Text(_assignmentCapabilityLabel(capability)),
+                              onSelected: (value) => setDialogState(() {
+                                if (value) {
+                                  selectedCapabilities.add(capability);
+                                } else {
+                                  selectedCapabilities.remove(capability);
+                                }
+                              }),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -554,20 +650,32 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
               child: const Text('Cancel'),
             ),
             FilledButton.icon(
-              onPressed: pollingUnitId == null
+              onPressed: locationBound && pollingUnitId == null
                   ? null
                   : () async {
                       try {
                         await assignments.createAssignment(
                           title: title.text,
                           memberId: memberId,
-                          pollingUnitId: pollingUnitId!,
+                          pollingUnitId:
+                              locationBound ? pollingUnitId : null,
                           assignedBy: session.accessId.isEmpty
                               ? session.operatorName
                               : session.accessId,
-                          authorizedScope: session.scope,
+                          authorizedScope: _scopeCovering(
+                                assignmentScopes,
+                                locationBound && pollingUnitId != null
+                                    ? membership.geography
+                                        .pollingUnit(pollingUnitId!)
+                                        ?.scope
+                                    : membership
+                                        .registrationScopeForMember(memberId),
+                              ) ??
+                              assignmentScopes.first,
                           priority: priority,
                           instructions: instructions.text,
+                          grantedCapabilities:
+                              Set.unmodifiable(selectedCapabilities),
                         );
                         if (dialogContext.mounted) {
                           Navigator.pop(dialogContext, true);
@@ -580,7 +688,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                       }
                     },
               icon: const Icon(Icons.assignment_turned_in_outlined),
-              label: const Text('Assign member'),
+              label: const Text('Create assignment'),
             ),
           ],
         ),
@@ -591,7 +699,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     instructions.dispose();
     if (created == true && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Assignment created and queued for sync.')),
+        const SnackBar(content: Text('Member assignment created and queued for sync.')),
       );
     }
   }
@@ -677,6 +785,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     MembershipOperationsController membership,
     TgcgSessionController session,
     List<TgcgMember> authorizedMembers,
+    List<GeographicScope> deviceScopes,
   ) async {
     final available = devices.devices
         .where((item) => item.status == ManagedDeviceStatus.available)
@@ -759,7 +868,9 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                     assignedBy: session.accessId.isEmpty
                         ? session.operatorName
                         : session.accessId,
-                    authorizedScope: session.scope,
+                    authorizedScope: deviceScopes.isEmpty
+                        ? session.scope
+                        : deviceScopes.first,
                   );
                   if (dialogContext.mounted) {
                     Navigator.pop(dialogContext, true);
@@ -786,6 +897,67 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     }
   }
 }
+
+GeographicScope? _scopeForUnit(
+  List<CanonicalPollingUnit> units,
+  String pollingUnitId,
+) {
+  for (final unit in units) {
+    if (unit.code == pollingUnitId) return unit.scope;
+  }
+  return null;
+}
+
+GeographicScope? _scopeCovering(
+  List<GeographicScope> authorities,
+  GeographicScope? target,
+) {
+  if (target == null) return authorities.isEmpty ? null : authorities.first;
+  for (final scope in authorities) {
+    if (TgcgPermissionPolicy.scopeAllows(scope, target)) return scope;
+  }
+  return null;
+}
+
+List<TgcgCapability> _assignmentGrantOptionsFor(TgcgRole role) {
+  const grantable = <TgcgCapability>[
+    TgcgCapability.viewGeography,
+    TgcgCapability.viewIncidents,
+    TgcgCapability.createIncident,
+    TgcgCapability.submitFieldReport,
+    TgcgCapability.viewCommunications,
+    TgcgCapability.sendOperationalMessage,
+    TgcgCapability.viewMediaIntelligence,
+    TgcgCapability.viewDiscussionRoom,
+    TgcgCapability.createDiscussionThread,
+    TgcgCapability.postDiscussionReply,
+    TgcgCapability.viewMeetingRoom,
+    TgcgCapability.startMeeting,
+    TgcgCapability.joinMeeting,
+    TgcgCapability.viewEvidence,
+  ];
+  final own = TgcgPermissionPolicy.capabilitiesFor(role);
+  return grantable.where(own.contains).toList(growable: false);
+}
+
+String _assignmentCapabilityLabel(TgcgCapability capability) =>
+    switch (capability) {
+      TgcgCapability.viewGeography => 'Geography',
+      TgcgCapability.viewIncidents => 'View incidents',
+      TgcgCapability.createIncident => 'Report incidents',
+      TgcgCapability.submitFieldReport => 'Field reports',
+      TgcgCapability.viewCommunications => 'Messages',
+      TgcgCapability.sendOperationalMessage => 'Send messages',
+      TgcgCapability.viewMediaIntelligence => 'Media',
+      TgcgCapability.viewDiscussionRoom => 'Discussion forum',
+      TgcgCapability.createDiscussionThread => 'Start discussions',
+      TgcgCapability.postDiscussionReply => 'Comment / reply',
+      TgcgCapability.viewMeetingRoom => 'Meeting rooms',
+      TgcgCapability.startMeeting => 'Start meetings',
+      TgcgCapability.joinMeeting => 'Join meetings',
+      TgcgCapability.viewEvidence => 'Evidence',
+      _ => capability.name,
+    };
 
 class _AssignmentCoverageMap extends StatelessWidget {
   const _AssignmentCoverageMap({

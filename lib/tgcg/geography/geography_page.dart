@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../access/access_policy.dart';
 import '../assignments/assignment_store.dart';
 import '../devices/managed_device_store.dart';
 import '../domain/permissions.dart';
@@ -31,7 +32,13 @@ class _GeographyPageState extends State<GeographyPage> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (path.isEmpty) {
-      path.add(TgcgSession.of(context, listen: false).scope);
+      final scope = TgcgAccessPolicy.authorizingScope(
+            context,
+            TgcgCapability.viewGeography,
+            listen: false,
+          ) ??
+          TgcgSession.of(context, listen: false).scope;
+      path.add(scope);
     }
   }
 
@@ -50,14 +57,18 @@ class _GeographyPageState extends State<GeographyPage> {
     final field = FieldOperations.of(context);
     final results = ResultOperations.of(context);
     final registry = membership.geography;
+    final geographyScopes = TgcgAccessPolicy.scopesFor(
+      context,
+      TgcgCapability.viewGeography,
+    );
     final canVerifyPollingUnit =
-        TgcgPermissionPolicy.allows(
-          session.role!,
+        TgcgAccessPolicy.allows(
+          context,
           TgcgCapability.manageMembership,
         ) ||
-        TgcgPermissionPolicy.allows(
-          session.role!,
-          TgcgCapability.manageAgentAssignments,
+        TgcgAccessPolicy.allows(
+          context,
+          TgcgCapability.manageAssignments,
         );
     final scope = path.last;
     final children = registry.childScopes(scope);
@@ -101,7 +112,7 @@ class _GeographyPageState extends State<GeographyPage> {
           eyebrow: 'GEOGRAPHIC COMMAND',
           title: 'Geographic Operations',
           subtitle:
-              '${scope.label}: membership, field-agent coverage, incidents and result activity across the operational hierarchy.',
+              '${scope.label}: members, assignments, incidents and result activity across the operational hierarchy.',
           trailing: TgcgStatusPill(
             label: _levelLabel(scope.level).toUpperCase(),
             color: TgcgColors.primary,
@@ -109,6 +120,33 @@ class _GeographyPageState extends State<GeographyPage> {
           ),
         ),
         const SizedBox(height: 18),
+        if (geographyScopes.length > 1) ...[
+          TgcgSectionCard(
+            title: 'Your authorized geographic scopes',
+            subtitle:
+                'Combined access can include several roles or assignments. Open any authorized scope below.',
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: geographyScopes
+                  .map(
+                    (authorized) => ActionChip(
+                      avatar: const Icon(Icons.location_on_outlined, size: 16),
+                      label: Text(authorized.label),
+                      onPressed: () => setState(() {
+                        path
+                          ..clear()
+                          ..add(authorized);
+                        query = '';
+                        searchController.clear();
+                      }),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+          const SizedBox(height: 14),
+        ],
         _BreadcrumbBar(
           path: path,
           onSelect: (index) => setState(() {

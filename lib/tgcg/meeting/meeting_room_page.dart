@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../access/access_policy.dart';
 import '../domain/permissions.dart';
 import '../media/local_camera_view.dart';
 import '../session.dart';
@@ -119,12 +120,12 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
   @override
   Widget build(BuildContext context) {
     final session = TgcgSession.of(context);
-    final canStart = TgcgPermissionPolicy.allows(
-      session.role!,
+    final canStart = TgcgAccessPolicy.allows(
+      context,
       TgcgCapability.startMeeting,
     );
-    final canJoin = TgcgPermissionPolicy.allows(
-      session.role!,
+    final canJoin = TgcgAccessPolicy.allows(
+      context,
       TgcgCapability.joinMeeting,
     );
 
@@ -159,7 +160,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
           eyebrow: 'LIVE COLLABORATION',
           title: 'Meeting Room',
           subtitle:
-              '${session.scope.label}: audio calls, video meetings and multi-participant conferences.',
+              'Combined authorized access: audio calls, video meetings and multi-participant conferences.',
           trailing: canStart
               ? FilledButton.icon(
                   onPressed: () => _scheduleMeeting(context, session),
