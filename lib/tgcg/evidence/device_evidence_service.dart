@@ -57,6 +57,20 @@ class DeviceEvidenceService {
     );
   }
 
+  Future<CapturedEvidence?> captureSelfie() async {
+    final file = await _imagePicker.pickImage(
+      source: ImageSource.camera,
+      preferredCameraDevice: CameraDevice.front,
+      imageQuality: 90,
+    );
+    if (file == null) return null;
+    return _fromXFile(
+      file,
+      type: EvidenceType.photo,
+      mimeType: file.mimeType ?? 'image/jpeg',
+    );
+  }
+
   Future<CapturedEvidence?> captureVideo() async {
     final file = await _imagePicker.pickVideo(
       source: ImageSource.camera,
