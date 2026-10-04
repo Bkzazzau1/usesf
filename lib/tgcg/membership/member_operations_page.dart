@@ -133,7 +133,7 @@ class _MemberOperationsPageState extends State<MemberOperationsPage> {
                 FilledButton.icon(
                   onPressed: () =>
                       widget.onOpenModule(TgcgModule.assignmentControl),
-                  icon: const Icon(Icons.assignment_add_rounded),
+                  icon: const Icon(Icons.add_task_rounded),
                   label: const Text('Assign job'),
                 ),
             ],
@@ -683,7 +683,7 @@ class _MemberInspector extends StatelessWidget {
                     width: double.infinity,
                     child: FilledButton.icon(
                       onPressed: onOpenAssignments,
-                      icon: const Icon(Icons.assignment_add_rounded),
+                      icon: const Icon(Icons.add_task_rounded),
                       label: const Text('Assign job to this member'),
                     ),
                   ),
