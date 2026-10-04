@@ -17,7 +17,7 @@ import 'governance/governance_page.dart';
 import 'governance/role_assignment_page.dart';
 import 'media/media_intelligence_page.dart';
 import 'meeting/meeting_room_page.dart';
-import 'membership/state_membership_page.dart';
+import 'membership/member_operations_page.dart';
 import 'membership/pvc_enrollment_page.dart';
 import 'monitoring/system_monitoring_page.dart';
 import 'offline/offline_persistence.dart';
@@ -151,7 +151,9 @@ class _TgcgShellState extends State<TgcgShell> {
   Widget _pageFor(TgcgModule module) => switch (module) {
         TgcgModule.overview => TgcgDashboardPage(onOpenModule: _select),
         TgcgModule.accreditation => const PvcEnrollmentPage(),
-        TgcgModule.membershipNetwork => const StateMembershipPage(),
+        TgcgModule.membershipNetwork => MemberOperationsPage(
+            onOpenModule: _select,
+          ),
         TgcgModule.roleAssignment => const RoleAssignmentPage(),
         TgcgModule.geography => const GeographyPage(),
         TgcgModule.assignmentControl => const AssignmentControlPage(),
@@ -191,7 +193,7 @@ const _destinations = <_Destination>[
   _Destination(TgcgModule.liveOperations, 'Live Operations', Icons.travel_explore_rounded, _NavGroup.command),
   _Destination(TgcgModule.aiAnalytics, 'AI Data Analytics', Icons.query_stats_rounded, _NavGroup.command),
   _Destination(TgcgModule.alertCenter, 'Alert Centre', Icons.notifications_active_outlined, _NavGroup.command),
-  _Destination(TgcgModule.membershipNetwork, 'Registered Members', Icons.groups_2_outlined, _NavGroup.command),
+  _Destination(TgcgModule.membershipNetwork, 'Member Operations', Icons.groups_2_outlined, _NavGroup.command),
   _Destination(TgcgModule.situationRoom, 'Situation Room', Icons.radar_rounded, _NavGroup.command),
   _Destination(TgcgModule.securityResponse, 'Security Response', Icons.emergency_share_outlined, _NavGroup.command),
   _Destination(TgcgModule.mediaIntelligence, 'Media Intelligence', Icons.insights_outlined, _NavGroup.command),
