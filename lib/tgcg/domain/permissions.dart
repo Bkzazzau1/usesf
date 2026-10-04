@@ -132,6 +132,7 @@ class TgcgPermissionPolicy {
       TgcgCapability.exportReports,
     },
     TgcgRole.stateCoordinator: {
+      TgcgCapability.manageMembership,
       TgcgCapability.createCustomRoles,
       TgcgCapability.manageRoleConflicts,
       TgcgCapability.manageAssignments,
