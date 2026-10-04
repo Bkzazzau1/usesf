@@ -728,6 +728,12 @@ class AssignmentController extends ChangeNotifier {
         'Invalid assignment transition from ${current.status.name} to ${status.name}.',
       );
     }
+    if (status == AssignmentStatus.completed &&
+        !_hasFreshAssignmentLocation(current)) {
+      throw StateError(
+        'A fresh GPS fix is required before this assignment can be completed.',
+      );
+    }
 
     final now = DateTime.now().toUtc();
     final updated = current.copyWith(
@@ -979,6 +985,11 @@ class AssignmentController extends ChangeNotifier {
         'Evidence cannot be added after this assignment is closed.',
       );
     }
+    if (!_hasFreshAssignmentLocation(current)) {
+      throw StateError(
+        'A fresh GPS fix is required before assignment evidence can be captured or submitted.',
+      );
+    }
     if (current.evidence.any((item) => item.id == evidence.id)) {
       return current;
     }
@@ -1123,6 +1134,16 @@ class AssignmentController extends ChangeNotifier {
                 },
         },
       );
+
+  static bool _hasFreshAssignmentLocation(
+    MemberAssignment assignment, {
+    Duration maxAge = const Duration(minutes: 2),
+  }) {
+    final ping = assignment.lastLocation;
+    if (ping == null) return false;
+    final age = DateTime.now().toUtc().difference(ping.capturedAt).abs();
+    return age <= maxAge && ping.accuracyMeters.isFinite;
+  }
 
   static AssignmentLocationMode? _assignmentLocationMode(Object? value) {
     final name = value?.toString();
