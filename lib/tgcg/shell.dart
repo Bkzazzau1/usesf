@@ -150,7 +150,9 @@ class _TgcgShellState extends State<TgcgShell> {
 
   Widget _pageFor(TgcgModule module) => switch (module) {
         TgcgModule.overview => TgcgDashboardPage(onOpenModule: _select),
-        TgcgModule.accreditation => const PvcEnrollmentPage(),
+        TgcgModule.accreditation => PvcEnrollmentPage(
+            onOpenAssignments: () => _select(TgcgModule.assignmentControl),
+          ),
         TgcgModule.membershipNetwork => MemberOperationsPage(
             onOpenModule: _select,
           ),
