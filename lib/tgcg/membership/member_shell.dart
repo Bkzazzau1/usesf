@@ -954,6 +954,17 @@ class _MemberAssignmentCardState extends State<_MemberAssignmentCard> {
     if (device == null) return;
     setState(() => _busy = true);
     try {
+      final fix = await _location.captureCurrentFix();
+      if (!mounted) return;
+      Assignments.of(context, listen: false).recordLocationHeartbeat(
+        assignmentId: assignment.id,
+        deviceId: device.id,
+        latitude: fix.latitude,
+        longitude: fix.longitude,
+        accuracyMeters: fix.accuracyMeters,
+        capturedAt: fix.capturedAt,
+      );
+
       final captured = switch (type) {
         EvidenceType.photo => await _evidenceService.capturePhoto(),
         EvidenceType.video => await _evidenceService.captureVideo(),
@@ -1018,6 +1029,25 @@ class _MemberAssignmentCardState extends State<_MemberAssignmentCard> {
     setState(() => _busy = true);
     final tracking = AssignmentTracking.of(context, listen: false);
     try {
+      if (target == AssignmentStatus.completed) {
+        final device = widget.managedDevice;
+        if (device == null) {
+          throw StateError(
+            'A device with location access is required to complete this assignment.',
+          );
+        }
+        final fix = await _location.captureCurrentFix();
+        if (!mounted) return;
+        Assignments.of(context, listen: false).recordLocationHeartbeat(
+          assignmentId: assignment.id,
+          deviceId: device.id,
+          latitude: fix.latitude,
+          longitude: fix.longitude,
+          accuracyMeters: fix.accuracyMeters,
+          capturedAt: fix.capturedAt,
+        );
+      }
+
       await Assignments.of(context, listen: false).transition(
         assignmentId: assignment.id,
         status: target,
