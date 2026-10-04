@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../access/access_policy.dart';
 import '../domain/permissions.dart';
 import '../membership/membership_store.dart';
 import '../session.dart';
@@ -47,12 +48,20 @@ class _RoleAssignmentPageState extends State<RoleAssignmentPage> {
     final membership = MembershipOperations.of(context);
     final governance = GovernanceOperations.of(context);
 
-    final currentRole = session.role!;
-    final canAssignRoles = TgcgPermissionPolicy.allows(
-      currentRole,
+    final currentRole = TgcgAccessPolicy.roleFor(
+          context,
+          TgcgCapability.manageRoleAssignments,
+        ) ??
+        session.role!;
+    final canAssignRoles = TgcgAccessPolicy.allows(
+      context,
       TgcgCapability.manageRoleAssignments,
     );
-    if (!canAssignRoles) {
+    final authorizedScopes = TgcgAccessPolicy.scopesFor(
+      context,
+      TgcgCapability.manageRoleAssignments,
+    );
+    if (!canAssignRoles || authorizedScopes.isEmpty) {
       return const Center(
         child: TgcgEmptyState(
           icon: Icons.admin_panel_settings_outlined,
@@ -72,24 +81,33 @@ class _RoleAssignmentPageState extends State<RoleAssignmentPage> {
     final members = membership.members.where((member) {
       final memberScope = membership.registrationScopeForMember(member.id);
       return memberScope != null &&
-          TgcgPermissionPolicy.scopeAllows(session.scope, memberScope);
+          authorizedScopes.any(
+            (scope) => TgcgPermissionPolicy.scopeAllows(scope, memberScope),
+          );
     }).toList(growable: false);
     if (selectedMemberId == null ||
         !members.any((item) => item.id == selectedMemberId)) {
       selectedMemberId = members.isEmpty ? null : members.first.id;
     }
 
-    final scopes = _scopeOptions(
+    final scopes = _scopeOptionsForAuthorities(
       membership,
       selectedRole,
-      session.scope,
+      authorizedScopes,
     );
     if (scopes.isNotEmpty &&
         !scopes.any((item) => item.key == selectedScopeKey)) {
       selectedScopeKey = scopes.first.key;
     }
 
-    final assignments = governance.roleAssignmentsForScope(session.scope)
+    final assignments = governance.roleAssignments
+        .where(
+          (item) => authorizedScopes.any(
+            (scope) =>
+                TgcgPermissionPolicy.scopeAllows(scope, item.scope) ||
+                TgcgPermissionPolicy.scopeAllows(item.scope, scope),
+          ),
+        )
         .where((item) =>
             search.trim().isEmpty ||
             item.subjectName.toLowerCase().contains(search.toLowerCase()) ||
@@ -197,8 +215,8 @@ class _RoleAssignmentPageState extends State<RoleAssignmentPage> {
                                     item.id,
                                     actorId: actorId,
                                     allowStateOverride:
-                                        session.role == TgcgRole.stateCoordinator ||
-                                            session.role ==
+                                        currentRole == TgcgRole.stateCoordinator ||
+                                            currentRole ==
                                                 TgcgRole.stateAdministrator,
                                   );
                                 }
@@ -256,6 +274,25 @@ class _RoleAssignmentPageState extends State<RoleAssignmentPage> {
       final targetRank = _coordinatorRank(role);
       return targetRank >= 0 && targetRank < actorRank;
     }).toList(growable: false);
+  }
+
+  List<_ScopeOption> _scopeOptionsForAuthorities(
+    MembershipOperationsController membership,
+    TgcgRole role,
+    List<GeographicScope> authorizedScopes,
+  ) {
+    final merged = <_ScopeOption>[];
+    final seen = <String>{};
+    for (final authorizedScope in authorizedScopes) {
+      for (final option in _scopeOptions(
+        membership,
+        role,
+        authorizedScope,
+      )) {
+        if (seen.add(option.key)) merged.add(option);
+      }
+    }
+    return merged;
   }
 
   List<_ScopeOption> _scopeOptions(
@@ -390,8 +427,14 @@ class _RoleAssignmentPageState extends State<RoleAssignmentPage> {
     final actorId =
         session.accessId.isEmpty ? session.operatorName : session.accessId;
     if (record.assignedBy == actorId) return true;
-    return session.role == TgcgRole.stateCoordinator ||
-        session.role == TgcgRole.stateAdministrator;
+    final role = TgcgAccessPolicy.roleFor(
+      context,
+      TgcgCapability.manageRoleAssignments,
+      targetScope: record.scope,
+      listen: false,
+    );
+    return role == TgcgRole.stateCoordinator ||
+        role == TgcgRole.stateAdministrator;
   }
 
   static bool _isFunctionalRole(TgcgRole role) => switch (role) {
