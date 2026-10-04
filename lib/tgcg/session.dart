@@ -143,9 +143,9 @@ String roleDescription(TgcgRole role) => switch (role) {
       TgcgRole.senatorialCoordinator =>
         'Coordination and operational monitoring across the LGAs of an assigned senatorial zone.',
       TgcgRole.stateCoordinator =>
-        'Kaduna State field network, accreditation, incidents and result verification.',
+        'Kaduna State member network, assignments, incidents and result verification.',
       TgcgRole.lgaCoordinator =>
-        'LGA field coordination, reporting, agent assignments and election-day operations.',
+        'LGA field coordination, reporting, member assignments and operational deployment.',
       TgcgRole.wardCoordinator =>
         'Ward-level field monitoring, reporting and result submission support.',
       TgcgRole.member =>
