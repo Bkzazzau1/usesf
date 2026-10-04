@@ -231,24 +231,35 @@ Set<TgcgModule> allowedModules(TgcgRole role) {
   if (role == TgcgRole.securityOfficer) {
     return const {TgcgModule.securityResponse};
   }
+  return modulesForCapabilities(
+    TgcgPermissionPolicy.capabilitiesFor(role),
+    role: role,
+  );
+}
+
+Set<TgcgModule> modulesForCapabilities(
+  Set<TgcgCapability> capabilities, {
+  TgcgRole? role,
+}) {
+  if (role == TgcgRole.securityOfficer) {
+    return const {TgcgModule.securityResponse};
+  }
 
   final modules = <TgcgModule>{TgcgModule.overview};
+  bool has(TgcgCapability capability) => capabilities.contains(capability);
 
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.manageMembership) ||
-      TgcgPermissionPolicy.allows(role, TgcgCapability.accreditAgents)) {
+  if (has(TgcgCapability.manageMembership) ||
+      has(TgcgCapability.accreditAgents)) {
     modules.add(TgcgModule.accreditation);
   }
   if (role == TgcgRole.stateAdministrator) {
     modules.add(TgcgModule.membershipNetwork);
   }
-  if (TgcgPermissionPolicy.allows(
-    role,
-    TgcgCapability.manageRoleAssignments,
-  )) {
+  if (has(TgcgCapability.manageRoleAssignments)) {
     modules.add(TgcgModule.membershipNetwork);
     modules.add(TgcgModule.roleAssignment);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.viewGeography)) {
+  if (has(TgcgCapability.viewGeography)) {
     modules.add(TgcgModule.geography);
     if (role != TgcgRole.pollingUnitAgent && role != TgcgRole.observer) {
       modules.add(TgcgModule.liveOperations);
@@ -256,68 +267,64 @@ Set<TgcgModule> allowedModules(TgcgRole role) {
       modules.add(TgcgModule.alertCenter);
     }
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.manageAssignments) ||
-      TgcgPermissionPolicy.allows(
-        role,
-        TgcgCapability.manageAgentAssignments,
-      )) {
+  if (has(TgcgCapability.manageAssignments) ||
+      has(TgcgCapability.manageAgentAssignments)) {
     modules.add(TgcgModule.assignmentControl);
   }
-
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.viewIncidents) ||
-      TgcgPermissionPolicy.allows(role, TgcgCapability.createIncident) ||
-      TgcgPermissionPolicy.allows(role, TgcgCapability.submitFieldReport)) {
+  if (has(TgcgCapability.viewIncidents) ||
+      has(TgcgCapability.createIncident) ||
+      has(TgcgCapability.submitFieldReport)) {
     modules.add(TgcgModule.fieldMonitoring);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.viewEvidence)) {
+  if (has(TgcgCapability.viewEvidence)) {
     modules.add(TgcgModule.evidenceCapture);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.viewSituationRoom)) {
+  if (has(TgcgCapability.viewSituationRoom)) {
     modules.add(TgcgModule.situationRoom);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.viewSituationRoom) &&
-      TgcgPermissionPolicy.allows(role, TgcgCapability.assignIncident)) {
+  if (has(TgcgCapability.viewSituationRoom) &&
+      has(TgcgCapability.assignIncident)) {
     modules.add(TgcgModule.securityResponse);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.submitElectionResult) ||
-      TgcgPermissionPolicy.allows(role, TgcgCapability.verifyElectionResult) ||
-      TgcgPermissionPolicy.allows(role, TgcgCapability.disputeElectionResult)) {
+  if (has(TgcgCapability.submitElectionResult) ||
+      has(TgcgCapability.verifyElectionResult) ||
+      has(TgcgCapability.disputeElectionResult)) {
     modules.add(TgcgModule.resultCapture);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.verifyElectionResult) ||
-      TgcgPermissionPolicy.allows(role, TgcgCapability.manageMembership) ||
-      TgcgPermissionPolicy.allows(role, TgcgCapability.manageEvidence)) {
+  if (has(TgcgCapability.verifyElectionResult) ||
+      has(TgcgCapability.manageMembership) ||
+      has(TgcgCapability.manageEvidence)) {
     modules.add(TgcgModule.aiVerification);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.viewCollation)) {
+  if (has(TgcgCapability.viewCollation)) {
     modules.add(TgcgModule.collation);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.viewMediaIntelligence)) {
+  if (has(TgcgCapability.viewMediaIntelligence)) {
     modules.add(TgcgModule.mediaIntelligence);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.viewCommunications)) {
+  if (has(TgcgCapability.viewCommunications)) {
     modules.add(TgcgModule.communications);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.sendBroadcast)) {
+  if (has(TgcgCapability.sendBroadcast)) {
     modules.add(TgcgModule.bulkCommunications);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.viewDiscussionRoom)) {
+  if (has(TgcgCapability.viewDiscussionRoom)) {
     modules.add(TgcgModule.discussionRoom);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.viewMeetingRoom)) {
+  if (has(TgcgCapability.viewMeetingRoom)) {
     modules.add(TgcgModule.meetingRoom);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.viewAudit) ||
-      TgcgPermissionPolicy.allows(role, TgcgCapability.manageSystemSettings) ||
-      TgcgPermissionPolicy.allows(role, TgcgCapability.viewSituationRoom)) {
+  if (has(TgcgCapability.viewAudit) ||
+      has(TgcgCapability.manageSystemSettings) ||
+      has(TgcgCapability.viewSituationRoom)) {
     modules.add(TgcgModule.systemMonitoring);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.exportReports)) {
+  if (has(TgcgCapability.exportReports)) {
     modules.add(TgcgModule.reports);
   }
-  if (TgcgPermissionPolicy.allows(role, TgcgCapability.viewAudit) ||
-      TgcgPermissionPolicy.allows(role, TgcgCapability.manageUsers) ||
-      TgcgPermissionPolicy.allows(role, TgcgCapability.manageSystemSettings)) {
+  if (has(TgcgCapability.viewAudit) ||
+      has(TgcgCapability.manageUsers) ||
+      has(TgcgCapability.manageSystemSettings)) {
     modules.add(TgcgModule.governance);
   }
 
