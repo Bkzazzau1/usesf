@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../access/access_policy.dart';
 import '../domain/permissions.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
@@ -34,8 +35,23 @@ class _CommunicationsPageState extends State<CommunicationsPage> {
   Widget build(BuildContext context) {
     final session = TgcgSession.of(context);
     final store = Communications.of(context);
-    final rooms = store.roomsForScope(session.scope);
-    final broadcasts = store.broadcastsForScope(session.scope);
+    final communicationScopes = TgcgAccessPolicy.scopesFor(
+      context,
+      TgcgCapability.viewCommunications,
+    );
+    final roomById = <String, OperationalRoom>{};
+    final broadcastById = <String, OperationalBroadcast>{};
+    for (final scope in communicationScopes) {
+      for (final room in store.roomsForScope(scope)) {
+        roomById[room.id] = room;
+      }
+      for (final broadcast in store.broadcastsForScope(scope)) {
+        broadcastById[broadcast.id] = broadcast;
+      }
+    }
+    final rooms = roomById.values.toList(growable: false);
+    final broadcasts = broadcastById.values.toList(growable: false)
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     final visibleRoomIds = rooms.map((room) => room.id).toSet();
     final visibleMessages = store.messages
         .where((message) => visibleRoomIds.contains(message.roomId))
@@ -56,12 +72,12 @@ class _CommunicationsPageState extends State<CommunicationsPage> {
     final messages = selectedRoom == null
         ? const <OperationalMessage>[]
         : store.messagesForRoom(selectedRoom.id);
-    final canSend = TgcgPermissionPolicy.allows(
-      session.role!,
+    final canSend = TgcgAccessPolicy.allows(
+      context,
       TgcgCapability.sendOperationalMessage,
     );
-    final canBroadcast = TgcgPermissionPolicy.allows(
-      session.role!,
+    final canBroadcast = TgcgAccessPolicy.allows(
+      context,
       TgcgCapability.sendBroadcast,
     );
     final queuedMessages = visibleMessages
@@ -81,7 +97,7 @@ class _CommunicationsPageState extends State<CommunicationsPage> {
           eyebrow: 'OPERATIONAL COORDINATION',
           title: 'Communications Hub',
           subtitle:
-              '${session.scope.label}: scoped messaging, authorized broadcasts and integration surfaces for fallback SMS/USSD plus voice/video coordination.',
+              '${communicationScopes.length} authorized scope${communicationScopes.length == 1 ? '' : 's'}: scoped messaging, broadcasts and voice/video coordination.',
           trailing: const TgcgStatusPill(
             label: 'OPERATIONAL ONLY',
             color: TgcgColors.primary,
@@ -153,7 +169,19 @@ class _CommunicationsPageState extends State<CommunicationsPage> {
           : session.accessId,
       body: messageController.text,
       role: session.role!,
-      userScope: session.scope,
+      userScope: TgcgAccessPolicy.authorizingScope(
+            context,
+            TgcgCapability.sendOperationalMessage,
+            targetScope: room.scope,
+            listen: false,
+          ) ??
+          session.scope,
+      capabilityAuthorized: TgcgAccessPolicy.allows(
+        context,
+        TgcgCapability.sendOperationalMessage,
+        targetScope: room.scope,
+        listen: false,
+      ),
     );
     if (!ok) return;
     messageController.clear();
@@ -169,15 +197,22 @@ class _CommunicationsPageState extends State<CommunicationsPage> {
     required CommunicationsController store,
     required TgcgSessionController session,
   }) {
+    final authority = TgcgAccessPolicy.authorizingScope(
+      context,
+      TgcgCapability.sendBroadcast,
+      listen: false,
+    );
+    if (authority == null) return;
     final ok = store.sendBroadcast(
       title: broadcastTitleController.text,
       body: broadcastBodyController.text,
-      targetScope: session.scope,
+      targetScope: authority,
       senderId: session.accessId.isEmpty
           ? session.operatorName
           : session.accessId,
       role: session.role!,
-      userScope: session.scope,
+      userScope: authority,
+      capabilityAuthorized: true,
     );
     if (!ok) return;
     broadcastTitleController.clear();
