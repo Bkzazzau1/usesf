@@ -48,8 +48,6 @@ class TgcgPermissionPolicy {
 
   static const Map<TgcgRole, Set<TgcgCapability>> _roleCapabilities = {
     TgcgRole.stateAdministrator: {
-      TgcgCapability.manageAssignments,
-      TgcgCapability.manageRoleAssignments,
       ...TgcgCapability.values,
     },
     TgcgRole.stateCollationOfficer: {
