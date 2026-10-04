@@ -20,14 +20,21 @@ class _RoleAssignmentPageState extends State<RoleAssignmentPage> {
   String search = '';
 
   static const assignableRoles = <TgcgRole>[
-    TgcgRole.stateAdministrator,
-    TgcgRole.stateCollationOfficer,
-    TgcgRole.situationRoomDirector,
     TgcgRole.senatorialCoordinator,
-    TgcgRole.stateCoordinator,
     TgcgRole.lgaCoordinator,
     TgcgRole.wardCoordinator,
+    TgcgRole.pollingUnitCoordinator,
     TgcgRole.pollingUnitAgent,
+    TgcgRole.mediaOfficer,
+    TgcgRole.womenMobilizationCoordinator,
+    TgcgRole.youthMobilizationCoordinator,
+    TgcgRole.communicationsOfficer,
+    TgcgRole.logisticsOfficer,
+    TgcgRole.monitoringEvaluationOfficer,
+    TgcgRole.dataEvidenceOfficer,
+    TgcgRole.transportCoordinator,
+    TgcgRole.trainingOfficer,
+    TgcgRole.ictOfficer,
     TgcgRole.observer,
     TgcgRole.legalOfficer,
     TgcgRole.technicalSupport,
@@ -40,27 +47,49 @@ class _RoleAssignmentPageState extends State<RoleAssignmentPage> {
     final membership = MembershipOperations.of(context);
     final governance = GovernanceOperations.of(context);
 
-    if (session.role != TgcgRole.stateAdministrator) {
+    final currentRole = session.role!;
+    final canAssignRoles = TgcgPermissionPolicy.allows(
+      currentRole,
+      TgcgCapability.manageRoleAssignments,
+    );
+    if (!canAssignRoles) {
       return const Center(
         child: TgcgEmptyState(
           icon: Icons.admin_panel_settings_outlined,
-          title: 'State Administrator access required',
-          message: 'Role assignment is restricted to state administration.',
+          title: 'Role assignment not available',
+          message:
+              'Only coordinators with role-assignment authority can manage member roles.',
         ),
       );
     }
 
-    final members = membership.members;
-    if (selectedMemberId == null && members.isNotEmpty) {
-      selectedMemberId = members.first.id;
+    final permittedRoles = _rolesAssignableBy(currentRole);
+    if (permittedRoles.isNotEmpty && !permittedRoles.contains(selectedRole)) {
+      selectedRole = permittedRoles.first;
+      selectedScopeKey = null;
     }
 
-    final scopes = _scopeOptions(membership, selectedRole);
-    if (scopes.isNotEmpty && !scopes.any((item) => item.key == selectedScopeKey)) {
+    final members = membership.members.where((member) {
+      final memberScope = membership.registrationScopeForMember(member.id);
+      return memberScope != null &&
+          TgcgPermissionPolicy.scopeAllows(session.scope, memberScope);
+    }).toList(growable: false);
+    if (selectedMemberId == null ||
+        !members.any((item) => item.id == selectedMemberId)) {
+      selectedMemberId = members.isEmpty ? null : members.first.id;
+    }
+
+    final scopes = _scopeOptions(
+      membership,
+      selectedRole,
+      session.scope,
+    );
+    if (scopes.isNotEmpty &&
+        !scopes.any((item) => item.key == selectedScopeKey)) {
       selectedScopeKey = scopes.first.key;
     }
 
-    final assignments = governance.roleAssignments
+    final assignments = governance.roleAssignmentsForScope(session.scope)
         .where((item) =>
             search.trim().isEmpty ||
             item.subjectName.toLowerCase().contains(search.toLowerCase()) ||
@@ -83,15 +112,15 @@ class _RoleAssignmentPageState extends State<RoleAssignmentPage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 36),
       children: [
-        const TgcgPageHeader(
-          eyebrow: 'ACCESS CONTROL',
-          title: 'Role Assignment',
+        TgcgPageHeader(
+          eyebrow: 'MEMBER ROLE CONTROL',
+          title: 'Roles & Authorization',
           subtitle:
-              'Assign operational roles and geographic responsibility across Kaduna State from one administration workspace.',
+              'Every person is a member first. Assign one or more operational roles only within your authority and geographic scope.',
           trailing: TgcgStatusPill(
-            label: 'STATE ADMIN ONLY',
+            label: roleLabel(currentRole).toUpperCase(),
             color: TgcgColors.primary,
-            icon: Icons.admin_panel_settings_rounded,
+            icon: roleIcon(currentRole),
           ),
         ),
         const SizedBox(height: 18),
@@ -103,6 +132,7 @@ class _RoleAssignmentPageState extends State<RoleAssignmentPage> {
               members: members,
               selectedMemberId: selectedMemberId,
               selectedRole: selectedRole,
+              assignableRoles: permittedRoles,
               scopes: scopes,
               selectedScopeKey: selectedScopeKey,
               onMemberChanged: (value) => setState(() => selectedMemberId = value),
@@ -155,13 +185,21 @@ class _RoleAssignmentPageState extends State<RoleAssignmentPage> {
                       .map(
                         (item) => _AssignmentRow(
                           item: item,
-                          onRevoke: item.active
-                              ? () => governance.revokeRole(
+                          onRevoke: item.active &&
+                                  _mayRevokeRole(session, item)
+                              ? () {
+                                  final actorId = session.accessId.isEmpty
+                                      ? session.operatorName
+                                      : session.accessId;
+                                  governance.revokeRole(
                                     item.id,
-                                    actorId: session.accessId.isEmpty
-                                        ? session.operatorName
-                                        : session.accessId,
-                                  )
+                                    actorId: actorId,
+                                    allowStateOverride:
+                                        session.role == TgcgRole.stateCoordinator ||
+                                            session.role ==
+                                                TgcgRole.stateAdministrator,
+                                  );
+                                }
                               : null,
                         ),
                       )
