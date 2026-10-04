@@ -819,10 +819,17 @@ class _QuickCommandPanel extends StatelessWidget {
     })>[
       (
         module: TgcgModule.membershipNetwork,
-        label: 'Registered Members',
-        detail: 'Senatorial zones, LGAs, members and agents',
+        label: 'Member Operations',
+        detail: 'Member identities, home polling units and jobs',
         icon: Icons.groups_2_outlined,
         tone: TgcgMetricTone.info,
+      ),
+      (
+        module: TgcgModule.assignmentControl,
+        label: 'Jobs & Assignments',
+        detail: 'Assign members, monitor presence and staffing',
+        icon: Icons.assignment_ind_outlined,
+        tone: TgcgMetricTone.success,
       ),
       (
         module: TgcgModule.situationRoom,
