@@ -66,7 +66,10 @@ class MemberShell extends StatelessWidget {
         actions: [
           IconButton(
             tooltip: 'Sign out',
-            onPressed: session.signOut,
+            onPressed: () async {
+              await AssignmentTracking.of(context, listen: false).stop();
+              session.signOut();
+            },
             icon: const Icon(Icons.logout_rounded),
           ),
         ],
