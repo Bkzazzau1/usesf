@@ -415,14 +415,16 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     final authorizedLgas = membership.geography.lgas
         .where((lga) => authorizedLgaIds.contains(lga.id))
         .toList(growable: false);
-    if (authorizedLgas.isEmpty) return;
 
-    var lgaId = authorizedLgas.first.id;
-    var units = authorizedUnits
-        .where((unit) => unit.scope.lgaId == lgaId)
-        .toList(growable: false);
+    String? lgaId =
+        authorizedLgas.isEmpty ? null : authorizedLgas.first.id;
+    var units = lgaId == null
+        ? const <CanonicalPollingUnit>[]
+        : authorizedUnits
+            .where((unit) => unit.scope.lgaId == lgaId)
+            .toList(growable: false);
     String? pollingUnitId = units.isEmpty ? null : units.first.code;
-    var locationBound = true;
+    var locationBound = authorizedLgas.isNotEmpty;
     var priority = AssignmentPriority.normal;
     final selectedCapabilities = <TgcgCapability>{};
     final availableCapabilities =
