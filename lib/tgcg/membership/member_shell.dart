@@ -6,6 +6,7 @@ import '../assignments/assignment_tracking_store.dart';
 import '../devices/managed_device_store.dart';
 import '../evidence/device_evidence_service.dart';
 import '../geography/geography_registry.dart';
+import '../governance/governance_store.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
 import 'membership_store.dart';
@@ -19,6 +20,7 @@ class MemberShell extends StatelessWidget {
     final membership = MembershipOperations.of(context);
     final devices = ManagedDevices.of(context);
     final assignments = Assignments.of(context);
+    final governance = GovernanceOperations.of(context);
     final member = membership.memberById(session.accessId);
 
     if (member == null) {
@@ -52,6 +54,19 @@ class MemberShell extends StatelessWidget {
     final registration = membership.registrationScopeForMember(member.id);
     final managedDevice = devices.deviceForMember(member.id);
     final activeAssignments = assignments.activeAssignmentsForMember(member.id);
+    final activeRoles = governance.activeRolesForMember(member.id);
+
+    if (member.isBlocked) {
+      return _BlockedMemberScaffold(member: member);
+    }
+
+    if (activeRoles.isEmpty && activeAssignments.isEmpty) {
+      return _WaitingForAccessScaffold(
+        member: member,
+        homePu: homePu,
+        registration: registration,
+      );
+    }
 
     return Scaffold(
       backgroundColor: TgcgColors.canvas,
@@ -96,8 +111,10 @@ class MemberShell extends StatelessWidget {
               final twoColumns = constraints.maxWidth >= 760;
               final profile = _ProfileCard(
                 memberId: member.membershipNumber ?? member.id,
+                pvcVin: member.pvcVin,
                 phone: member.phoneNumber,
                 email: member.email,
+                emailVerified: member.emailVerified,
                 location: registration?.label ?? 'Kaduna State',
               );
               final pollingUnit = _HomePollingUnitCard(unit: homePu);
@@ -119,6 +136,41 @@ class MemberShell extends StatelessWidget {
                 ],
               );
             },
+          ),
+          const SizedBox(height: 14),
+          TgcgSectionCard(
+            title: 'Active roles',
+            subtitle:
+                'All active roles are combined automatically. Each role keeps its own geographic scope.',
+            trailing: TgcgStatusPill(
+              label: '${activeRoles.length} ACTIVE',
+              color: TgcgColors.success,
+              icon: Icons.manage_accounts_outlined,
+              compact: true,
+            ),
+            child: Column(
+              children: activeRoles
+                  .map(
+                    (role) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                        roleIcon(role.role),
+                        color: TgcgColors.primary,
+                      ),
+                      title: Text(
+                        roleLabel(role.role),
+                        style: const TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                      subtitle: Text(role.scope.label),
+                      trailing: const TgcgStatusPill(
+                        label: 'ACTIVE',
+                        color: TgcgColors.success,
+                        compact: true,
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
           ),
           const SizedBox(height: 14),
           TgcgSectionCard(
@@ -187,7 +239,7 @@ class MemberShell extends StatelessWidget {
           TgcgSectionCard(
             title: 'Location readiness',
             subtitle:
-                'GPS is activated only for authorized assignment workflows on managed devices.',
+                'Location permission is required for device telemetry and for every assignment capture, evidence update and submission.',
             child: Row(
               children: [
                 Container(
@@ -758,14 +810,18 @@ IconData _actionIcon(_MemberAssignmentAction action) => switch (action) {
 class _ProfileCard extends StatelessWidget {
   const _ProfileCard({
     required this.memberId,
+    required this.pvcVin,
     required this.phone,
     required this.email,
+    required this.emailVerified,
     required this.location,
   });
 
   final String memberId;
+  final String? pvcVin;
   final String phone;
   final String? email;
+  final bool emailVerified;
   final String location;
 
   @override
@@ -774,8 +830,17 @@ class _ProfileCard extends StatelessWidget {
         child: Column(
           children: [
             _Detail(label: 'Member ID', value: memberId),
-            _Detail(label: 'Phone', value: phone),
-            _Detail(label: 'Email', value: email ?? 'Not provided'),
+            _Detail(label: 'PVC / VIN', value: pvcVin ?? 'Not available'),
+            _Detail(
+              label: 'Phone',
+              value: phone.trim().isEmpty ? 'Not provided' : phone,
+            ),
+            _Detail(
+              label: 'Email',
+              value: email == null
+                  ? 'Not provided'
+                  : '$email${emailVerified ? ' • VERIFIED' : ' • NOT VERIFIED'}',
+            ),
             _Detail(label: 'Registered scope', value: location),
           ],
         ),
