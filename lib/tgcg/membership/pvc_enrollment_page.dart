@@ -8,7 +8,12 @@ import 'membership_store.dart';
 import 'pvc_recognition_service.dart';
 
 class PvcEnrollmentPage extends StatefulWidget {
-  const PvcEnrollmentPage({super.key});
+  const PvcEnrollmentPage({
+    super.key,
+    this.onOpenAssignments,
+  });
+
+  final VoidCallback? onOpenAssignments;
 
   @override
   State<PvcEnrollmentPage> createState() => _PvcEnrollmentPageState();
@@ -49,11 +54,6 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
       session.role!,
       TgcgCapability.manageMembership,
     );
-    final canAccredit = TgcgPermissionPolicy.allows(
-      session.role!,
-      TgcgCapability.accreditAgents,
-    );
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 36),
       children: [
@@ -120,10 +120,8 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
         const SizedBox(height: 16),
         _RecentMembers(store: store),
         const SizedBox(height: 16),
-        _AgentAccreditationPanel(
-          store: store,
-          canAccredit: canAccredit,
-          onAccredit: canAccredit ? () => _accredit(context, store) : null,
+        _AssignmentNextStepPanel(
+          onOpenAssignments: widget.onOpenAssignments,
         ),
       ],
     );
@@ -759,48 +757,51 @@ class _RecentMembers extends StatelessWidget {
       );
 }
 
-class _AgentAccreditationPanel extends StatelessWidget {
-  const _AgentAccreditationPanel({
-    required this.store,
-    required this.canAccredit,
-    required this.onAccredit,
+class _AssignmentNextStepPanel extends StatelessWidget {
+  const _AssignmentNextStepPanel({
+    required this.onOpenAssignments,
   });
-  final MembershipOperationsController store;
-  final bool canAccredit;
-  final VoidCallback? onAccredit;
+
+  final VoidCallback? onOpenAssignments;
 
   @override
   Widget build(BuildContext context) => TgcgSectionCard(
-        title: 'Agent accreditation',
+        title: 'One registration, many possible assignments',
         subtitle:
-            'Convert enrolled members into geographically assigned field agents.',
-        trailing: canAccredit
-            ? FilledButton.icon(
-                onPressed: onAccredit,
-                icon: const Icon(Icons.badge_outlined),
-                label: const Text('Accredit agent'),
-              )
-            : null,
-        child: Column(
-          children: store.agents.map((agent) {
-            final member = store.memberById(agent.memberId);
-            return ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const CircleAvatar(child: Icon(Icons.badge_outlined)),
-              title: Text(
-                member?.fullName ?? agent.agentId,
-                style: const TextStyle(fontWeight: FontWeight.w800),
+            'Every person is enrolled once as a USESF member. Jobs, temporary duties and polling-unit deployments are attached later from Assignment Control; they do not create a second member identity.',
+        trailing: onOpenAssignments == null
+            ? null
+            : FilledButton.icon(
+                onPressed: onOpenAssignments,
+                icon: const Icon(Icons.assignment_add_rounded),
+                label: const Text('Open Assignment Control'),
               ),
-              subtitle: Text('${agent.agentId} • ${agent.scope.label}'),
-              trailing: TgcgStatusPill(
-                label: agent.status.name.toUpperCase(),
-                color: agent.status == AccreditationStatus.approved
-                    ? TgcgColors.success
-                    : TgcgColors.warning,
-                compact: true,
-              ),
-            );
-          }).toList(),
+        child: const Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            TgcgStatusPill(
+              label: '1 MEMBER IDENTITY',
+              color: TgcgColors.info,
+              compact: true,
+            ),
+            TgcgStatusPill(
+              label: '2 HOME POLLING UNIT',
+              color: TgcgColors.primary,
+              compact: true,
+            ),
+            TgcgStatusPill(
+              label: '3 ASSIGN ANY AUTHORIZED JOB',
+              color: TgcgColors.success,
+              compact: true,
+            ),
+            TgcgStatusPill(
+              label: '4 TRACK DUTY SEPARATELY',
+              color: TgcgColors.accentStrong,
+              compact: true,
+            ),
+          ],
         ),
       );
 }
+
