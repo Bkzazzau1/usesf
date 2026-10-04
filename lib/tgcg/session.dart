@@ -235,8 +235,7 @@ Set<TgcgModule> allowedModules(TgcgRole role) {
   final modules = <TgcgModule>{TgcgModule.overview};
 
   if (TgcgPermissionPolicy.allows(role, TgcgCapability.manageMembership) ||
-      TgcgPermissionPolicy.allows(role, TgcgCapability.accreditAgents) ||
-      TgcgPermissionPolicy.allows(role, TgcgCapability.manageAgentAssignments)) {
+      TgcgPermissionPolicy.allows(role, TgcgCapability.accreditAgents)) {
     modules.add(TgcgModule.accreditation);
   }
   if (role == TgcgRole.stateAdministrator) {
