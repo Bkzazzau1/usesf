@@ -377,13 +377,12 @@ class MembershipOperationsController extends ChangeNotifier {
     for (final row in memberRows) {
       final id = row['id']?.toString();
       final fullName = row['fullName']?.toString();
-      final phoneNumber = row['phoneNumber']?.toString();
+      final phoneNumber = row['phoneNumber']?.toString() ?? '';
       final createdAt =
           DateTime.tryParse(row['createdAt']?.toString() ?? '')?.toUtc();
       final status = _recordStatus(row['status']);
       if (id == null ||
           fullName == null ||
-          phoneNumber == null ||
           createdAt == null ||
           status == null) {
         continue;
@@ -395,7 +394,14 @@ class MembershipOperationsController extends ChangeNotifier {
         fullName: fullName,
         phoneNumber: phoneNumber,
         email: _nullableText(row['email']),
+        emailVerified: row['emailVerified'] == true,
         membershipNumber: _nullableText(row['membershipNumber']),
+        pvcVin: _nullableText(row['pvcVin']),
+        selfieReference: _nullableText(row['selfieReference']),
+        accountStatus: _memberAccountStatus(row['accountStatus']) ??
+            MemberAccountStatus.active,
+        identityReview: _memberIdentityReview(row['identityReview']) ??
+            MemberIdentityReview.pending,
         createdAt: createdAt,
         status: status,
         origin: origin,
@@ -558,6 +564,18 @@ class MembershipOperationsController extends ChangeNotifier {
       if ((member.email ?? '').trim().toLowerCase() == target) return member;
     }
     return null;
+  }
+
+  Future<TgcgMember?> memberByPvcVin(String pvcVin) async {
+    final target = _normalizePvcCredential(pvcVin);
+    if (target.isEmpty) return null;
+    for (final member in _members) {
+      final stored = member.pvcVin;
+      if (stored != null && _normalizePvcCredential(stored) == target) {
+        return member;
+      }
+    }
+    return memberByPvcCredential(pvcVin);
   }
 
   AccreditedAgent? approvedAccreditationForMember(String memberId) {
@@ -802,13 +820,24 @@ class MembershipOperationsController extends ChangeNotifier {
 
   Future<TgcgMember> createMember({
     required String fullName,
-    required String phoneNumber,
+    String phoneNumber = '',
     String? email,
+    bool emailVerified = false,
+    String? pvcVin,
+    String? selfieReference,
     GeographicScope registrationScope = GeographicScope.kaduna,
     String? homePollingUnitId,
     String? pvcPollingUnitCode,
     String? linkedBy,
   }) async {
+    final normalizedVin = _normalizePvcCredential(pvcVin ?? '');
+    if (normalizedVin.isNotEmpty) {
+      final existing = await memberByPvcVin(normalizedVin);
+      if (existing != null) {
+        throw StateError('This PVC/VIN is already registered to a USESF member.');
+      }
+    }
+
     CanonicalPollingUnit? homePollingUnit;
     if (homePollingUnitId != null && homePollingUnitId.trim().isNotEmpty) {
       homePollingUnit = _geography.pollingUnit(homePollingUnitId);
@@ -824,8 +853,14 @@ class MembershipOperationsController extends ChangeNotifier {
       fullName: fullName.trim(),
       phoneNumber: phoneNumber.trim(),
       email: email?.trim().isEmpty == true ? null : email?.trim(),
+      emailVerified: emailVerified,
       membershipNumber:
           'USESF-${(_members.length + 1).toString().padLeft(6, '0')}',
+      pvcVin: normalizedVin.isEmpty ? null : normalizedVin,
+      selfieReference:
+          selfieReference?.trim().isEmpty == true ? null : selfieReference?.trim(),
+      accountStatus: MemberAccountStatus.active,
+      identityReview: MemberIdentityReview.pending,
       createdAt: DateTime.now().toUtc(),
       status: RecordStatus.submitted,
       origin: RecordOrigin.localEntry,
@@ -1049,7 +1084,12 @@ class MembershipOperationsController extends ChangeNotifier {
           'fullName': member.fullName,
           'phoneNumber': member.phoneNumber,
           'email': member.email,
+          'emailVerified': member.emailVerified,
           'membershipNumber': member.membershipNumber,
+          'pvcVin': member.pvcVin,
+          'selfieReference': member.selfieReference,
+          'accountStatus': member.accountStatus.name,
+          'identityReview': member.identityReview.name,
           'createdAt': member.createdAt.toIso8601String(),
           'status': member.status.name,
           'origin': member.origin.name,
@@ -1109,6 +1149,22 @@ class MembershipOperationsController extends ChangeNotifier {
   static RecordStatus? _recordStatus(Object? value) {
     final name = value?.toString();
     for (final item in RecordStatus.values) {
+      if (item.name == name) return item;
+    }
+    return null;
+  }
+
+  static MemberAccountStatus? _memberAccountStatus(Object? value) {
+    final name = value?.toString();
+    for (final item in MemberAccountStatus.values) {
+      if (item.name == name) return item;
+    }
+    return null;
+  }
+
+  static MemberIdentityReview? _memberIdentityReview(Object? value) {
+    final name = value?.toString();
+    for (final item in MemberIdentityReview.values) {
       if (item.name == name) return item;
     }
     return null;
