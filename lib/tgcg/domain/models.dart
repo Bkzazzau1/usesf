@@ -61,6 +61,17 @@ enum RecordOrigin {
   manualOverride,
 }
 
+enum MemberAccountStatus {
+  active,
+  blocked,
+}
+
+enum MemberIdentityReview {
+  pending,
+  verified,
+  suspicious,
+}
+
 enum SubmissionSource { app, sms, ussd, manual }
 
 enum IncidentSeverity { info, low, medium, high, critical }
@@ -164,18 +175,37 @@ class TgcgMember {
     required this.createdAt,
     required this.status,
     this.email,
+    this.emailVerified = false,
     this.membershipNumber,
+    this.pvcVin,
+    this.selfieReference,
+    this.accountStatus = MemberAccountStatus.active,
+    this.identityReview = MemberIdentityReview.pending,
     this.origin = RecordOrigin.localEntry,
   });
 
   final String id;
   final String fullName;
+
+  /// Phone is optional for membership. An empty value means none has been set.
   final String phoneNumber;
   final String? email;
+  final bool emailVerified;
   final String? membershipNumber;
+
+  /// Structured PVC/VIN identifier retained after the PVC image is discarded.
+  final String? pvcVin;
+
+  /// Durable/local reference to the registration selfie used for human review.
+  final String? selfieReference;
+
+  final MemberAccountStatus accountStatus;
+  final MemberIdentityReview identityReview;
   final DateTime createdAt;
   final RecordStatus status;
   final RecordOrigin origin;
+
+  bool get isBlocked => accountStatus == MemberAccountStatus.blocked;
 }
 
 class AccreditedAgent {
