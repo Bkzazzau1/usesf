@@ -64,7 +64,7 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
           eyebrow: 'PVC IDENTITY ENROLMENT',
           title: 'Member Enrolment',
           subtitle:
-              'Scan a Permanent Voter Card, match its polling-unit code to the canonical registry, confirm the member identity and create the home polling-unit relationship.',
+              'Create the permanent member identity and home polling-unit relationship. Normal registration uses PVC; State Coordinator may create a member manually without it.',
           trailing: TgcgStatusPill(
             label: '${store.members.length} MEMBERS',
             color: TgcgColors.primary,
@@ -609,7 +609,7 @@ class _IdentityForm extends StatelessWidget {
                     onPressed: enabled &&
                             created == null &&
                             selectedPollingUnitId != null &&
-                            RegExp(r'^\d{6}$').hasMatch(pin.text.trim())
+                            password.text.length >= 8
                         ? onCreate
                         : null,
                     icon: const Icon(Icons.person_add_alt_1_rounded),
