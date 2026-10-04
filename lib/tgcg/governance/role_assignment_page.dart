@@ -105,8 +105,10 @@ class _RoleAssignmentPageState extends State<RoleAssignmentPage> {
         .where((item) =>
             item.active &&
             (item.role == TgcgRole.pollingUnitAgent ||
+                item.role == TgcgRole.pollingUnitCoordinator ||
                 item.role == TgcgRole.wardCoordinator ||
-                item.role == TgcgRole.lgaCoordinator))
+                item.role == TgcgRole.lgaCoordinator ||
+                item.role == TgcgRole.senatorialCoordinator))
         .length;
 
     return ListView(
@@ -242,68 +244,191 @@ class _RoleAssignmentPageState extends State<RoleAssignmentPage> {
     setState(() {});
   }
 
+  List<TgcgRole> _rolesAssignableBy(TgcgRole actorRole) {
+    if (actorRole == TgcgRole.stateAdministrator) {
+      return List.unmodifiable(assignableRoles);
+    }
+    final actorRank = _coordinatorRank(actorRole);
+    if (actorRank < 1) return const [];
+
+    return assignableRoles.where((role) {
+      if (_isFunctionalRole(role)) return true;
+      final targetRank = _coordinatorRank(role);
+      return targetRank >= 0 && targetRank < actorRank;
+    }).toList(growable: false);
+  }
+
   List<_ScopeOption> _scopeOptions(
     MembershipOperationsController membership,
     TgcgRole role,
+    GeographicScope authorizedScope,
   ) {
     final geography = membership.geography;
-    switch (role) {
-      case TgcgRole.senatorialCoordinator:
-        return geography.senatorialDistricts
-            .map((item) => _ScopeOption(item.id, item.name, item.scope))
-            .toList(growable: false);
-      case TgcgRole.lgaCoordinator:
-        return geography.lgas
-            .map(
-              (item) => _ScopeOption(
-                item.id,
-                '${item.name} • ${item.senatorialDistrictName}',
-                item.scope,
-              ),
-            )
-            .toList(growable: false);
-      case TgcgRole.wardCoordinator:
-        final seen = <String>{};
-        return geography.pollingUnits
-            .map((item) => item.scope)
-            .where((scope) => scope.wardId != null && seen.add(scope.wardId!))
-            .map(
-              (scope) => _ScopeOption(
-                scope.wardId!,
-                '${scope.wardName ?? 'Ward'} • ${scope.lgaName ?? ''} LGA',
-                GeographicScope(
-                  level: GeographyLevel.ward,
-                  country: scope.country,
-                  zoneId: scope.zoneId,
-                  zoneName: scope.zoneName,
-                  stateId: scope.stateId,
-                  stateName: scope.stateName,
-                  senatorialDistrictId: scope.senatorialDistrictId,
-                  senatorialDistrictName: scope.senatorialDistrictName,
-                  lgaId: scope.lgaId,
-                  lgaName: scope.lgaName,
-                  wardId: scope.wardId,
-                  wardName: scope.wardName,
-                ),
-              ),
-            )
-            .toList(growable: false);
-      case TgcgRole.pollingUnitAgent:
-        return geography.pollingUnits
-            .map(
-              (item) => _ScopeOption(
-                item.code,
-                '${item.scope.pollingUnitName ?? item.code} • ${item.scope.wardName ?? ''} • ${item.scope.lgaName ?? ''}',
-                item.scope,
-              ),
-            )
-            .toList(growable: false);
-      default:
-        return const [
-          _ScopeOption('KD', 'Kaduna State', GeographicScope.kaduna),
-        ];
+
+    bool allowed(GeographicScope scope) =>
+        TgcgPermissionPolicy.scopeAllows(authorizedScope, scope);
+
+    if (role == TgcgRole.senatorialCoordinator) {
+      return geography.senatorialDistricts
+          .where((item) => allowed(item.scope))
+          .map((item) => _ScopeOption(item.id, item.name, item.scope))
+          .toList(growable: false);
     }
+
+    if (role == TgcgRole.lgaCoordinator) {
+      return geography.lgas
+          .where((item) => allowed(item.scope))
+          .map(
+            (item) => _ScopeOption(
+              item.id,
+              '${item.name} • ${item.senatorialDistrictName}',
+              item.scope,
+            ),
+          )
+          .toList(growable: false);
+    }
+
+    if (role == TgcgRole.wardCoordinator) {
+      final seen = <String>{};
+      return geography.pollingUnits
+          .map((item) => item.scope)
+          .where(
+            (scope) =>
+                scope.wardId != null &&
+                allowed(scope) &&
+                seen.add(scope.wardId!),
+          )
+          .map((scope) {
+            final wardScope = GeographicScope(
+              level: GeographyLevel.ward,
+              country: scope.country,
+              zoneId: scope.zoneId,
+              zoneName: scope.zoneName,
+              stateId: scope.stateId,
+              stateName: scope.stateName,
+              senatorialDistrictId: scope.senatorialDistrictId,
+              senatorialDistrictName: scope.senatorialDistrictName,
+              lgaId: scope.lgaId,
+              lgaName: scope.lgaName,
+              wardId: scope.wardId,
+              wardName: scope.wardName,
+            );
+            return _ScopeOption(
+              scope.wardId!,
+              '${scope.wardName ?? 'Ward'} • ${scope.lgaName ?? ''} LGA',
+              wardScope,
+            );
+          })
+          .toList(growable: false);
+    }
+
+    if (role == TgcgRole.pollingUnitCoordinator ||
+        role == TgcgRole.pollingUnitAgent) {
+      return geography.pollingUnits
+          .where((item) => allowed(item.scope))
+          .map(
+            (item) => _ScopeOption(
+              item.code,
+              '${item.displayCode} • ${item.scope.pollingUnitName ?? item.code} • ${item.scope.wardName ?? ''}',
+              item.scope,
+            ),
+          )
+          .toList(growable: false);
+    }
+
+    final options = <_ScopeOption>[];
+    final seen = <String>{};
+
+    void addScope(GeographicScope scope, String label) {
+      if (!allowed(scope)) return;
+      final key = _scopeKey(scope);
+      if (!seen.add(key)) return;
+      options.add(_ScopeOption(key, label, scope));
+    }
+
+    addScope(authorizedScope, authorizedScope.label);
+
+    for (final district in geography.senatorialDistricts) {
+      addScope(district.scope, district.scope.label);
+    }
+    for (final lga in geography.lgas) {
+      addScope(lga.scope, lga.scope.label);
+    }
+
+    final wardIds = <String>{};
+    for (final unit in geography.pollingUnits) {
+      final scope = unit.scope;
+      if (scope.wardId != null && wardIds.add(scope.wardId!)) {
+        addScope(
+          GeographicScope(
+            level: GeographyLevel.ward,
+            country: scope.country,
+            zoneId: scope.zoneId,
+            zoneName: scope.zoneName,
+            stateId: scope.stateId,
+            stateName: scope.stateName,
+            senatorialDistrictId: scope.senatorialDistrictId,
+            senatorialDistrictName: scope.senatorialDistrictName,
+            lgaId: scope.lgaId,
+            lgaName: scope.lgaName,
+            wardId: scope.wardId,
+            wardName: scope.wardName,
+          ),
+          '${scope.wardName ?? 'Ward'} Ward • ${scope.lgaName ?? ''} LGA',
+        );
+      }
+      addScope(scope, '${unit.displayCode} • ${scope.label}');
+    }
+
+    return options;
   }
+
+  bool _mayRevokeRole(
+    TgcgSessionController session,
+    RoleAssignmentRecord record,
+  ) {
+    final actorId =
+        session.accessId.isEmpty ? session.operatorName : session.accessId;
+    if (record.assignedBy == actorId) return true;
+    return session.role == TgcgRole.stateCoordinator ||
+        session.role == TgcgRole.stateAdministrator;
+  }
+
+  static bool _isFunctionalRole(TgcgRole role) => switch (role) {
+        TgcgRole.mediaOfficer ||
+        TgcgRole.womenMobilizationCoordinator ||
+        TgcgRole.youthMobilizationCoordinator ||
+        TgcgRole.communicationsOfficer ||
+        TgcgRole.logisticsOfficer ||
+        TgcgRole.monitoringEvaluationOfficer ||
+        TgcgRole.dataEvidenceOfficer ||
+        TgcgRole.transportCoordinator ||
+        TgcgRole.trainingOfficer ||
+        TgcgRole.ictOfficer ||
+        TgcgRole.observer ||
+        TgcgRole.legalOfficer ||
+        TgcgRole.technicalSupport ||
+        TgcgRole.readOnlyExecutive ||
+        TgcgRole.stateCollationOfficer ||
+        TgcgRole.situationRoomDirector =>
+          true,
+        _ => false,
+      };
+
+  static int _coordinatorRank(TgcgRole role) => switch (role) {
+        TgcgRole.stateAdministrator => 99,
+        TgcgRole.stateCoordinator => 5,
+        TgcgRole.senatorialCoordinator => 4,
+        TgcgRole.lgaCoordinator => 3,
+        TgcgRole.wardCoordinator => 2,
+        TgcgRole.pollingUnitCoordinator => 1,
+        TgcgRole.pollingUnitAgent => 0,
+        _ => -1,
+      };
+
+  static String _scopeKey(GeographicScope scope) =>
+      '${scope.level.name}:${scope.stateId ?? ''}:${scope.senatorialDistrictId ?? ''}:${scope.lgaId ?? ''}:${scope.wardId ?? ''}:${scope.pollingUnitId ?? ''}';
+
 }
 
 class _AssignmentForm extends StatelessWidget {
@@ -311,6 +436,7 @@ class _AssignmentForm extends StatelessWidget {
     required this.members,
     required this.selectedMemberId,
     required this.selectedRole,
+    required this.assignableRoles,
     required this.scopes,
     required this.selectedScopeKey,
     required this.onMemberChanged,
@@ -322,6 +448,7 @@ class _AssignmentForm extends StatelessWidget {
   final List<TgcgMember> members;
   final String? selectedMemberId;
   final TgcgRole selectedRole;
+  final List<TgcgRole> assignableRoles;
   final List<_ScopeOption> scopes;
   final String? selectedScopeKey;
   final ValueChanged<String?> onMemberChanged;
@@ -359,7 +486,7 @@ class _AssignmentForm extends StatelessWidget {
                 labelText: 'Role',
                 prefixIcon: Icon(Icons.manage_accounts_outlined),
               ),
-              items: _RoleAssignmentPageState.assignableRoles
+              items: assignableRoles
                   .map(
                     (role) => DropdownMenuItem(
                       value: role,
