@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'assignments/assignment_store.dart';
 import 'collation/collation_engine.dart';
 import 'field/field_operations_store.dart';
 import 'membership/membership_store.dart';
@@ -18,6 +19,7 @@ class TgcgDashboardPage extends StatelessWidget {
     final field = FieldOperations.of(context);
     final results = ResultOperations.of(context);
     final membership = MembershipOperations.of(context);
+    final assignments = Assignments.of(context);
     final modules = allowedModules(session.role!);
     final scope = session.scope;
 
@@ -26,18 +28,19 @@ class TgcgDashboardPage extends StatelessWidget {
     final submissions = results.submissionsForScope(scope);
     final review = results.reviewQueueForScope(scope);
     final members = membership.membersForScope(scope);
-    final agents = membership.agentsForScope(scope);
-    final approvedAgents = agents
-        .where((agent) => agent.status == AccreditationStatus.approved)
+    final scopedAssignments = assignments.assignmentsForScope(scope);
+    final activeAssignments = scopedAssignments
+        .where((item) => !item.isTerminal)
         .toList(growable: false);
-    final readyAgents = approvedAgents
+    final presentMembers = activeAssignments
         .where(
-          (agent) =>
-              agent.trainingCompleted &&
-              agent.biometricEnrolled &&
-              agent.deviceId != null,
+          (item) =>
+              assignments.presenceFor(item) ==
+              AssignmentPresence.insideGeofence,
         )
-        .toList(growable: false);
+        .map((item) => item.memberId)
+        .toSet()
+        .length;
     final openIncidents = incidents
         .where(
           (item) =>
@@ -65,7 +68,10 @@ class TgcgDashboardPage extends StatelessWidget {
           (child) => _CoverageData(
             scope: child,
             members: membership.memberCountForScope(child),
-            agents: membership.agentCountForScope(child),
+            assignments: assignments
+                .assignmentsForScope(child)
+                .where((item) => !item.isTerminal)
+                .length,
             incidents: field
                 .incidentsForScope(child)
                 .where(
@@ -93,7 +99,7 @@ class TgcgDashboardPage extends StatelessWidget {
                   : 'AUTHORIZED OPERATIONAL SCOPE',
               title: 'Operations Command',
               subtitle:
-                  '${roleLabel(session.role!)} • ${scope.label}. Membership, field operations, incidents, agents and verified-result activity in one command view.',
+                  '${roleLabel(session.role!)} • ${scope.label}. Membership, assignments, live presence, incidents and verified-result activity in one command view.',
               trailing: compact
                   ? null
                   : const TgcgStatusPill(
@@ -110,8 +116,8 @@ class TgcgDashboardPage extends StatelessWidget {
               submissions: submissions.length,
               review: review.length,
               verifiedPollingUnits: collation.verifiedPollingUnitCount,
-              approvedAgents: approvedAgents.length,
-              readyAgents: readyAgents.length,
+              activeAssignments: activeAssignments.length,
+              presentMembers: presentMembers,
               modules: modules,
               onOpenModule: onOpenModule,
             ),
@@ -120,7 +126,7 @@ class TgcgDashboardPage extends StatelessWidget {
               scope: scope,
               coverage: coverage,
               totalMembers: members.length,
-              totalAgents: agents.length,
+              totalAssignments: activeAssignments.length,
               onOpenMembership: modules.contains(TgcgModule.membershipNetwork)
                   ? () => onOpenModule(TgcgModule.membershipNetwork)
                   : null,
@@ -133,8 +139,8 @@ class TgcgDashboardPage extends StatelessWidget {
               builder: (context, inner) {
                 final progress = _OperationsProgressPanel(
                   collation: collation,
-                  readyAgents: readyAgents.length,
-                  approvedAgents: approvedAgents.length,
+                  presentMembers: presentMembers,
+                  activeAssignments: activeAssignments.length,
                   fieldReports: fieldReports.length,
                   openIncidents: openIncidents.length,
                   onOpenCollation: modules.contains(TgcgModule.collation)
@@ -187,8 +193,8 @@ class _MetricGrid extends StatelessWidget {
     required this.submissions,
     required this.review,
     required this.verifiedPollingUnits,
-    required this.approvedAgents,
-    required this.readyAgents,
+    required this.activeAssignments,
+    required this.presentMembers,
     required this.modules,
     required this.onOpenModule,
   });
@@ -199,8 +205,8 @@ class _MetricGrid extends StatelessWidget {
   final int submissions;
   final int review;
   final int verifiedPollingUnits;
-  final int approvedAgents;
-  final int readyAgents;
+  final int activeAssignments;
+  final int presentMembers;
   final Set<TgcgModule> modules;
   final ValueChanged<TgcgModule> onOpenModule;
 
@@ -231,13 +237,13 @@ class _MetricGrid extends StatelessWidget {
             ),
             TgcgMetricCard(
               width: width,
-              label: 'Approved agents',
-              value: '$approvedAgents',
-              detail: '$readyAgents operationally ready',
-              icon: Icons.badge_outlined,
+              label: 'Active assignments',
+              value: '$activeAssignments',
+              detail: '$presentMembers members currently at location',
+              icon: Icons.assignment_turned_in_outlined,
               tone: TgcgMetricTone.success,
-              onTap: modules.contains(TgcgModule.accreditation)
-                  ? () => onOpenModule(TgcgModule.accreditation)
+              onTap: modules.contains(TgcgModule.assignmentControl)
+                  ? () => onOpenModule(TgcgModule.assignmentControl)
                   : null,
             ),
             TgcgMetricCard(
@@ -277,15 +283,15 @@ class _MetricGrid extends StatelessWidget {
             ),
             TgcgMetricCard(
               width: width,
-              label: 'Agent readiness',
-              value: approvedAgents == 0
+              label: 'Assignment presence',
+              value: activeAssignments == 0
                   ? '0%'
-                  : '${((readyAgents / approvedAgents) * 100).round()}%',
-              detail: 'Training + identity + device',
-              icon: Icons.verified_user_outlined,
+                  : '${((presentMembers / activeAssignments) * 100).round()}%',
+              detail: 'Members with fresh GPS inside duty geofence',
+              icon: Icons.gps_fixed_rounded,
               tone: TgcgMetricTone.neutral,
-              onTap: modules.contains(TgcgModule.accreditation)
-                  ? () => onOpenModule(TgcgModule.accreditation)
+              onTap: modules.contains(TgcgModule.assignmentControl)
+                  ? () => onOpenModule(TgcgModule.assignmentControl)
                   : null,
             ),
           ];
@@ -299,14 +305,14 @@ class _CoverageData {
   const _CoverageData({
     required this.scope,
     required this.members,
-    required this.agents,
+    required this.assignments,
     required this.incidents,
     required this.results,
   });
 
   final GeographicScope scope;
   final int members;
-  final int agents;
+  final int assignments;
   final int incidents;
   final int results;
 }
@@ -316,7 +322,7 @@ class _CoveragePanel extends StatelessWidget {
     required this.scope,
     required this.coverage,
     required this.totalMembers,
-    required this.totalAgents,
+    required this.totalAssignments,
     required this.onOpenMembership,
     required this.onOpenGeography,
   });
@@ -324,7 +330,7 @@ class _CoveragePanel extends StatelessWidget {
   final GeographicScope scope;
   final List<_CoverageData> coverage;
   final int totalMembers;
-  final int totalAgents;
+  final int totalAssignments;
   final VoidCallback? onOpenMembership;
   final VoidCallback? onOpenGeography;
 
@@ -342,7 +348,7 @@ class _CoveragePanel extends StatelessWidget {
   Widget build(BuildContext context) => TgcgSectionCard(
         title: _title,
         subtitle:
-            '$totalMembers registered members • $totalAgents agents • ${scope.label}',
+            '$totalMembers registered members • $totalAssignments active assignments • ${scope.label}',
         trailing: Wrap(
           spacing: 6,
           children: [
@@ -381,7 +387,7 @@ class _CoveragePanel extends StatelessWidget {
                     runSpacing: gap,
                     children: coverage.map((item) {
                       final active = item.members > 0 ||
-                          item.agents > 0 ||
+                          item.assignments > 0 ||
                           item.incidents > 0 ||
                           item.results > 0;
                       return Container(
@@ -459,8 +465,8 @@ class _CoveragePanel extends StatelessWidget {
                                 ),
                                 Expanded(
                                   child: _CoverageMetric(
-                                    label: 'Agents',
-                                    value: item.agents,
+                                    label: 'Assignments',
+                                    value: item.assignments,
                                   ),
                                 ),
                                 Expanded(
@@ -520,26 +526,27 @@ class _CoverageMetric extends StatelessWidget {
 class _OperationsProgressPanel extends StatelessWidget {
   const _OperationsProgressPanel({
     required this.collation,
-    required this.readyAgents,
-    required this.approvedAgents,
+    required this.presentMembers,
+    required this.activeAssignments,
     required this.fieldReports,
     required this.openIncidents,
     required this.onOpenCollation,
   });
 
   final CollationSummary collation;
-  final int readyAgents;
-  final int approvedAgents;
+  final int presentMembers;
+  final int activeAssignments;
   final int fieldReports;
   final int openIncidents;
   final VoidCallback? onOpenCollation;
 
   @override
   Widget build(BuildContext context) {
-    final readiness = approvedAgents == 0 ? 0.0 : readyAgents / approvedAgents;
+    final readiness =
+        activeAssignments == 0 ? 0.0 : presentMembers / activeAssignments;
     return TgcgSectionCard(
-      title: 'Operational readiness',
-      subtitle: 'Current field readiness and verified result activity.',
+      title: 'Operational presence',
+      subtitle: 'Current assignment presence and verified result activity.',
       trailing: onOpenCollation == null
           ? null
           : IconButton(
@@ -565,7 +572,7 @@ class _OperationsProgressPanel extends StatelessWidget {
               const SizedBox(width: 8),
               const Expanded(
                 child: Text(
-                  'agent readiness',
+                  'assignment presence',
                   style: TextStyle(color: TgcgColors.muted, fontSize: 10.5),
                 ),
               ),
@@ -582,7 +589,10 @@ class _OperationsProgressPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          _ProgressRow('Ready agents', '$readyAgents / $approvedAgents'),
+          _ProgressRow(
+            'Members at assigned location',
+            '$presentMembers / $activeAssignments',
+          ),
           _ProgressRow('Field reports', '$fieldReports'),
           _ProgressRow('Open incidents', '$openIncidents'),
           _ProgressRow(
