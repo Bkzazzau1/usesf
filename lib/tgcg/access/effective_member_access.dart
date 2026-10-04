@@ -15,6 +15,7 @@ class EffectiveAccessGrant {
     required this.label,
     required this.scope,
     required this.capabilities,
+    this.role,
   });
 
   final EffectiveGrantSource source;
@@ -22,6 +23,7 @@ class EffectiveAccessGrant {
   final String label;
   final GeographicScope scope;
   final Set<TgcgCapability> capabilities;
+  final TgcgRole? role;
 
   bool allows(
     TgcgCapability capability, {
@@ -65,6 +67,7 @@ class EffectiveMemberAccess {
           scope: record.scope,
           capabilities:
               TgcgPermissionPolicy.capabilitiesFor(record.role),
+          role: record.role,
         ),
       );
     }
