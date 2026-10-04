@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'login_page.dart';
 import 'membership/member_access_page.dart';
 import 'membership/membership_store.dart';
+import 'membership/self_registration_page.dart';
 import 'security/security_portal_login_page.dart';
 import 'session.dart';
 import 'ui/tgcg_design.dart';
@@ -58,6 +59,34 @@ class _PresentationAccessLoginState extends State<PresentationAccessLogin> {
                           vertical: 16,
                         ),
                         side: const BorderSide(color: TgcgColors.navy700),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(TgcgRadius.md),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Material(
+                    elevation: 8,
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(16),
+                    child: FilledButton.icon(
+                      onPressed: resetting
+                          ? null
+                          : () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => const SelfRegistrationPage(),
+                                ),
+                              ),
+                      icon: const Icon(Icons.person_add_alt_1_rounded),
+                      label: const Text('Register as Member'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: TgcgColors.accent,
+                        foregroundColor: TgcgColors.primaryDark,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 16,
+                        ),
+                        side: const BorderSide(color: TgcgColors.gold400),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(TgcgRadius.md),
                         ),
