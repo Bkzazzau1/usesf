@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
@@ -64,10 +65,33 @@ class DeviceEvidenceService {
       imageQuality: 90,
     );
     if (file == null) return null;
+
+    XFile durableFile = file;
+    if (!kIsWeb && file.path.isNotEmpty) {
+      final directory = await getApplicationSupportDirectory();
+      final selfieDirectory = Directory(p.join(directory.path, 'member_selfies'));
+      if (!await selfieDirectory.exists()) {
+        await selfieDirectory.create(recursive: true);
+      }
+      final extension = p.extension(file.name).isEmpty
+          ? '.jpg'
+          : p.extension(file.name);
+      final durablePath = p.join(
+        selfieDirectory.path,
+        'selfie_${DateTime.now().microsecondsSinceEpoch}$extension',
+      );
+      final copied = await File(file.path).copy(durablePath);
+      durableFile = XFile(
+        copied.path,
+        mimeType: file.mimeType ?? 'image/jpeg',
+        name: p.basename(copied.path),
+      );
+    }
+
     return _fromXFile(
-      file,
+      durableFile,
       type: EvidenceType.photo,
-      mimeType: file.mimeType ?? 'image/jpeg',
+      mimeType: durableFile.mimeType ?? 'image/jpeg',
     );
   }
 
