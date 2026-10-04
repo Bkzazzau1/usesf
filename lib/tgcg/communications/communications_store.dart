@@ -307,11 +307,16 @@ class CommunicationsController extends ChangeNotifier {
     required String body,
     required TgcgRole role,
     required GeographicScope userScope,
+    bool capabilityAuthorized = false,
   }) {
     final roomIndex = _rooms.indexWhere((room) => room.id == roomId);
     if (roomIndex < 0 || body.trim().isEmpty) return false;
     final room = _rooms[roomIndex];
-    if (!TgcgPermissionPolicy.allows(role, TgcgCapability.sendOperationalMessage)) {
+    if (!capabilityAuthorized &&
+        !TgcgPermissionPolicy.allows(
+          role,
+          TgcgCapability.sendOperationalMessage,
+        )) {
       return false;
     }
 
@@ -349,9 +354,11 @@ class CommunicationsController extends ChangeNotifier {
     required String senderId,
     required TgcgRole role,
     required GeographicScope userScope,
+    bool capabilityAuthorized = false,
   }) {
     if (title.trim().isEmpty || body.trim().isEmpty) return false;
-    if (!TgcgPermissionPolicy.allows(role, TgcgCapability.sendBroadcast)) {
+    if (!capabilityAuthorized &&
+        !TgcgPermissionPolicy.allows(role, TgcgCapability.sendBroadcast)) {
       return false;
     }
     if (!_within(userScope, targetScope)) return false;
