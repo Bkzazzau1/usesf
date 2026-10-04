@@ -124,8 +124,19 @@ String roleLabel(TgcgRole role) => switch (role) {
       TgcgRole.stateCoordinator => 'State Coordinator',
       TgcgRole.lgaCoordinator => 'LGA Coordinator',
       TgcgRole.wardCoordinator => 'Ward Coordinator',
-      TgcgRole.member => 'Member',
+      TgcgRole.pollingUnitCoordinator => 'Polling Unit Coordinator',
       TgcgRole.pollingUnitAgent => 'Polling Unit Agent',
+      TgcgRole.mediaOfficer => 'Media Officer',
+      TgcgRole.womenMobilizationCoordinator => 'Women Mobilization Coordinator',
+      TgcgRole.youthMobilizationCoordinator => 'Youth Mobilization Coordinator',
+      TgcgRole.communicationsOfficer => 'Communications Officer',
+      TgcgRole.logisticsOfficer => 'Logistics Officer',
+      TgcgRole.monitoringEvaluationOfficer => 'Monitoring & Evaluation Officer',
+      TgcgRole.dataEvidenceOfficer => 'Data & Evidence Officer',
+      TgcgRole.transportCoordinator => 'Transport Coordinator',
+      TgcgRole.trainingOfficer => 'Training Officer',
+      TgcgRole.ictOfficer => 'ICT Officer',
+      TgcgRole.member => 'Member',
       TgcgRole.observer => 'Observer',
       TgcgRole.legalOfficer => 'Legal Officer',
       TgcgRole.technicalSupport => 'Technical Support',
@@ -147,11 +158,33 @@ String roleDescription(TgcgRole role) => switch (role) {
       TgcgRole.lgaCoordinator =>
         'LGA field coordination, reporting, member assignments and operational deployment.',
       TgcgRole.wardCoordinator =>
-        'Ward-level field monitoring, reporting and result submission support.',
-      TgcgRole.member =>
-        'Member profile, home polling-unit information and authorized assignment access.',
+        'Ward-level coordination, member roles, assignments and operational reporting.',
+      TgcgRole.pollingUnitCoordinator =>
+        'Polling-unit coordination, member assignments, presence and operational reporting.',
       TgcgRole.pollingUnitAgent =>
-        'Polling-unit check-in, incident reporting, evidence and result submission.',
+        'Polling-unit field duty, incident reporting, evidence and result submission.',
+      TgcgRole.mediaOfficer =>
+        'Media information, field updates, review, coordination and escalation within the assigned scope.',
+      TgcgRole.womenMobilizationCoordinator =>
+        'Women-focused coordination, meetings, communications and assigned operational activities.',
+      TgcgRole.youthMobilizationCoordinator =>
+        'Youth-focused coordination, meetings, communications and assigned operational activities.',
+      TgcgRole.communicationsOfficer =>
+        'Operational communications, discussion and meeting coordination.',
+      TgcgRole.logisticsOfficer =>
+        'Logistics coordination, location-aware operations and field communications.',
+      TgcgRole.monitoringEvaluationOfficer =>
+        'Monitoring, field reporting, evidence review and operational reporting.',
+      TgcgRole.dataEvidenceOfficer =>
+        'Data, evidence, audit and reporting responsibilities within the assigned scope.',
+      TgcgRole.transportCoordinator =>
+        'Transport coordination, geographic operations and field communications.',
+      TgcgRole.trainingOfficer =>
+        'Training coordination, discussion, communications and meeting support.',
+      TgcgRole.ictOfficer =>
+        'ICT support, system visibility and operational technical coordination.',
+      TgcgRole.member =>
+        'Registered member identity. Operational access is granted by roles or active assignments.',
       TgcgRole.observer =>
         'Observation, structured field reporting and evidence submission.',
       TgcgRole.legalOfficer =>
@@ -172,8 +205,19 @@ IconData roleIcon(TgcgRole role) => switch (role) {
       TgcgRole.stateCoordinator => Icons.map_rounded,
       TgcgRole.lgaCoordinator => Icons.location_city_rounded,
       TgcgRole.wardCoordinator => Icons.grid_view_rounded,
-      TgcgRole.member => Icons.person_pin_circle_rounded,
+      TgcgRole.pollingUnitCoordinator => Icons.place_rounded,
       TgcgRole.pollingUnitAgent => Icons.how_to_vote_rounded,
+      TgcgRole.mediaOfficer => Icons.campaign_outlined,
+      TgcgRole.womenMobilizationCoordinator => Icons.groups_2_outlined,
+      TgcgRole.youthMobilizationCoordinator => Icons.diversity_3_outlined,
+      TgcgRole.communicationsOfficer => Icons.forum_outlined,
+      TgcgRole.logisticsOfficer => Icons.inventory_2_outlined,
+      TgcgRole.monitoringEvaluationOfficer => Icons.monitoring_outlined,
+      TgcgRole.dataEvidenceOfficer => Icons.fact_check_outlined,
+      TgcgRole.transportCoordinator => Icons.local_shipping_outlined,
+      TgcgRole.trainingOfficer => Icons.school_outlined,
+      TgcgRole.ictOfficer => Icons.computer_outlined,
+      TgcgRole.member => Icons.person_pin_circle_rounded,
       TgcgRole.observer => Icons.visibility_rounded,
       TgcgRole.legalOfficer => Icons.gavel_rounded,
       TgcgRole.technicalSupport => Icons.support_agent_rounded,
@@ -197,6 +241,12 @@ Set<TgcgModule> allowedModules(TgcgRole role) {
   }
   if (role == TgcgRole.stateAdministrator) {
     modules.add(TgcgModule.membershipNetwork);
+  }
+  if (TgcgPermissionPolicy.allows(
+    role,
+    TgcgCapability.manageRoleAssignments,
+  )) {
+    modules.add(TgcgModule.membershipNetwork);
     modules.add(TgcgModule.roleAssignment);
   }
   if (TgcgPermissionPolicy.allows(role, TgcgCapability.viewGeography)) {
@@ -207,10 +257,11 @@ Set<TgcgModule> allowedModules(TgcgRole role) {
       modules.add(TgcgModule.alertCenter);
     }
   }
-  if (TgcgPermissionPolicy.allows(
-    role,
-    TgcgCapability.manageAgentAssignments,
-  )) {
+  if (TgcgPermissionPolicy.allows(role, TgcgCapability.manageAssignments) ||
+      TgcgPermissionPolicy.allows(
+        role,
+        TgcgCapability.manageAgentAssignments,
+      )) {
     modules.add(TgcgModule.assignmentControl);
   }
 
