@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../evidence/device_evidence_service.dart';
+import '../geography/geography_registry.dart';
 import '../media/device_media.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
