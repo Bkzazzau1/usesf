@@ -354,6 +354,7 @@ class MembershipOperationsController extends ChangeNotifier {
   final OfflinePersistenceController _persistence;
   final Map<String, String> _memberPvcCredentialHashes = {};
   final Map<String, _MemberPinCredential> _memberPinCredentials = {};
+  final Map<String, _MemberPinCredential> _memberPasswordCredentials = {};
   final FlutterSecureStorage _credentialStorage =
       const FlutterSecureStorage();
 
@@ -602,6 +603,18 @@ class MembershipOperationsController extends ChangeNotifier {
     return stored != null && stored.trim().isNotEmpty;
   }
 
+  Future<bool> hasMemberPasswordCredential(String memberId) async {
+    if (_memberPasswordCredentials.containsKey(memberId)) return true;
+    final stored = await _credentialStorage.read(
+      key: _passwordCredentialKey(memberId),
+    );
+    if (stored != null && stored.trim().isNotEmpty) return true;
+
+    // Development migration: existing 6-digit member PIN credentials remain
+    // usable until the member sets a normal password.
+    return hasMemberPinCredential(memberId);
+  }
+
   Future<bool> hasPersistedPvcCredential(String memberId) async {
     if (_memberPvcCredentialHashes.containsKey(memberId)) return true;
     final fingerprint = await _credentialStorage.read(
@@ -701,6 +714,81 @@ class MembershipOperationsController extends ChangeNotifier {
     notifyListeners();
   }
 
+
+  Future<void> setMemberPassword({
+    required String memberId,
+    required String password,
+  }) async {
+    if (memberById(memberId) == null) {
+      throw ArgumentError('Unknown member: $memberId');
+    }
+    if (password.length < 8) {
+      throw ArgumentError('Password must contain at least 8 characters.');
+    }
+    final random = Random.secure();
+    final saltBytes = List<int>.generate(
+      16,
+      (_) => random.nextInt(256),
+      growable: false,
+    );
+    final hash = await _derivePin(password, saltBytes);
+    final credential = _MemberPinCredential(
+      salt: base64UrlEncode(saltBytes),
+      hash: base64UrlEncode(hash),
+    );
+    _memberPasswordCredentials[memberId] = credential;
+    await _credentialStorage.write(
+      key: _passwordCredentialKey(memberId),
+      value: jsonEncode({
+        'salt': credential.salt,
+        'hash': credential.hash,
+      }),
+    );
+    notifyListeners();
+  }
+
+  Future<bool> verifyMemberPassword({
+    required String memberId,
+    required String password,
+  }) async {
+    if (password.isEmpty) return false;
+
+    var credential = _memberPasswordCredentials[memberId];
+    if (credential == null) {
+      final stored = await _credentialStorage.read(
+        key: _passwordCredentialKey(memberId),
+      );
+      if (stored != null && stored.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(stored);
+          if (decoded is Map &&
+              decoded['salt'] is String &&
+              decoded['hash'] is String) {
+            credential = _MemberPinCredential(
+              salt: decoded['salt'] as String,
+              hash: decoded['hash'] as String,
+            );
+            _memberPasswordCredentials[memberId] = credential;
+          }
+        } catch (_) {
+          return false;
+        }
+      }
+    }
+
+    if (credential != null) {
+      final salt = base64Url.decode(credential.salt);
+      final actual = base64UrlEncode(await _derivePin(password, salt));
+      return _constantTimeEquals(credential.hash, actual);
+    }
+
+    // Development migration path for accounts created before password login.
+    if (RegExp(r'^\d{6}$').hasMatch(password)) {
+      return verifyMemberPin(memberId: memberId, pin: password);
+    }
+    return false;
+  }
+
   Future<void> clearLocalCredentials() async {
     for (final member in _members) {
       final fingerprint = _memberPvcCredentialHashes[member.id] ??
@@ -718,9 +806,13 @@ class MembershipOperationsController extends ChangeNotifier {
       await _credentialStorage.delete(
         key: _pinCredentialKey(member.id),
       );
+      await _credentialStorage.delete(
+        key: _passwordCredentialKey(member.id),
+      );
     }
     _memberPvcCredentialHashes.clear();
     _memberPinCredentials.clear();
+    _memberPasswordCredentials.clear();
   }
 
   Future<bool> verifyMemberPin({
@@ -1198,6 +1290,9 @@ class MembershipOperationsController extends ChangeNotifier {
 
   static String _pinCredentialKey(String memberId) =>
       'usesf.member.$memberId.pin';
+
+  static String _passwordCredentialKey(String memberId) =>
+      'usesf.member.$memberId.password';
 
   static String _pvcMemberFingerprintKey(String memberId) =>
       'usesf.member.$memberId.pvc_fingerprint';
