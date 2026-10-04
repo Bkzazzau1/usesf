@@ -34,8 +34,9 @@ Future<void> showPresentationTour(
     ),
     PresentationTourStep(
       number: 2,
-      title: 'Registered Members',
-      subtitle: 'Show membership and agent coverage by zone and state.',
+      title: 'Member Operations',
+      subtitle:
+          'Show the single member registry, home polling units, active jobs and assignment readiness.',
       module: TgcgModule.membershipNetwork,
       icon: Icons.groups_2_outlined,
     ),
@@ -56,7 +57,8 @@ Future<void> showPresentationTour(
     PresentationTourStep(
       number: 5,
       title: 'Live Operations',
-      subtitle: 'Show state activity, incidents, agents and reporting progress.',
+      subtitle:
+          'Show state activity, incidents, member assignments and reporting progress.',
       module: TgcgModule.liveOperations,
       icon: Icons.travel_explore_rounded,
     ),
@@ -182,7 +184,7 @@ Future<void> showPresentationTour(
                         SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'For the Polling Agent segment: sign out, use Quick Field Access, open Digital ID, check in, send a local message, open Meeting Room, capture evidence and submit a result.',
+                            'For the field-duty segment: sign in as a member with an authorized assignment, open the duty workspace, check in, communicate, capture evidence and complete the assigned task.',
                             style: TextStyle(
                               color: TgcgColors.ink,
                               fontSize: 11,
