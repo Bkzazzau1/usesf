@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../access/access_policy.dart';
 import '../assignments/assignment_store.dart';
 import '../devices/managed_device_store.dart';
 import '../domain/permissions.dart';
@@ -26,28 +27,32 @@ class _FieldMonitoringPageState extends State<FieldMonitoringPage> {
   Widget build(BuildContext context) {
     final session = TgcgSession.of(context);
     final store = FieldOperations.of(context);
-    var incidents = store.incidentsForScope(session.scope);
-    final reports = store.reportsForScope(session.scope);
-    final permissions = session.role!;
-    final canCreateIncident = TgcgPermissionPolicy.allows(
-      permissions,
+    final fieldScopes = <GeographicScope>[
+      ...TgcgAccessPolicy.scopesFor(context, TgcgCapability.viewIncidents),
+      ...TgcgAccessPolicy.scopesFor(context, TgcgCapability.createIncident),
+      ...TgcgAccessPolicy.scopesFor(context, TgcgCapability.submitFieldReport),
+    ];
+    var incidents = store.incidents
+        .where(
+          (item) => fieldScopes.any(
+            (scope) => TgcgPermissionPolicy.scopeAllows(scope, item.scope),
+          ),
+        )
+        .toList(growable: false);
+    final reports = store.reports
+        .where(
+          (item) => fieldScopes.any(
+            (scope) => TgcgPermissionPolicy.scopeAllows(scope, item.scope),
+          ),
+        )
+        .toList(growable: false);
+    final canCreateIncident = TgcgAccessPolicy.allows(
+      context,
       TgcgCapability.createIncident,
     );
-    final canSubmitFieldReport = TgcgPermissionPolicy.allows(
-      permissions,
+    final canSubmitFieldReport = TgcgAccessPolicy.allows(
+      context,
       TgcgCapability.submitFieldReport,
-    );
-    final canAcknowledge = TgcgPermissionPolicy.allows(
-      permissions,
-      TgcgCapability.acknowledgeIncident,
-    );
-    final canAssign = TgcgPermissionPolicy.allows(
-      permissions,
-      TgcgCapability.assignIncident,
-    );
-    final canClose = TgcgPermissionPolicy.allows(
-      permissions,
-      TgcgCapability.closeIncident,
     );
 
     if (statusFilter != null) {
@@ -63,7 +68,13 @@ class _FieldMonitoringPageState extends State<FieldMonitoringPage> {
 
     incidents = List<FieldIncident>.from(incidents)
       ..sort((a, b) => b.reportedAt.compareTo(a.reportedAt));
-    final allScoped = store.incidentsForScope(session.scope);
+    final allScoped = store.incidents
+        .where(
+          (item) => fieldScopes.any(
+            (scope) => TgcgPermissionPolicy.scopeAllows(scope, item.scope),
+          ),
+        )
+        .toList(growable: false);
     final selected = selectedIncidentId == null
         ? (incidents.isEmpty ? null : incidents.first)
         : allScoped.where((item) => item.id == selectedIncidentId).firstOrNull;
@@ -89,6 +100,24 @@ class _FieldMonitoringPageState extends State<FieldMonitoringPage> {
     final geoTagged = allScoped
         .where((item) => item.latitude != null && item.longitude != null)
         .length;
+    final canAcknowledge = selected != null &&
+        TgcgAccessPolicy.allows(
+          context,
+          TgcgCapability.acknowledgeIncident,
+          targetScope: selected.scope,
+        );
+    final canAssign = selected != null &&
+        TgcgAccessPolicy.allows(
+          context,
+          TgcgCapability.assignIncident,
+          targetScope: selected.scope,
+        );
+    final canClose = selected != null &&
+        TgcgAccessPolicy.allows(
+          context,
+          TgcgCapability.closeIncident,
+          targetScope: selected.scope,
+        );
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 36),
@@ -97,7 +126,7 @@ class _FieldMonitoringPageState extends State<FieldMonitoringPage> {
           eyebrow: 'FIELD OPERATIONS',
           title: 'Field Monitoring & Incident Capture',
           subtitle:
-              '${session.scope.label}: structured field reporting, incident response, evidence context and operational escalation.',
+              '${fieldScopes.length} authorized scope${fieldScopes.length == 1 ? '' : 's'}: structured field reporting, incident response, evidence context and operational escalation.',
           trailing: Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -211,18 +240,35 @@ class _FieldMonitoringPageState extends State<FieldMonitoringPage> {
     final managedDevice =
         memberId == null ? null : devices.deviceForMember(memberId);
 
-    final scopedUnits = membership.geography.pollingUnitsWithin(session.scope);
+    final scopedUnits = membership.geography.pollingUnits
+        .where(
+          (unit) => TgcgAccessPolicy.allows(
+            context,
+            TgcgCapability.createIncident,
+            targetScope: unit.scope,
+            listen: false,
+          ),
+        )
+        .toList(growable: false);
     final unitById = <String, CanonicalPollingUnit>{
       for (final unit in scopedUnits) unit.code: unit,
     };
     for (final assignment in activeAssignments) {
-      final unit =
-          membership.geography.pollingUnit(assignment.targetPollingUnitId);
+      final pollingUnitId = assignment.targetPollingUnitId;
+      if (pollingUnitId == null) continue;
+      final unit = membership.geography.pollingUnit(pollingUnitId);
       if (unit != null) unitById[unit.code] = unit;
     }
     final units = unitById.values.toList(growable: false);
+    final incidentAuthority = TgcgAccessPolicy.authorizingScope(
+      context,
+      TgcgCapability.createIncident,
+      listen: false,
+    );
     GeographicScope scope = selectedAssignment?.targetScope ??
-        (units.isEmpty ? session.scope : units.first.scope);
+        (units.isEmpty
+            ? incidentAuthority ?? session.scope
+            : units.first.scope);
 
     Future<void> capture(
       StateSetter setDialogState,
@@ -308,7 +354,7 @@ class _FieldMonitoringPageState extends State<FieldMonitoringPage> {
                     decoration: const InputDecoration(labelText: 'Field location'),
                     isExpanded: true,
                     items: (units.isEmpty
-                            ? <GeographicScope>[session.scope]
+                            ? <GeographicScope>[scope]
                             : units.map((unit) => unit.scope).toList())
                         .map(
                           (value) => DropdownMenuItem(
@@ -467,11 +513,33 @@ class _FieldMonitoringPageState extends State<FieldMonitoringPage> {
     final store = FieldOperations.of(context, listen: false);
     final summary = TextEditingController();
     var category = _reportCategories.first;
-    final units = membership.geography.pollingUnitsWithin(session.scope);
-    GeographicScope scope = units.isEmpty ? session.scope : units.first.scope;
+    final units = membership.geography.pollingUnits
+        .where(
+          (unit) => TgcgAccessPolicy.allows(
+            context,
+            TgcgCapability.submitFieldReport,
+            targetScope: unit.scope,
+            listen: false,
+          ),
+        )
+        .toList(growable: false);
+    final reportAuthority = TgcgAccessPolicy.authorizingScope(
+      context,
+      TgcgCapability.submitFieldReport,
+      listen: false,
+    );
+    GeographicScope scope =
+        units.isEmpty ? reportAuthority ?? session.scope : units.first.scope;
     String? incidentId;
-    final availableIncidents = store
-        .incidentsForScope(session.scope)
+    final availableIncidents = store.incidents
+        .where(
+          (item) => TgcgAccessPolicy.allows(
+            context,
+            TgcgCapability.submitFieldReport,
+            targetScope: item.scope,
+            listen: false,
+          ),
+        )
         .where(
           (item) =>
               item.status != IncidentStatus.closed &&
