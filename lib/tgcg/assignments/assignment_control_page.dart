@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../access/access_policy.dart';
 import '../devices/managed_device_store.dart';
 import '../domain/permissions.dart';
 import '../geography/geography_registry.dart';
@@ -23,27 +24,31 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     final membership = MembershipOperations.of(context);
     final devices = ManagedDevices.of(context);
     final assignments = Assignments.of(context);
-    final canManageAssignments = TgcgPermissionPolicy.may(
-      session.role!,
-      session.scope,
+    final assignmentScopes = TgcgAccessPolicy.scopesFor(
+      context,
       TgcgCapability.manageAssignments,
     );
-    final canManageDevices = TgcgPermissionPolicy.may(
-      session.role!,
-      session.scope,
+    final deviceScopes = TgcgAccessPolicy.scopesFor(
+      context,
       TgcgCapability.manageDevices,
     );
+    final canManageAssignments = assignmentScopes.isNotEmpty;
+    final canManageDevices = deviceScopes.isNotEmpty;
     final authorizedUnits = membership.geography.pollingUnits
         .where(
-          (unit) =>
-              TgcgPermissionPolicy.scopeAllows(session.scope, unit.scope),
+          (unit) => assignmentScopes.any(
+            (scope) => TgcgPermissionPolicy.scopeAllows(scope, unit.scope),
+          ),
         )
         .toList(growable: false);
     final authorizedMembers = membership.members
         .where((member) {
           final scope = membership.registrationScopeForMember(member.id);
           return scope != null &&
-              TgcgPermissionPolicy.scopeAllows(session.scope, scope);
+              assignmentScopes.any(
+                (authority) =>
+                    TgcgPermissionPolicy.scopeAllows(authority, scope),
+              );
         })
         .toList(growable: false);
     final authorizedMemberIds =
@@ -53,8 +58,23 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
       final memberId = device.assignedMemberId;
       return memberId != null && authorizedMemberIds.contains(memberId);
     }).toList(growable: false);
-    final visible = assignments.assignmentsForScope(session.scope);
-    final coverage = assignments.coverageForScope(session.scope);
+    final visible = assignments.assignments
+        .where(
+          (item) => assignmentScopes.any(
+            (scope) =>
+                TgcgPermissionPolicy.scopeAllows(scope, item.targetScope) ||
+                TgcgPermissionPolicy.scopeAllows(item.targetScope, scope),
+          ),
+        )
+        .toList()
+      ..sort((a, b) => b.assignedAt.compareTo(a.assignedAt));
+    final coverageByUnit = <String, PollingUnitCoverageSnapshot>{};
+    for (final scope in assignmentScopes) {
+      for (final snapshot in assignments.coverageForScope(scope)) {
+        coverageByUnit[snapshot.unit.code] = snapshot;
+      }
+    }
+    final coverage = coverageByUnit.values.toList(growable: false);
     final gaps = coverage.where((item) => item.needsAttention).toList();
     final staffed =
         coverage.where((item) => !item.isBelowMinimum).length;
@@ -66,7 +86,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
           eyebrow: 'FIELD DEPLOYMENT',
           title: 'Jobs & Assignment Control',
           subtitle:
-              '${session.scope.label}: any registered member can receive an authorized job or temporary field assignment. The assignment is tracked separately and never changes the member\'s permanent home polling unit.',
+              '${assignmentScopes.length} authorized scope${assignmentScopes.length == 1 ? '' : 's'}: any registered member inside your authority can receive a job or temporary field assignment without changing the member\'s permanent home polling unit.',
           trailing: canManageAssignments
               ? Wrap(
                   spacing: 8,
@@ -78,6 +98,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                         assignments,
                         session,
                         authorizedUnits,
+                        assignmentScopes,
                       ),
                       icon: const Icon(Icons.groups_2_outlined),
                       label: const Text('Staffing needs'),
@@ -90,6 +111,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                         session,
                         authorizedMembers,
                         authorizedUnits,
+                        assignmentScopes,
                       ),
                       icon: const Icon(Icons.add_task_rounded),
                       label: const Text('New assignment'),
@@ -180,7 +202,9 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
           authorizedMembers: authorizedMembers,
           actorId:
               session.accessId.isEmpty ? session.operatorName : session.accessId,
-          authorizedScope: session.scope,
+          authorizedScope: assignmentScopes.isEmpty
+              ? session.scope
+              : assignmentScopes.first,
         ),
         const SizedBox(height: 16),
         _DeviceRegistry(
@@ -206,6 +230,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     AssignmentController assignments,
     TgcgSessionController session,
     List<CanonicalPollingUnit> authorizedUnits,
+    List<GeographicScope> assignmentScopes,
   ) async {
     if (authorizedUnits.isEmpty) return;
 
@@ -372,7 +397,11 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                   actorId: session.accessId.isEmpty
                       ? session.operatorName
                       : session.accessId,
-                  authorizedScope: session.scope,
+                  authorizedScope: _scopeCovering(
+                        assignmentScopes,
+                        _scopeForUnit(authorizedUnits, pollingUnitId),
+                      ) ??
+                      session.scope,
                 );
                 if (dialogContext.mounted) {
                   Navigator.pop(dialogContext, true);
@@ -402,6 +431,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     TgcgSessionController session,
     List<TgcgMember> authorizedMembers,
     List<CanonicalPollingUnit> authorizedUnits,
+    List<GeographicScope> assignmentScopes,
   ) async {
     if (authorizedMembers.isEmpty) {
       return;
@@ -427,8 +457,14 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     var locationBound = authorizedLgas.isNotEmpty;
     var priority = AssignmentPriority.normal;
     final selectedCapabilities = <TgcgCapability>{};
+    final capabilityRole = TgcgAccessPolicy.roleFor(
+          context,
+          TgcgCapability.manageAssignments,
+          listen: false,
+        ) ??
+        session.role!;
     final availableCapabilities =
-        _assignmentGrantOptionsFor(session.role!);
+        _assignmentGrantOptionsFor(capabilityRole);
     final title = TextEditingController(text: 'Field Duty Assignment');
     final instructions = TextEditingController();
 
@@ -625,7 +661,16 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                           assignedBy: session.accessId.isEmpty
                               ? session.operatorName
                               : session.accessId,
-                          authorizedScope: session.scope,
+                          authorizedScope: _scopeCovering(
+                                assignmentScopes,
+                                locationBound && pollingUnitId != null
+                                    ? membership.geography
+                                        .pollingUnit(pollingUnitId!)
+                                        ?.scope
+                                    : membership
+                                        .registrationScopeForMember(memberId),
+                              ) ??
+                              assignmentScopes.first,
                           priority: priority,
                           instructions: instructions.text,
                           grantedCapabilities:
@@ -847,6 +892,27 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
       );
     }
   }
+}
+
+GeographicScope? _scopeForUnit(
+  List<CanonicalPollingUnit> units,
+  String pollingUnitId,
+) {
+  for (final unit in units) {
+    if (unit.code == pollingUnitId) return unit.scope;
+  }
+  return null;
+}
+
+GeographicScope? _scopeCovering(
+  List<GeographicScope> authorities,
+  GeographicScope? target,
+) {
+  if (target == null) return authorities.isEmpty ? null : authorities.first;
+  for (final scope in authorities) {
+    if (TgcgPermissionPolicy.scopeAllows(scope, target)) return scope;
+  }
+  return null;
 }
 
 List<TgcgCapability> _assignmentGrantOptionsFor(TgcgRole role) {
