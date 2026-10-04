@@ -219,6 +219,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
             membership,
             session,
             authorizedMembers,
+            deviceScopes,
           ),
         ),
       ],
@@ -784,6 +785,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     MembershipOperationsController membership,
     TgcgSessionController session,
     List<TgcgMember> authorizedMembers,
+    List<GeographicScope> deviceScopes,
   ) async {
     final available = devices.devices
         .where((item) => item.status == ManagedDeviceStatus.available)
@@ -866,7 +868,9 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                     assignedBy: session.accessId.isEmpty
                         ? session.operatorName
                         : session.accessId,
-                    authorizedScope: session.scope,
+                    authorizedScope: deviceScopes.isEmpty
+                        ? session.scope
+                        : deviceScopes.first,
                   );
                   if (dialogContext.mounted) {
                     Navigator.pop(dialogContext, true);
