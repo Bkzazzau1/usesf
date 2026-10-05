@@ -176,6 +176,8 @@ void main() {
           latitude: 11.0,
           longitude: 8.0,
           recordedBy: 'STATE-COORD',
+          recordedByRole: TgcgRole.stateCoordinator,
+          authorizedScope: GeographicScope.kaduna,
         ),
         throwsStateError,
       );
@@ -183,6 +185,27 @@ void main() {
       final saved = geography.pollingUnit(unit.code)!;
       expect(saved.operationalLatitude, 10.5);
       expect(saved.operationalLongitude, 7.4);
+    });
+
+    test('non-State Coordinator cannot add manual polling-unit GPS',
+        () async {
+      final unit = geography.pollingUnits.firstWhere(
+        (item) =>
+            item.operationalLatitude == null ||
+            item.operationalLongitude == null,
+      );
+
+      await expectLater(
+        membership.addManualPollingUnitCoordinate(
+          pollingUnitId: unit.code,
+          latitude: 10.7,
+          longitude: 7.7,
+          recordedBy: 'LGA-COORD',
+          recordedByRole: TgcgRole.lgaCoordinator,
+          authorizedScope: GeographicScope.kaduna,
+        ),
+        throwsStateError,
+      );
     });
 
     test('manual coordinates hydrate for later assignments', () async {
