@@ -136,6 +136,8 @@ void main() {
         latitude: 10.523456,
         longitude: 7.438765,
         recordedBy: 'STATE-COORD',
+        recordedByRole: TgcgRole.stateCoordinator,
+        authorizedScope: GeographicScope.kaduna,
       );
 
       expect(updated.referenceLatitude, 10.523456);
@@ -164,6 +166,8 @@ void main() {
         latitude: 10.5,
         longitude: 7.4,
         recordedBy: 'STATE-COORD',
+        recordedByRole: TgcgRole.stateCoordinator,
+        authorizedScope: GeographicScope.kaduna,
       );
 
       await expectLater(
@@ -192,6 +196,8 @@ void main() {
         latitude: 10.61,
         longitude: 7.51,
         recordedBy: 'STATE-COORD',
+        recordedByRole: TgcgRole.stateCoordinator,
+        authorizedScope: GeographicScope.kaduna,
       );
 
       final restoredGeography = GeographyRegistry.prototypeSeed();
