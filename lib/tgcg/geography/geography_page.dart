@@ -5,6 +5,7 @@ import '../assignments/assignment_store.dart';
 import '../devices/managed_device_store.dart';
 import '../domain/permissions.dart';
 import '../field/field_operations_store.dart';
+import '../governance/governance_store.dart';
 import '../membership/membership_store.dart';
 import '../results/result_operations_store.dart';
 import '../session.dart';
@@ -55,6 +56,7 @@ class _GeographyPageState extends State<GeographyPage> {
     final assignments = Assignments.of(context);
     final devices = ManagedDevices.of(context);
     final field = FieldOperations.of(context);
+    final governance = GovernanceOperations.of(context);
     final results = ResultOperations.of(context);
     final registry = membership.geography;
     final geographyScopes = TgcgAccessPolicy.scopesFor(
@@ -74,7 +76,14 @@ class _GeographyPageState extends State<GeographyPage> {
     final children = registry.childScopes(scope);
     final units = registry.pollingUnitsWithin(scope);
     final members = membership.membersForScope(scope);
-    final agents = membership.agentsForScope(scope);
+    final activeAssignments = assignments
+        .assignmentsForScope(scope)
+        .where((item) => !item.isTerminal)
+        .toList(growable: false);
+    final activeRoles = governance
+        .roleAssignmentsForScope(scope)
+        .where((item) => item.active)
+        .toList(growable: false);
     final incidents = field.incidentsForScope(scope);
     final openIncidents = incidents
         .where(
@@ -159,7 +168,7 @@ class _GeographyPageState extends State<GeographyPage> {
         _MetricGrid(
           childAreas: children.length,
           members: members.length,
-          agents: agents.length,
+          assignments: activeAssignments.length,
           openIncidents: openIncidents.length,
           submissions: submissions.length,
           verifiedResults: verifiedResults,
@@ -210,8 +219,9 @@ class _GeographyPageState extends State<GeographyPage> {
           }),
         ),
         const SizedBox(height: 16),
-        _AgentPanel(
-          agents: agents,
+        _RoleDeploymentPanel(
+          roles: activeRoles,
+          assignments: activeAssignments,
           membership: membership,
         ),
       ],
@@ -268,7 +278,7 @@ class _MetricGrid extends StatelessWidget {
   const _MetricGrid({
     required this.childAreas,
     required this.members,
-    required this.agents,
+    required this.assignments,
     required this.openIncidents,
     required this.submissions,
     required this.verifiedResults,
@@ -276,7 +286,7 @@ class _MetricGrid extends StatelessWidget {
 
   final int childAreas;
   final int members;
-  final int agents;
+  final int assignments;
   final int openIncidents;
   final int submissions;
   final int verifiedResults;
@@ -316,10 +326,10 @@ class _MetricGrid extends StatelessWidget {
               ),
               TgcgMetricCard(
                 width: width,
-                label: 'Agents',
-                value: '$agents',
-                detail: 'Operational assignments',
-                icon: Icons.badge_outlined,
+                label: 'Assignments',
+                value: '$assignments',
+                detail: 'Active operational assignments',
+                icon: Icons.assignment_outlined,
                 tone: TgcgMetricTone.success,
               ),
               TgcgMetricCard(
@@ -717,7 +727,10 @@ class _DirectoryPanel extends StatelessWidget {
               ...children.map((child) => _AreaRow(
                     scope: child,
                     members: membership.memberCountForScope(child),
-                    agents: membership.agentCountForScope(child),
+                    assignments: assignments
+                        .assignmentsForScope(child)
+                        .where((item) => !item.isTerminal)
+                        .length,
                     incidents: field
                         .incidentsForScope(child)
                         .where(
@@ -731,7 +744,6 @@ class _DirectoryPanel extends StatelessWidget {
                   ))
             else if (units.isNotEmpty)
               ...units.map((unit) {
-                final agents = membership.agentsForScope(unit.scope);
                 final members =
                     membership.memberCountForPollingUnit(unit.code);
                 final unitAssignments = assignments
@@ -815,11 +827,7 @@ class _DirectoryPanel extends StatelessWidget {
                         color: TgcgColors.primary,
                         compact: true,
                       ),
-                      TgcgStatusPill(
-                        label: '${agents.length} AGENT${agents.length == 1 ? '' : 'S'}',
-                        color: TgcgColors.info,
-                        compact: true,
-                      ),
+
                       TgcgStatusPill(
                         label: '${unitAssignments.length} ASSIGNED',
                         color: TgcgColors.primary,
@@ -853,7 +861,7 @@ class _DirectoryPanel extends StatelessWidget {
               const TgcgEmptyState(
                 icon: Icons.map_outlined,
                 title: 'State overview',
-                message: 'Membership and agent activity for this area is shown above.',
+                message: 'Membership and assignment activity for this area is shown above.',
               ),
           ],
         ),
@@ -1244,7 +1252,7 @@ class _AreaRow extends StatelessWidget {
   const _AreaRow({
     required this.scope,
     required this.members,
-    required this.agents,
+    required this.assignments,
     required this.incidents,
     required this.results,
     required this.onTap,
@@ -1252,7 +1260,7 @@ class _AreaRow extends StatelessWidget {
 
   final GeographicScope scope;
   final int members;
-  final int agents;
+  final int assignments;
   final int incidents;
   final int results;
   final VoidCallback onTap;
@@ -1315,7 +1323,7 @@ class _AreaRow extends StatelessWidget {
                 ),
                 _Count(value: members, label: 'Members'),
                 const SizedBox(width: 14),
-                _Count(value: agents, label: 'Agents'),
+                _Count(value: assignments, label: 'Assignments'),
                 const SizedBox(width: 14),
                 _Count(value: incidents, label: 'Incidents'),
                 const SizedBox(width: 14),
@@ -1361,46 +1369,75 @@ class _Count extends StatelessWidget {
       );
 }
 
-class _AgentPanel extends StatelessWidget {
-  const _AgentPanel({required this.agents, required this.membership});
+class _RoleDeploymentPanel extends StatelessWidget {
+  const _RoleDeploymentPanel({
+    required this.roles,
+    required this.assignments,
+    required this.membership,
+  });
 
-  final List<AccreditedAgent> agents;
+  final List<RoleAssignmentRecord> roles;
+  final List<MemberAssignment> assignments;
   final MembershipOperationsController membership;
 
   @override
   Widget build(BuildContext context) => TgcgSectionCard(
-        title: 'Agent coverage',
-        subtitle: 'Operational agents assigned within the selected geography.',
-        child: agents.isEmpty
+        title: 'Roles & deployment',
+        subtitle:
+            'Active member roles and assignments within the selected geography.',
+        child: roles.isEmpty && assignments.isEmpty
             ? const TgcgEmptyState(
-                icon: Icons.badge_outlined,
-                title: 'No agents in this scope',
-                message: 'Agent assignments will appear here.',
+                icon: Icons.assignment_ind_outlined,
+                title: 'No active deployment in this scope',
+                message: 'Roles and assignments will appear here when activated.',
               )
             : Column(
-                children: agents.take(10).map((agent) {
-                  final member = membership.memberById(agent.memberId);
-                  return ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const CircleAvatar(
-                      child: Icon(Icons.badge_outlined),
-                    ),
-                    title: Text(
-                      member?.fullName ?? agent.agentId,
-                      style: const TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                    subtitle: Text(
-                      '${agent.agentId} • ${roleLabel(agent.role)} • ${agent.scope.label}',
-                    ),
-                    trailing: TgcgStatusPill(
-                      label: agent.status.name.toUpperCase(),
-                      color: agent.status == AccreditationStatus.approved
-                          ? TgcgColors.success
-                          : TgcgColors.warning,
-                      compact: true,
-                    ),
-                  );
-                }).toList(),
+                children: [
+                  ...roles.take(8).map((record) {
+                    final member = membership.memberById(record.subjectId);
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                        roleIcon(record.role),
+                        color: TgcgColors.primary,
+                      ),
+                      title: Text(
+                        member?.fullName ?? record.subjectName,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      subtitle: Text(
+                        '${roleLabel(record.role)} • ${record.scope.label}',
+                      ),
+                      trailing: const TgcgStatusPill(
+                        label: 'ROLE ACTIVE',
+                        color: TgcgColors.success,
+                        compact: true,
+                      ),
+                    );
+                  }),
+                  ...assignments.take(8).map((assignment) {
+                    final member = membership.memberById(assignment.memberId);
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(
+                        Icons.assignment_outlined,
+                        color: TgcgColors.accentStrong,
+                      ),
+                      title: Text(
+                        member?.fullName ?? assignment.memberId,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      subtitle: Text(
+                        '${assignment.title} • ${assignment.targetScope.label}',
+                      ),
+                      trailing: TgcgStatusPill(
+                        label: assignment.status.name.toUpperCase(),
+                        color: TgcgColors.info,
+                        compact: true,
+                      ),
+                    );
+                  }),
+                ],
               ),
       );
 }
