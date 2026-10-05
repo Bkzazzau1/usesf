@@ -67,6 +67,7 @@ Assignments are separate from roles.
 - Group movement may be together, manually distributed member-by-member, or automatically distributed across the selected targets.
 - Every group has one chairman, selected by the State Coordinator or assigned automatically by the system.
 - Only the group chairman submits the group assignment; members do not submit separate completion records.
+- Group cancellation is handled at the group level by the State Coordinator so child assignments close consistently.
 - Group GPS telemetry, AI-derived records and operational intelligence are internal system data and are not exposed on member-facing group assignment screens.
 - Temporary capabilities on a group assignment remain constrained to the group's selected geographic targets, including when the group moves together.
 - The coordinator can grant only the temporary app capabilities needed for the assignment and only from authority they already possess.
