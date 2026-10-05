@@ -1606,6 +1606,7 @@ class _AssignmentList extends StatelessWidget {
                               assignment: assignment,
                               edgeAi: edgeAi,
                               actorId: actorId,
+                              authorizedScope: authorizedScope,
                             );
                           } else if (action == _AssignmentMenuAction.videoCall ||
                               action == _AssignmentMenuAction.audioCall) {
