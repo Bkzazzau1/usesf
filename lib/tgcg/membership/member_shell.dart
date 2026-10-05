@@ -406,7 +406,6 @@ class _WaitingForAccessScaffoldState extends State<_WaitingForAccessScaffold> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 36),
         children: [
-          IncomingOperationalCallCard(memberId: member.id),
           TgcgPageHeader(
             eyebrow: 'MEMBERSHIP ACTIVE',
             title: member.fullName,
