@@ -8,7 +8,6 @@ import 'assignments/assignment_tracking_store.dart';
 import 'communications/bulk_communications_store.dart';
 import 'communications/communications_store.dart';
 import 'devices/managed_device_store.dart';
-import 'field/field_agent_shell.dart';
 import 'field/field_operations_store.dart';
 import 'geography/geography_registry.dart';
 import 'governance/governance_store.dart';
@@ -509,9 +508,6 @@ class _AuthenticationGate extends StatelessWidget {
         return const MemberShell(key: ValueKey('member-shell'));
       }
       return const TgcgShell(key: ValueKey('member-operational-shell'));
-    }
-    if (session.role == TgcgRole.pollingUnitAgent) {
-      return const FieldAgentShell(key: ValueKey('field-agent-shell'));
     }
     return const TgcgShell(key: ValueKey('tgcg-shell'));
   }
