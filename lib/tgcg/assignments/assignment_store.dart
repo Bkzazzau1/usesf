@@ -853,7 +853,7 @@ class AssignmentController extends ChangeNotifier {
 
     final restricted =
         grantedCapabilities.intersection(groupAssignmentRestrictedCapabilities);
-    if (restricted.isNotEmpty) {
+    if (groupAssignmentId != null && restricted.isNotEmpty) {
       throw StateError(
         'Internal intelligence capabilities cannot be granted to group members.',
       );
@@ -1028,6 +1028,13 @@ class AssignmentController extends ChangeNotifier {
       }
     }
 
+    final restrictedGroupCapabilities =
+        grantedCapabilities.intersection(groupAssignmentRestrictedCapabilities);
+    if (restrictedGroupCapabilities.isNotEmpty) {
+      throw StateError(
+        'Internal intelligence capabilities cannot be granted to group members.',
+      );
+    }
     final notGrantable =
         grantedCapabilities.difference(assignmentGrantableCapabilities);
     if (notGrantable.isNotEmpty) {
