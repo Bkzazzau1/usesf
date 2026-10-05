@@ -213,23 +213,23 @@ class _TgcgAppState extends State<TgcgApp> {
                             child: AssignmentTracking(
                               controller: assignmentTrackingController,
                               child: FieldOperations(
-                              controller: fieldOperationsController,
-                              child: ResultOperations(
-                                controller: resultOperationsController,
-                                child: MaterialApp(
-                                  navigatorKey: tgcgNavigatorKey,
-                                  debugShowCheckedModeBanner: false,
-                                  title: 'USESF',
-                                  theme: _theme(),
-                                  home: _AuthenticationGate(
-                                    onResetPresentation: _resetPresentation,
+                                controller: fieldOperationsController,
+                                child: ResultOperations(
+                                  controller: resultOperationsController,
+                                  child: MaterialApp(
+                                    navigatorKey: tgcgNavigatorKey,
+                                    debugShowCheckedModeBanner: false,
+                                    title: 'USESF',
+                                    theme: _theme(),
+                                    home: _AuthenticationGate(
+                                      onResetPresentation: _resetPresentation,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
                           ),
                         ),
-                      ),
                       ),
                     ),
                   ),
