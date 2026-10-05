@@ -159,6 +159,8 @@ class GroupAssignment {
     this.dueAt,
     this.submittedAt,
     this.submittedBy,
+    this.cancelledAt,
+    this.cancelledBy,
     this.systemIntelligenceRestricted = true,
   });
 
@@ -176,6 +178,8 @@ class GroupAssignment {
   final DateTime? dueAt;
   final DateTime? submittedAt;
   final String? submittedBy;
+  final DateTime? cancelledAt;
+  final String? cancelledBy;
 
   /// GPS, AI-derived records and operational intelligence are coordinator /
   /// backend data. Group members never receive these records through the
@@ -191,6 +195,8 @@ class GroupAssignment {
     GroupAssignmentStatus? status,
     DateTime? submittedAt,
     String? submittedBy,
+    DateTime? cancelledAt,
+    String? cancelledBy,
   }) =>
       GroupAssignment(
         id: id,
@@ -207,6 +213,8 @@ class GroupAssignment {
         dueAt: dueAt,
         submittedAt: submittedAt ?? this.submittedAt,
         submittedBy: submittedBy ?? this.submittedBy,
+        cancelledAt: cancelledAt ?? this.cancelledAt,
+        cancelledBy: cancelledBy ?? this.cancelledBy,
         systemIntelligenceRestricted: systemIntelligenceRestricted,
       );
 }
@@ -570,6 +578,8 @@ class AssignmentController extends ChangeNotifier {
         dueAt: _date(row['dueAt']),
         submittedAt: _date(row['submittedAt']),
         submittedBy: _clean(row['submittedBy']?.toString()),
+        cancelledAt: _date(row['cancelledAt']),
+        cancelledBy: _clean(row['cancelledBy']?.toString()),
         systemIntelligenceRestricted:
             row['systemIntelligenceRestricted'] != false,
       );
@@ -1150,6 +1160,67 @@ class AssignmentController extends ChangeNotifier {
     return group;
   }
 
+  Future<GroupAssignment> cancelGroupAssignment({
+    required String groupAssignmentId,
+    required String cancelledBy,
+    required TgcgRole cancelledByRole,
+    required GeographicScope authorizedScope,
+  }) async {
+    if (cancelledByRole != TgcgRole.stateCoordinator ||
+        authorizedScope.level != GeographyLevel.state ||
+        authorizedScope.stateId != GeographicScope.kaduna.stateId) {
+      throw StateError(
+        'Only the Kaduna State Coordinator can cancel group assignments.',
+      );
+    }
+
+    final groupIndex =
+        _groupAssignments.indexWhere((item) => item.id == groupAssignmentId);
+    if (groupIndex < 0) {
+      throw ArgumentError('Unknown group assignment: $groupAssignmentId');
+    }
+    final current = _groupAssignments[groupIndex];
+    if (current.isTerminal) {
+      throw StateError('This group assignment is already closed.');
+    }
+    for (final target in current.targetScopes) {
+      if (!GeographyRegistry.scopeContains(authorizedScope, target)) {
+        throw StateError(
+          'This group assignment is outside the coordinator authorization scope.',
+        );
+      }
+    }
+
+    final now = DateTime.now().toUtc();
+    for (final child in assignmentsForGroup(groupAssignmentId)) {
+      if (child.isTerminal) continue;
+      final index = _assignments.indexWhere((item) => item.id == child.id);
+      if (index < 0) continue;
+      final updated = child.copyWith(
+        status: AssignmentStatus.cancelled,
+        cancelledAt: now,
+      );
+      _assignments[index] = updated;
+      await _appendEvent(
+        updated,
+        action: 'group_cancelled',
+        actorId: cancelledBy,
+        detail: 'Group assignment cancelled by State Coordinator.',
+      );
+      await _persistAssignment(updated);
+    }
+
+    final cancelled = current.copyWith(
+      status: GroupAssignmentStatus.cancelled,
+      cancelledAt: now,
+      cancelledBy: cancelledBy,
+    );
+    _groupAssignments[groupIndex] = cancelled;
+    await _persistGroupAssignment(cancelled);
+    notifyListeners();
+    return cancelled;
+  }
+
   Future<GroupAssignment> submitGroupAssignment({
     required String groupAssignmentId,
     required String chairmanMemberId,
@@ -1698,6 +1769,8 @@ class AssignmentController extends ChangeNotifier {
           'dueAt': group.dueAt?.toIso8601String(),
           'submittedAt': group.submittedAt?.toIso8601String(),
           'submittedBy': group.submittedBy,
+          'cancelledAt': group.cancelledAt?.toIso8601String(),
+          'cancelledBy': group.cancelledBy,
           'systemIntelligenceRestricted':
               group.systemIntelligenceRestricted,
         },
