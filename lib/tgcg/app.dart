@@ -75,6 +75,8 @@ class _TgcgAppState extends State<TgcgApp> {
       await assignmentController.hydrateFromOffline();
       await assignmentEdgeAiController.hydrateFromOffline();
       await evidenceOperationsController.hydrateFromOffline();
+      await fieldOperationsController.hydrateFromOffline();
+      await resultOperationsController.hydrateFromOffline();
       await operationalCallController.hydrateFromOffline();
     } catch (_) {
       // Keep the prototype-seeded in-memory state available if a persisted
