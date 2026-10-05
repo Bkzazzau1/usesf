@@ -1389,6 +1389,9 @@ class _AssignmentList extends StatelessWidget {
     required this.authorizedMembers,
     required this.actorId,
     required this.authorizedScope,
+    required this.calls,
+    required this.session,
+    required this.stateCoordinatorScope,
   });
 
   final List<MemberAssignment> assignments;
@@ -1398,6 +1401,9 @@ class _AssignmentList extends StatelessWidget {
   final List<TgcgMember> authorizedMembers;
   final String actorId;
   final GeographicScope authorizedScope;
+  final OperationalCallController calls;
+  final TgcgSessionController session;
+  final GeographicScope? stateCoordinatorScope;
 
   @override
   Widget build(BuildContext context) => TgcgSectionCard(
@@ -1491,13 +1497,56 @@ class _AssignmentList extends StatelessWidget {
                             ],
                           ),
                         ),
-                        if (canManage &&
-                            !assignment.isTerminal &&
-                            !assignment.belongsToGroup)
+                        if (!assignment.isTerminal &&
+                            (canManage || stateCoordinatorScope != null))
                           PopupMenuButton<_AssignmentMenuAction>(
                             tooltip: 'Assignment actions',
                             onSelected: (action) async {
-                              if (action == _AssignmentMenuAction.reassign) {
+                              if (action == _AssignmentMenuAction.videoCall ||
+                                  action == _AssignmentMenuAction.audioCall) {
+                                final targetMember =
+                                    membership.memberById(assignment.memberId);
+                                final scope = stateCoordinatorScope;
+                                if (targetMember == null || scope == null) {
+                                  return;
+                                }
+                                try {
+                                  await startStateCoordinatorMemberCall(
+                                    context,
+                                    calls: calls,
+                                    session: session,
+                                    stateScope: scope,
+                                    member: targetMember,
+                                    kind: action ==
+                                            _AssignmentMenuAction.audioCall
+                                        ? OperationalCallKind.audio
+                                        : OperationalCallKind.video,
+                                    assignmentId: assignment.id,
+                                  );
+                                } on StateError catch (error) {
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text(error.message)),
+                                  );
+                                }
+                              } else if (action ==
+                                  _AssignmentMenuAction.coordinate) {
+                                final pollingUnitId =
+                                    assignment.targetPollingUnitId;
+                                if (pollingUnitId == null) return;
+                                final unit =
+                                    membership.geography.pollingUnit(
+                                  pollingUnitId,
+                                );
+                                if (unit == null) return;
+                                await showPollingUnitCoordinateDialog(
+                                  context,
+                                  membership: membership,
+                                  unit: unit,
+                                  actorId: actorId,
+                                );
+                              } else if (action ==
+                                  _AssignmentMenuAction.reassign) {
                                 await _reassign(context, assignment);
                               } else if (action ==
                                   _AssignmentMenuAction.cancel) {
@@ -1505,7 +1554,42 @@ class _AssignmentList extends StatelessWidget {
                               }
                             },
                             itemBuilder: (context) => [
-                              if (!assignment.belongsToGroup)
+                              if (stateCoordinatorScope != null) ...[
+                                const PopupMenuItem(
+                                  value: _AssignmentMenuAction.videoCall,
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.videocam_outlined, size: 18),
+                                      SizedBox(width: 8),
+                                      Text('Video call'),
+                                    ],
+                                  ),
+                                ),
+                                const PopupMenuItem(
+                                  value: _AssignmentMenuAction.audioCall,
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.call_outlined, size: 18),
+                                      SizedBox(width: 8),
+                                      Text('Audio call'),
+                                    ],
+                                  ),
+                                ),
+                                if (assignment.targetPollingUnitId != null)
+                                  const PopupMenuItem(
+                                    value: _AssignmentMenuAction.coordinate,
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.gps_fixed_rounded, size: 18),
+                                        SizedBox(width: 8),
+                                        Text('Polling-unit GPS'),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                              if (canManage && !assignment.belongsToGroup) ...[
+                                if (stateCoordinatorScope != null)
+                                  const PopupMenuDivider(),
                                 const PopupMenuItem(
                                   value: _AssignmentMenuAction.reassign,
                                   child: Row(
@@ -1516,16 +1600,17 @@ class _AssignmentList extends StatelessWidget {
                                     ],
                                   ),
                                 ),
-                              const PopupMenuItem(
-                                value: _AssignmentMenuAction.cancel,
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.cancel_outlined, size: 18),
-                                    SizedBox(width: 8),
-                                    Text('Cancel assignment'),
-                                  ],
+                                const PopupMenuItem(
+                                  value: _AssignmentMenuAction.cancel,
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.cancel_outlined, size: 18),
+                                      SizedBox(width: 8),
+                                      Text('Cancel assignment'),
+                                    ],
+                                  ),
                                 ),
-                              ),
+                              ],
                             ],
                           ),
                       ],
@@ -1669,6 +1754,9 @@ class _AssignmentList extends StatelessWidget {
 }
 
 enum _AssignmentMenuAction {
+  videoCall,
+  audioCall,
+  coordinate,
   reassign,
   cancel,
 }
