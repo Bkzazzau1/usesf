@@ -191,13 +191,6 @@ class AssignmentEdgeAiController extends ChangeNotifier {
   static const Set<AssignmentEdgeAiCapability> defaultCapabilities = {
     AssignmentEdgeAiCapability.gpsIntegrity,
     AssignmentEdgeAiCapability.deviceIntegrity,
-    AssignmentEdgeAiCapability.identityVerification,
-    AssignmentEdgeAiCapability.imageQuality,
-    AssignmentEdgeAiCapability.videoVerification,
-    AssignmentEdgeAiCapability.audioEventDetection,
-    AssignmentEdgeAiCapability.crowdActivity,
-    AssignmentEdgeAiCapability.ocrLocationCorroboration,
-    AssignmentEdgeAiCapability.evidenceIntegrity,
   };
 
   final AssignmentController _assignments;
@@ -553,7 +546,7 @@ class AssignmentEdgeAiController extends ChangeNotifier {
       };
     }
 
-    final normalized = score.clamp(0, 100);
+    final normalized = score.clamp(0, 100).toInt();
     final health = normalized >= 80
         ? AssignmentEdgeAiHealth.healthy
         : normalized >= 60
