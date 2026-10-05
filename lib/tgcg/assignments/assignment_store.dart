@@ -29,6 +29,7 @@ const Set<TgcgCapability> assignmentGrantableCapabilities = {
   TgcgCapability.startMeeting,
   TgcgCapability.joinMeeting,
   TgcgCapability.viewEvidence,
+  TgcgCapability.captureEvidence,
 };
 
 const Set<TgcgCapability> groupAssignmentRestrictedCapabilities = {
