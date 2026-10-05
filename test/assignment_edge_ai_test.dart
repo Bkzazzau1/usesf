@@ -194,6 +194,22 @@ void main() {
       expect(saved.resolvedAt, isNotNull);
     });
 
+    test('AI profile changes are rejected outside coordinator scope',
+        () async {
+      final assignment = await createAssignment();
+      final zaria = geography.lga('KD-ZARIA')!.scope;
+
+      await expectLater(
+        edgeAi.updateProfile(
+          assignmentId: assignment.id,
+          updatedBy: 'LGA-COORD',
+          authorizedScope: zaria,
+          mode: AssignmentEdgeAiMode.event,
+        ),
+        throwsStateError,
+      );
+    });
+
     test('disabling Edge AI produces offline health state', () async {
       final assignment = await createAssignment();
       await edgeAi.updateProfile(
