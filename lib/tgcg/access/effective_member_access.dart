@@ -35,16 +35,6 @@ class EffectiveAccessGrant {
   }
 }
 
-/// Resolves the operational authority attached to one permanent member
-/// identity. Membership by itself grants no operational capability.
-///
-/// Access is the union of:
-/// - every active role assignment, each constrained to that role's scope; and
-/// - every active job/assignment capability grant, constrained to the
-///   assignment's authorization/target scope.
-///
-/// Because this snapshot is rebuilt from active records, assignment-only
-/// access disappears automatically as soon as the assignment becomes terminal.
 class EffectiveMemberAccess {
   EffectiveMemberAccess._({
     required this.memberId,
@@ -76,6 +66,25 @@ class EffectiveMemberAccess {
       if (!assignment.confersAccess || assignment.grantedCapabilities.isEmpty) {
         continue;
       }
+
+      final group = assignment.groupAssignmentId == null
+          ? null
+          : assignments.groupAssignmentById(assignment.groupAssignmentId!);
+      if (group != null && group.targetScopes.isNotEmpty) {
+        for (var index = 0; index < group.targetScopes.length; index++) {
+          grants.add(
+            EffectiveAccessGrant(
+              source: EffectiveGrantSource.assignment,
+              sourceId: assignment.id + ':group-target-' + index.toString(),
+              label: assignment.title,
+              scope: group.targetScopes[index],
+              capabilities: assignment.grantedCapabilities,
+            ),
+          );
+        }
+        continue;
+      }
+
       grants.add(
         EffectiveAccessGrant(
           source: EffectiveGrantSource.assignment,
@@ -99,9 +108,8 @@ class EffectiveMemberAccess {
   bool get hasOperationalAccess =>
       grants.any((grant) => grant.capabilities.isNotEmpty);
 
-  Set<TgcgCapability> get capabilities => grants
-      .expand((grant) => grant.capabilities)
-      .toSet();
+  Set<TgcgCapability> get capabilities =>
+      grants.expand((grant) => grant.capabilities).toSet();
 
   List<GeographicScope> scopesFor(TgcgCapability capability) {
     final scopes = <GeographicScope>[];
