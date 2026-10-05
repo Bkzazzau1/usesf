@@ -70,7 +70,11 @@ Future<void> showStateCoordinatorCallMemberDialog(
   required GeographicScope stateScope,
 }) async {
   final members = membership.members
-      .where((member) => !member.isBlocked)
+      .where(
+        (member) =>
+            !member.isBlocked &&
+            (session.accessId.isEmpty || member.id != session.accessId),
+      )
       .toList(growable: false);
   if (members.isEmpty) return;
 
