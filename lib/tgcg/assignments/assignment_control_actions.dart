@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../devices/managed_device_store.dart';
 import '../geography/geography_registry.dart';
 import '../membership/membership_store.dart';
 import '../meeting/operational_call_stage.dart';
@@ -90,6 +91,7 @@ Future<void> showStateCoordinatorCallMemberDialog(
     context: context,
     builder: (dialogContext) => StatefulBuilder(
       builder: (context, setDialogState) {
+        ManagedDevices.of(context);
         final needle = search.text.trim().toLowerCase();
         final visible = members
             .where((member) {
