@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../access/access_policy.dart';
 import '../domain/permissions.dart';
 import '../field/field_operations_store.dart';
 import '../membership/membership_store.dart';
@@ -26,31 +27,45 @@ class _GovernancePageState extends State<GovernancePage> {
   Widget build(BuildContext context) {
     final session = TgcgSession.of(context);
     final governance = GovernanceOperations.of(context);
-    final membership = MembershipOperations.of(context);
     final results = ResultOperations.of(context);
     final field = FieldOperations.of(context);
-    final role = session.role!;
+    final governanceScopes = TgcgAccessPolicy.scopesForAny(
+      context,
+      const [
+        TgcgCapability.viewAudit,
+        TgcgCapability.manageSystemSettings,
+        TgcgCapability.viewEvidence,
+      ],
+    );
+    final scope = governanceScopes.isEmpty
+        ? session.scope
+        : governanceScopes.first;
 
-    final canManage = TgcgPermissionPolicy.allows(
-      role,
+    final canManage = TgcgAccessPolicy.allows(
+      context,
       TgcgCapability.manageSystemSettings,
+      targetScope: scope,
     );
-    final canAudit = TgcgPermissionPolicy.allows(
-      role,
+    final canAudit = TgcgAccessPolicy.allows(
+      context,
       TgcgCapability.viewAudit,
+      targetScope: scope,
     );
-    final canEvidence = TgcgPermissionPolicy.allows(
-      role,
+    final canEvidence = TgcgAccessPolicy.allows(
+      context,
       TgcgCapability.viewEvidence,
+      targetScope: scope,
     );
 
-    final agents = membership.agentsForScope(session.scope);
-    final submissions = results.submissionsForScope(session.scope);
-    final incidents = field.incidentsForScope(session.scope);
-    final reports = field.reportsForScope(session.scope);
+    final agents = governance.roleAssignmentsForScope(scope)
+        .where((item) => item.active)
+        .toList(growable: false);
+    final submissions = results.submissionsForScope(scope);
+    final incidents = field.incidentsForScope(scope);
+    final reports = field.reportsForScope(scope);
 
     var audit = canAudit
-        ? governance.auditForScope(session.scope)
+        ? governance.auditForScope(scope)
         : const <AuditEvent>[];
     final q = auditSearch.trim().toLowerCase();
     if (q.isNotEmpty) {
@@ -121,7 +136,7 @@ class _GovernancePageState extends State<GovernancePage> {
           eyebrow: 'CONTROL & ASSURANCE',
           title: 'Data, Audit & Governance',
           subtitle:
-              '${session.scope.label}: sync integrity, evidence provenance, audit visibility and privileged system safeguards.',
+              '${governanceScopes.length <= 1 ? scope.label : '${governanceScopes.length} authorized scopes'}: sync integrity, evidence provenance, audit visibility and privileged system safeguards.',
           trailing: TgcgStatusPill(
             label: failed > 0 || conflicts > 0
                 ? 'ATTENTION REQUIRED'
@@ -136,7 +151,7 @@ class _GovernancePageState extends State<GovernancePage> {
         ),
         const SizedBox(height: 18),
         _MetricGrid(
-          audit: canAudit ? governance.auditForScope(session.scope).length : null,
+          audit: canAudit ? governance.auditForScope(scope).length : null,
           queued: queued,
           syncing: syncing,
           failed: failed,
@@ -412,7 +427,7 @@ class _ControlSnapshot extends StatelessWidget {
               spacing: 9,
               runSpacing: 9,
               children: [
-                _DarkStat('Agents', '$agents'),
+                _DarkStat('Active roles', '$agents'),
                 _DarkStat('Incidents', '$incidents'),
                 _DarkStat('Field reports', '$reports'),
                 _DarkStat('Results', '$results'),
@@ -978,7 +993,7 @@ class _Provenance extends StatelessWidget {
           spacing: 10,
           runSpacing: 10,
           children: [
-            _Chip('Agents', '$agents', Icons.badge_outlined),
+            _Chip('Active roles', '$agents', Icons.badge_outlined),
             _Chip('Incidents', '$incidents', Icons.warning_amber_rounded),
             _Chip('Field reports', '$reports', Icons.feed_outlined),
             _Chip('Result submissions', '$results', Icons.ballot_outlined),
