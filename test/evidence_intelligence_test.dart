@@ -267,6 +267,75 @@ void main() {
       expect(zariaResult.requiresReview, isTrue);
     });
 
+    test('field-report evidence survives field-controller recreation',
+        () async {
+      final pu = membership.geography.pollingUnit('KD-KN-W01-PU001')!;
+      await field.submitFieldReport(
+        category: 'Persisted report',
+        summary: 'Evidence persists after restart.',
+        scope: pu.scope,
+        reporterId: 'MEM-0001',
+        evidence: [
+          EvidenceAttachment(
+            id: 'EVD-FIELD-HYDRATE',
+            type: EvidenceType.photo,
+            fileName: 'persisted_field.jpg',
+            createdAt: DateTime.utc(2026, 9, 27, 10, 10),
+            uploaderId: 'MEM-0001',
+            contentHash: 'sha256:field-hydrate',
+            mimeType: 'image/jpeg',
+          ),
+        ],
+      );
+
+      final restored = FieldOperationsController.prototypeSeed(
+        persistence: persistence,
+      );
+      await restored.hydrateFromOffline();
+
+      expect(
+        restored.reports.expand((item) => item.evidence).map((item) => item.id),
+        contains('EVD-FIELD-HYDRATE'),
+      );
+    });
+
+    test('result-form evidence survives result-controller recreation',
+        () async {
+      final pu = membership.geography.pollingUnit('KD-KN-W01-PU001')!;
+      await results.submit(
+        pollingUnitScope: pu.scope,
+        submittedBy: 'MEM-0001',
+        source: SubmissionSource.app,
+        partyVotes: const {'P1': 10, 'P2': 8},
+        totalVotesRecorded: 18,
+        accreditedVoters: 20,
+        rejectedVotes: 2,
+        resultForm: EvidenceAttachment(
+          id: 'EVD-RESULT-HYDRATE',
+          type: EvidenceType.resultForm,
+          fileName: 'persisted_result.jpg',
+          createdAt: DateTime.utc(2026, 9, 27, 10, 20),
+          uploaderId: 'MEM-0001',
+          contentHash: 'sha256:result-hydrate',
+          mimeType: 'image/jpeg',
+        ),
+        ocrPartyVotes: const {'P1': 10, 'P2': 8},
+        ocrConfidence: .98,
+      );
+
+      final restored = ResultOperationsController.prototypeSeed(
+        persistence: persistence,
+      );
+      await restored.hydrateFromOffline();
+
+      expect(
+        restored.submissions
+            .map((item) => item.resultForm?.id)
+            .whereType<String>(),
+        contains('EVD-RESULT-HYDRATE'),
+      );
+    });
+
     test('direct captures hydrate back into intelligence registry', () async {
       final pu = membership.geography.pollingUnit('KD-KN-W01-PU001')!;
       await evidence.addCapture(
