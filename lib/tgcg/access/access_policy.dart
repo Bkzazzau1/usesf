@@ -70,6 +70,33 @@ class TgcgAccessPolicy {
     );
   }
 
+  static Set<TgcgCapability> capabilitiesForTarget(
+    BuildContext context,
+    GeographicScope targetScope, {
+    bool listen = false,
+  }) {
+    final session = TgcgSession.of(context, listen: listen);
+    final member = memberAccess(context, listen: listen);
+    if (member != null) {
+      return member.grants
+          .where(
+            (grant) => TgcgPermissionPolicy.scopeAllows(
+              grant.scope,
+              targetScope,
+            ),
+          )
+          .expand((grant) => grant.capabilities)
+          .toSet();
+    }
+
+    final role = session.role;
+    if (role == null ||
+        !TgcgPermissionPolicy.scopeAllows(session.scope, targetScope)) {
+      return const {};
+    }
+    return TgcgPermissionPolicy.capabilitiesFor(role);
+  }
+
   static List<GeographicScope> scopesFor(
     BuildContext context,
     TgcgCapability capability, {
