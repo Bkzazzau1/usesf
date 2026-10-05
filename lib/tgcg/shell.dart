@@ -387,7 +387,19 @@ class _OperatorCard extends StatelessWidget {
   final TgcgSessionController session;
 
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) {
+    final accessSummary = TgcgAccessPolicy.accessSummary(context);
+    final accessScopes = TgcgAccessPolicy.scopesForAny(
+      context,
+      TgcgAccessPolicy.capabilities(context),
+    );
+    final scopeSummary = accessScopes.length > 1
+        ? '${accessScopes.length} authorized scopes'
+        : accessScopes.isEmpty
+            ? session.scope.label
+            : accessScopes.first.label;
+
+    return Container(
         padding: const EdgeInsets.all(11),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: .045),
@@ -425,7 +437,7 @@ class _OperatorCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        roleLabel(session.role!),
+                        accessSummary,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(color: Color(0xFFA4AAB9), fontSize: 9.5),
@@ -448,7 +460,7 @@ class _OperatorCard extends StatelessWidget {
                 const SizedBox(width: 5),
                 Expanded(
                   child: Text(
-                    session.scope.label,
+                    scopeSummary,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(color: Color(0xFF8C94A6), fontSize: 9.5),
@@ -459,6 +471,7 @@ class _OperatorCard extends StatelessWidget {
           ],
         ),
       );
+  }
 }
 
 class _CommandBar extends StatelessWidget {
@@ -478,6 +491,16 @@ class _CommandBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final session = TgcgSession.of(context);
     final pending = OfflinePersistence.of(context).pendingOutbox.length;
+    final accessSummary = TgcgAccessPolicy.accessSummary(context);
+    final scopes = TgcgAccessPolicy.scopesForAny(
+      context,
+      TgcgAccessPolicy.capabilities(context),
+    );
+    final scopeSummary = scopes.length > 1
+        ? '${scopes.length} authorized scopes'
+        : scopes.isEmpty
+            ? session.scope.label
+            : scopes.first.label;
     return Container(
       height: 68,
       padding: const EdgeInsets.symmetric(horizontal: 22),
@@ -505,7 +528,7 @@ class _CommandBar extends StatelessWidget {
               child: const TextField(
                 readOnly: true,
                 decoration: InputDecoration(
-                  hintText: 'Search agents, polling units, incidents or results',
+                  hintText: 'Search members, assignments, polling units or incidents',
                   prefixIcon: Icon(Icons.search_rounded, size: 20),
                   isDense: true,
                 ),
@@ -542,7 +565,7 @@ class _CommandBar extends StatelessWidget {
           ],
           const SizedBox(width: 4),
           Tooltip(
-            message: '${roleLabel(session.role!)} • ${session.scope.label}',
+            message: '$accessSummary • $scopeSummary',
             child: Container(
               width: 36,
               height: 36,
