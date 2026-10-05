@@ -6,6 +6,7 @@ import '../devices/managed_device_store.dart';
 import '../domain/permissions.dart';
 import '../edge_ai/assignment_edge_ai_panel.dart';
 import '../edge_ai/assignment_edge_ai_store.dart';
+import '../edge_ai/submitted_assignment_ai_report.dart';
 import '../geography/geography_registry.dart';
 import '../membership/membership_store.dart';
 import '../meeting/operational_call_store.dart';
@@ -336,6 +337,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
             entries: submitted,
             membership: membership,
             controller: assignments,
+            edgeAi: edgeAi,
           ),
         },
         const SizedBox(height: 16),
@@ -2201,11 +2203,13 @@ class _SubmittedAssignments extends StatelessWidget {
     required this.entries,
     required this.membership,
     required this.controller,
+    required this.edgeAi,
   });
 
   final List<_SubmittedEntry> entries;
   final MembershipOperationsController membership;
   final AssignmentController controller;
+  final AssignmentEdgeAiController edgeAi;
 
   @override
   Widget build(BuildContext context) => TgcgSectionCard(
@@ -2219,10 +2223,10 @@ class _SubmittedAssignments extends StatelessWidget {
             message:
                 'Completed individual assignments and submitted group assignments will appear here.',
           )
-        : Column(children: [for (final entry in entries) _row(entry)]),
+        : Column(children: [for (final entry in entries) _row(context, entry)]),
   );
 
-  Widget _row(_SubmittedEntry entry) {
+  Widget _row(BuildContext context, _SubmittedEntry entry) {
     final group = entry.group;
     final assignment = entry.assignment;
     final String title;
@@ -2258,16 +2262,28 @@ class _SubmittedAssignments extends StatelessWidget {
       evidence = item.evidence.length;
     }
 
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 9),
-      padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(
-        color: TgcgColors.surfaceRaised,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => showSubmittedAssignmentAiReport(
+          context,
+          membership: membership,
+          assignments: controller,
+          edgeAi: edgeAi,
+          assignment: assignment,
+          group: group,
+        ),
         borderRadius: BorderRadius.circular(TgcgRadius.md),
-        border: Border.all(color: TgcgColors.border),
-      ),
-      child: Row(
+        child: Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 9),
+          padding: const EdgeInsets.all(13),
+          decoration: BoxDecoration(
+            color: TgcgColors.surfaceRaised,
+            borderRadius: BorderRadius.circular(TgcgRadius.md),
+            border: Border.all(color: TgcgColors.border),
+          ),
+          child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
@@ -2333,15 +2349,35 @@ class _SubmittedAssignments extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          Text(
-            _submittedTime(entry.at),
-            style: const TextStyle(
-              color: TgcgColors.muted,
-              fontSize: 10.5,
-              fontWeight: FontWeight.w800,
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                _submittedTime(entry.at),
+                style: const TextStyle(
+                  color: TgcgColors.muted,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 7),
+              const TgcgStatusPill(
+                label: 'AI REPORT',
+                color: TgcgColors.ai,
+                icon: Icons.psychology_alt_outlined,
+                compact: true,
+              ),
+              const SizedBox(height: 5),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: TgcgColors.muted,
+                size: 20,
+              ),
+            ],
           ),
         ],
+      ),
+        ),
       ),
     );
   }
