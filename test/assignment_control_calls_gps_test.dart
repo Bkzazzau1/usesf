@@ -104,6 +104,43 @@ void main() {
       expect(calls.incomingForMember('MEM-0012'), hasLength(1));
     });
 
+    test('assignment-context call attaches the live assignment GPS',
+        () async {
+      final assignment = await assignments.createAssignment(
+        title: 'Live field duty',
+        memberId: 'MEM-0001',
+        targetScopeOverride: GeographicScope.kaduna,
+        assignedBy: 'STATE-COORD',
+        authorizedScope: GeographicScope.kaduna,
+        assignerCapabilities: const {},
+      );
+      final device = devices.deviceForMember('MEM-0001')!;
+      assignments.recordLocationHeartbeat(
+        assignmentId: assignment.id,
+        deviceId: device.id,
+        latitude: 10.5333,
+        longitude: 7.4555,
+        accuracyMeters: 5,
+        capturedAt: DateTime.now().toUtc(),
+      );
+
+      final call = await calls.startDirectCall(
+        recipientMemberId: 'MEM-0001',
+        kind: OperationalCallKind.video,
+        callerId: 'STATE-COORD',
+        callerName: 'State Coordinator',
+        callerRole: TgcgRole.stateCoordinator,
+        authorizedScope: GeographicScope.kaduna,
+        assignmentId: assignment.id,
+      );
+
+      final gps = call.gpsForMember('MEM-0001')!;
+      expect(gps.source, OperationalCallGpsSource.assignmentHeartbeat);
+      expect(gps.assignmentId, assignment.id);
+      expect(gps.latitude, 10.5333);
+      expect(gps.longitude, 7.4555);
+    });
+
     test('operational call is rejected when recipient GPS is inactive',
         () async {
       await expectLater(
