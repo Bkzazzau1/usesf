@@ -13,8 +13,6 @@ void main() {
 
     setUpAll(() {
       TestWidgetsFlutterBinding.ensureInitialized();
-      // Member changes are saved through the encrypted offline store; tests
-      // use an in-memory database and the secure-storage test mode.
       FlutterSecureStorage.setMockInitialValues({});
     });
 
@@ -30,82 +28,100 @@ void main() {
 
     tearDown(() => store.dispose());
 
-    test('creates a member in submitted state', () async {
+    test('creates a member without a phone number', () async {
       final before = store.members.length;
       final member = await store.createMember(
         fullName: 'Test Member',
-        phoneNumber: '+2348000000099',
       );
 
       expect(store.members.length, before + 1);
       expect(member.status, RecordStatus.submitted);
+      expect(member.phoneNumber, isEmpty);
       expect(member.membershipNumber, isNotNull);
     });
 
-    test('creates a pending accreditation against canonical polling unit', () async {
-      final member = store.members.first;
-      final pu = geography.pollingUnit('KD-KN-W01-PU002')!.scope;
-
-      final agent = await store.accredit(
-        memberId: member.id,
-        role: TgcgRole.pollingUnitAgent,
-        scope: pu,
-        phoneNumber: member.phoneNumber,
+    test('stores PVC VIN and prevents duplicate registration', () async {
+      const vin = '90F5A1B2C3D4E5F67890';
+      final member = await store.createMember(
+        fullName: 'PVC Member',
+        pvcVin: vin,
       );
 
-      expect(agent.status, AccreditationStatus.pending);
-      expect(agent.scope.pollingUnitId, 'KD-KN-W01-PU002');
-    });
+      expect(member.pvcVin, vin);
+      expect((await store.memberByPvcVin(vin))?.id, member.id);
 
-    test('approved polling-unit agents contribute to assignment coverage', () {
-      final kaduna = geography.pollingUnit('KD-KN-W01-PU001')!.scope;
-      final state = GeographicScope(
-        level: GeographyLevel.state,
-        country: 'Nigeria',
-        zoneId: kaduna.zoneId,
-        zoneName: kaduna.zoneName,
-        stateId: kaduna.stateId,
-        stateName: kaduna.stateName,
-      );
-
-      expect(store.assignedPollingUnitsWithin(state), 2);
       expect(
-        store.assignedPollingUnitsWithin(
-          geography.senatorialDistrict('SD/053/KD')!.scope,
+        () => store.createMember(
+          fullName: 'Duplicate PVC Member',
+          pvcVin: vin,
         ),
-        1,
+        throwsA(isA<StateError>()),
       );
     });
 
-    test('status changes update accreditation record', () async {
-      final pending = store.agents.firstWhere(
-        (agent) => agent.status == AccreditationStatus.pending,
+    test('password credential authenticates the member', () async {
+      final member = await store.createMember(
+        fullName: 'Password Member',
       );
 
-      await store.updateAccreditationStatus(
-        pending.id,
-        AccreditationStatus.approved,
+      await store.setMemberPassword(
+        memberId: member.id,
+        password: 'SecurePass123!',
       );
 
-      final updated = store.agents.firstWhere((agent) => agent.id == pending.id);
-      expect(updated.status, AccreditationStatus.approved);
+      expect(
+        await store.hasMemberPasswordCredential(member.id),
+        isTrue,
+      );
+      expect(
+        await store.verifyMemberPassword(
+          memberId: member.id,
+          password: 'SecurePass123!',
+        ),
+        isTrue,
+      );
+      expect(
+        await store.verifyMemberPassword(
+          memberId: member.id,
+          password: 'WrongPassword',
+        ),
+        isFalse,
+      );
     });
 
-    test('readiness update preserves identity while changing readiness', () async {
-      final agent = store.agents.first;
-
-      await store.updateReadiness(
-        agent.id,
-        trainingCompleted: false,
-        biometricEnrolled: false,
-        deviceId: 'DEV-UPDATED',
+    test('verified email cannot be changed by member profile operation', () async {
+      final member = await store.createMember(
+        fullName: 'Verified Email Member',
+        email: 'member@example.com',
+        emailVerified: true,
       );
 
-      final updated = store.agents.firstWhere((item) => item.id == agent.id);
-      expect(updated.agentId, agent.agentId);
-      expect(updated.trainingCompleted, isFalse);
-      expect(updated.biometricEnrolled, isFalse);
-      expect(updated.deviceId, 'DEV-UPDATED');
+      expect(
+        () => store.updateMemberContact(
+          memberId: member.id,
+          email: 'changed@example.com',
+        ),
+        throwsA(isA<StateError>()),
+      );
+    });
+
+    test('identity review can block and reactivate the same member', () async {
+      final member = await store.createMember(
+        fullName: 'Review Member',
+      );
+
+      final blocked = await store.setIdentityReview(
+        memberId: member.id,
+        review: MemberIdentityReview.suspicious,
+      );
+      expect(blocked.isBlocked, isTrue);
+
+      final restored = await store.setIdentityReview(
+        memberId: member.id,
+        review: MemberIdentityReview.verified,
+      );
+      expect(restored.isBlocked, isFalse);
+      expect(restored.id, member.id);
     });
   });
 }
