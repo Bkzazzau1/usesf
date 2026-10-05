@@ -563,44 +563,52 @@ class AssignmentEdgeAiController extends ChangeNotifier {
     );
   }
 
-  Future<void> _persistProfile(AssignmentEdgeAiProfile profile) =>
-      _persistence.persistMutation(
-        entityType: 'assignment_edge_ai_profile',
-        entityId: profile.assignmentId,
-        mutationType: SyncMutationType.upsert,
-        ownerId: profile.assignmentId,
-        payload: {
-          'assignmentId': profile.assignmentId,
-          'enabled': profile.enabled,
-          'mode': profile.mode.name,
-          'capabilities':
-              profile.capabilities.map((item) => item.name).toList(),
-          'updatedAt': profile.updatedAt.toIso8601String(),
-          'updatedBy': profile.updatedBy,
-        },
-      );
+  Future<void> _persistProfile(AssignmentEdgeAiProfile profile) {
+    final assignment = _assignments.assignmentById(profile.assignmentId);
+    return _persistence.persistMutation(
+      entityType: 'assignment_edge_ai_profile',
+      entityId: profile.assignmentId,
+      mutationType: SyncMutationType.upsert,
+      scopeKey:
+          assignment == null ? null : scopeStorageKey(assignment.targetScope),
+      ownerId: assignment?.memberId,
+      payload: {
+        'assignmentId': profile.assignmentId,
+        'enabled': profile.enabled,
+        'mode': profile.mode.name,
+        'capabilities':
+            profile.capabilities.map((item) => item.name).toList(),
+        'updatedAt': profile.updatedAt.toIso8601String(),
+        'updatedBy': profile.updatedBy,
+      },
+    );
+  }
 
-  Future<void> _persistEvent(AssignmentEdgeAiEvent event) =>
-      _persistence.persistMutation(
-        entityType: 'assignment_edge_ai_event',
-        entityId: event.id,
-        mutationType: SyncMutationType.upsert,
-        ownerId: event.assignmentId,
-        payload: {
-          'id': event.id,
-          'assignmentId': event.assignmentId,
-          'type': event.type.name,
-          'severity': event.severity.name,
-          'createdAt': event.createdAt.toIso8601String(),
-          'source': event.source,
-          'confidence': event.confidence,
-          'summary': event.summary,
-          'evidenceReference': event.evidenceReference,
-          'resolvedAt': event.resolvedAt?.toIso8601String(),
-          'resolvedBy': event.resolvedBy,
-          'private': true,
-        },
-      );
+  Future<void> _persistEvent(AssignmentEdgeAiEvent event) {
+    final assignment = _assignments.assignmentById(event.assignmentId);
+    return _persistence.persistMutation(
+      entityType: 'assignment_edge_ai_event',
+      entityId: event.id,
+      mutationType: SyncMutationType.upsert,
+      scopeKey:
+          assignment == null ? null : scopeStorageKey(assignment.targetScope),
+      ownerId: assignment?.memberId,
+      payload: {
+        'id': event.id,
+        'assignmentId': event.assignmentId,
+        'type': event.type.name,
+        'severity': event.severity.name,
+        'createdAt': event.createdAt.toIso8601String(),
+        'source': event.source,
+        'confidence': event.confidence,
+        'summary': event.summary,
+        'evidenceReference': event.evidenceReference,
+        'resolvedAt': event.resolvedAt?.toIso8601String(),
+        'resolvedBy': event.resolvedBy,
+        'private': true,
+      },
+    );
+  }
 
   static DateTime? _date(Object? value) {
     final text = value?.toString();
