@@ -13,6 +13,7 @@ import 'geography/geography_registry.dart';
 import 'governance/governance_store.dart';
 import 'membership/member_shell.dart';
 import 'membership/membership_store.dart';
+import 'meeting/operational_call_stage.dart';
 import 'meeting/operational_call_store.dart';
 import 'media/device_media.dart';
 import 'offline/offline_persistence.dart';
@@ -221,8 +222,11 @@ class _TgcgAppState extends State<TgcgApp> {
                                     debugShowCheckedModeBanner: false,
                                     title: 'USESF',
                                     theme: _theme(),
-                                    home: _AuthenticationGate(
-                                      onResetPresentation: _resetPresentation,
+                                    home: OperationalCallOverlay(
+                                      child: _AuthenticationGate(
+                                        onResetPresentation:
+                                            _resetPresentation,
+                                      ),
                                     ),
                                   ),
                                 ),
