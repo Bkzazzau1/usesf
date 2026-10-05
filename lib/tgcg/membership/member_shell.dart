@@ -779,8 +779,16 @@ class _MemberAssignmentCardState extends State<_MemberAssignmentCard> {
                       runSpacing: 6,
                       children: [
                         TgcgStatusPill(
-                          label: _assignmentStatusLabel(current.status),
-                          color: _assignmentStatusColor(current.status),
+                          label: restricted &&
+                                  current.status ==
+                                      AssignmentStatus.gpsMismatch
+                              ? 'IN PROGRESS'
+                              : _assignmentStatusLabel(current.status),
+                          color: restricted &&
+                                  current.status ==
+                                      AssignmentStatus.gpsMismatch
+                              ? TgcgColors.info
+                              : _assignmentStatusColor(current.status),
                           compact: true,
                         ),
                         if (!restricted)
