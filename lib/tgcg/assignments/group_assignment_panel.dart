@@ -480,6 +480,7 @@ Future<bool> showGroupAssignmentDialog({
                                       actorId: session.accessId.isEmpty
                                           ? session.operatorName
                                           : session.accessId,
+                                      stateScope: authorizedScope,
                                     );
                                     if (changed && dialogContext.mounted) {
                                       setDialogState(() {});
