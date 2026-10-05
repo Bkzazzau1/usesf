@@ -71,7 +71,7 @@ class EvidenceOperationsController extends ChangeNotifier {
         sourceReference: _clean(row['sourceReference']?.toString()),
         latitude: _double(row['latitude']),
         longitude: _double(row['longitude']),
-        origin: RecordOrigin.localEntry,
+        origin: _origin(row['origin']) ?? RecordOrigin.localEntry,
       );
       final restored = DirectEvidenceRecord(
         evidence: attachment,
@@ -133,6 +133,14 @@ class EvidenceOperationsController extends ChangeNotifier {
     _records.insert(0, record);
     notifyListeners();
     return record;
+  }
+
+  static RecordOrigin? _origin(Object? value) {
+    final name = value?.toString();
+    for (final item in RecordOrigin.values) {
+      if (item.name == name) return item;
+    }
+    return null;
   }
 
   static EvidenceType? _evidenceType(Object? value) {
