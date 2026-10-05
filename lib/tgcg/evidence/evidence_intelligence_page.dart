@@ -520,14 +520,18 @@ class _EvidenceFilters extends StatelessWidget {
                         value: null,
                         child: Text('All LGAs'),
                       ),
-                      ...lgas.entries.toList()
-                        ..sort((a, b) => a.value.compareTo(b.value))
-                        ..map(
-                          (entry) => DropdownMenuItem(
-                            value: entry.key,
-                            child: Text(entry.value),
-                          ),
-                        ),
+                      ...(() {
+                        final entries = lgas.entries.toList()
+                          ..sort((a, b) => a.value.compareTo(b.value));
+                        return entries
+                            .map(
+                              (entry) => DropdownMenuItem<String?>(
+                                value: entry.key,
+                                child: Text(entry.value),
+                              ),
+                            )
+                            .toList(growable: false);
+                      })(),
                     ],
                     onChanged: onLga,
                   ),
@@ -820,15 +824,17 @@ Future<void> _showEvidenceRecord(
               final assignment = record.assignment!;
               final group = record.group;
               Navigator.pop(dialogContext);
+              final submittedGroup =
+                  group?.status == GroupAssignmentStatus.submitted
+                      ? group
+                      : null;
               showSubmittedAssignmentAiReport(
                 context,
                 membership: membership,
                 assignments: assignments,
                 edgeAi: edgeAi,
-                assignment: group == null ? assignment : null,
-                group: group?.status == GroupAssignmentStatus.submitted
-                    ? group
-                    : null,
+                assignment: submittedGroup == null ? assignment : null,
+                group: submittedGroup,
               );
             },
             icon: const Icon(Icons.psychology_alt_outlined),
