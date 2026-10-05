@@ -7,7 +7,7 @@ export 'domain/models.dart';
 
 enum TgcgModule {
   overview,
-  accreditation,
+  memberEnrollment,
   membershipNetwork,
   roleAssignment,
   geography,
@@ -249,7 +249,7 @@ Set<TgcgModule> modulesForCapabilities(
   bool has(TgcgCapability capability) => capabilities.contains(capability);
 
   if (has(TgcgCapability.manageMembership)) {
-    modules.add(TgcgModule.accreditation);
+    modules.add(TgcgModule.memberEnrollment);
   }
   if (role == TgcgRole.stateAdministrator) {
     modules.add(TgcgModule.membershipNetwork);
