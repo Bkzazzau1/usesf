@@ -1680,11 +1680,7 @@ class AssignmentController extends ChangeNotifier {
         entityType: 'group_assignment',
         entityId: group.id,
         mutationType: SyncMutationType.upsert,
-        scopeKey: scopeStorageKey(
-          group.targetScopes.isEmpty
-              ? GeographicScope.kaduna
-              : group.targetScopes.first,
-        ),
+        scopeKey: scopeStorageKey(GeographicScope.kaduna),
         ownerId: group.chairmanMemberId,
         payload: {
           'id': group.id,
