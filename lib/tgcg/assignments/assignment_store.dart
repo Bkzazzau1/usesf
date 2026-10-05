@@ -30,6 +30,10 @@ const Set<TgcgCapability> assignmentGrantableCapabilities = {
   TgcgCapability.viewEvidence,
 };
 
+const Set<TgcgCapability> groupAssignmentRestrictedCapabilities = {
+  TgcgCapability.viewMediaIntelligence,
+};
+
 enum AssignmentStatus {
   assigned,
   accepted,
@@ -847,6 +851,13 @@ class AssignmentController extends ChangeNotifier {
       throw ArgumentError('Unknown USESF member: $memberId');
     }
 
+    final restricted =
+        grantedCapabilities.intersection(groupAssignmentRestrictedCapabilities);
+    if (restricted.isNotEmpty) {
+      throw StateError(
+        'Internal intelligence capabilities cannot be granted to group members.',
+      );
+    }
     final notGrantable =
         grantedCapabilities.difference(assignmentGrantableCapabilities);
     if (notGrantable.isNotEmpty) {
@@ -1208,6 +1219,11 @@ class AssignmentController extends ChangeNotifier {
       throw ArgumentError('Unknown assignment: $assignmentId');
     }
     final current = _assignments[index];
+    if (current.groupAssignmentId != null) {
+      throw StateError(
+        'Group assignment membership cannot be changed through individual reassignment.',
+      );
+    }
     if (authorizedScope != null &&
         !GeographyRegistry.scopeContains(
           authorizedScope,
