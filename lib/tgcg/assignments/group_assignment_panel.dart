@@ -8,6 +8,7 @@ import '../geography/geography_registry.dart';
 import '../membership/membership_store.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
+import 'assignment_control_actions.dart';
 import 'assignment_store.dart';
 
 GeographicScope? stateCoordinatorGroupScope(
@@ -450,11 +451,49 @@ Future<bool> showGroupAssignmentDialog({
                       itemCount: visibleTargets.length,
                       itemBuilder: (context, index) {
                         final option = visibleTargets[index];
+                        final pollingUnit =
+                            areaLevel == _GroupAreaLevel.pollingUnit &&
+                                    option.scope.pollingUnitId != null
+                                ? membership.geography.pollingUnit(
+                                    option.scope.pollingUnitId!,
+                                  )
+                                : null;
+                        final gpsReady =
+                            pollingUnit?.operationalLatitude != null &&
+                                pollingUnit?.operationalLongitude != null;
                         return CheckboxListTile(
                           dense: true,
                           contentPadding: EdgeInsets.zero,
                           value: selectedTargetKeys.contains(option.key),
                           title: Text(option.label),
+                          secondary: pollingUnit == null
+                              ? null
+                              : IconButton(
+                                  tooltip:
+                                      gpsReady ? 'Polling-unit GPS' : 'Add GPS',
+                                  onPressed: () async {
+                                    final changed =
+                                        await showPollingUnitCoordinateDialog(
+                                      context,
+                                      membership: membership,
+                                      unit: pollingUnit,
+                                      actorId: session.accessId.isEmpty
+                                          ? session.operatorName
+                                          : session.accessId,
+                                    );
+                                    if (changed && dialogContext.mounted) {
+                                      setDialogState(() {});
+                                    }
+                                  },
+                                  icon: Icon(
+                                    gpsReady
+                                        ? Icons.gps_fixed_rounded
+                                        : Icons.add_location_alt_outlined,
+                                    color: gpsReady
+                                        ? TgcgColors.success
+                                        : TgcgColors.warning,
+                                  ),
+                                ),
                           onChanged: (value) => setDialogState(() {
                             if (value == true) {
                               selectedTargetKeys.add(option.key);
