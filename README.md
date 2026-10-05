@@ -84,8 +84,13 @@ Assignments are separate from roles.
 - Submitted individual and group assignments open a historical AI report from the Submitted register. The report assesses stored completion GPS, evidence, assignment timeline and recorded AI events as they existed at submission rather than re-scoring old work from current live telemetry.
 - Submitted group AI reports aggregate all child assignments and their evidence under the chairman's submitted group record.
 - Evidence entries in a submitted AI report are individually clickable for capture metadata, GPS, integrity/reference fields and uploader details when available.
+- Evidence viewing and evidence capture are separate permissions. The State Coordinator has statewide evidence visibility but does not receive field capture controls.
+- The State Coordinator's Evidence module is rendered as Evidence Intelligence and aggregates direct captures, assignment evidence, incident evidence, field-report evidence and result-form evidence across the authorized state scope.
+- Evidence Intelligence supports filtering by source, evidence type, LGA and AI-review state, and every evidence record opens into its uploader, source/reference, geographic scope, capture time, GPS, integrity metadata, AI events and linked assignment/result/incident context.
+- Direct field captures are stored in the shared encrypted evidence registry and become visible to authorized Evidence Intelligence reporting after synchronization.
+- Coordinators with assignment-management authority may delegate the temporary Capture evidence capability to field members even when the coordinator's own interface is review-only.
 - Temporary capabilities on a group assignment remain constrained to the group's selected geographic targets, including when the group moves together.
-- The coordinator can grant only the temporary app capabilities needed for the assignment and only from authority they already possess.
+- The coordinator grants only the temporary app capabilities needed for the assignment; evidence capture may be delegated through assignment-management authority even when the coordinator's own evidence interface is review-only.
 - Assignment-only access disappears automatically when the assignment is completed, cancelled or removed.
 - GPS remains required for evidence capture and individual assignment completion; group submission is chairman-controlled while member telemetry is retained internally.
 - Role and assignment history remain auditable after deactivation.
@@ -111,7 +116,7 @@ Assignments are separate from roles.
 4. Jobs & Assignment Control
 5. Kaduna geography and polling-unit registry
 6. Field Monitoring & Incident Capture
-7. Evidence Capture
+7. Evidence Capture / State Evidence Intelligence
 8. Result Capture & Verification
 9. Collation
 10. Situation Room and Live Operations
