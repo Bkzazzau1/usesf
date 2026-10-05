@@ -166,7 +166,7 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
         if (!compact) ...[
           const SizedBox(height: 10),
           const Text(
-            'Accreditation, field monitoring, incident management, evidence, result capture, collation and coordination across all 23 LGAs of Kaduna State.',
+            'Member operations, field monitoring, incident management, evidence, result capture, collation and coordination across all 23 LGAs of Kaduna State.',
             style: TextStyle(color: Colors.white70, height: 1.5),
           ),
         ],
