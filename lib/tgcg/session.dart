@@ -276,7 +276,8 @@ Set<TgcgModule> modulesForCapabilities(
       has(TgcgCapability.submitFieldReport)) {
     modules.add(TgcgModule.fieldMonitoring);
   }
-  if (has(TgcgCapability.viewEvidence)) {
+  if (has(TgcgCapability.viewEvidence) ||
+      has(TgcgCapability.captureEvidence)) {
     modules.add(TgcgModule.evidenceCapture);
   }
   if (has(TgcgCapability.viewSituationRoom)) {
