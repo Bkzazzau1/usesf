@@ -10,6 +10,7 @@ import '../membership/membership_store.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
 import 'assignment_store.dart';
+import 'group_assignment_panel.dart';
 
 class AssignmentControlPage extends StatefulWidget {
   const AssignmentControlPage({super.key});
@@ -35,6 +36,8 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     );
     final canManageAssignments = assignmentScopes.isNotEmpty;
     final canManageDevices = deviceScopes.isNotEmpty;
+    final canCreateGroupAssignment =
+        stateCoordinatorGroupScope(context, session) != null;
     final authorizedUnits = membership.geography.pollingUnits
         .where(
           (unit) => assignmentScopes.any(
@@ -122,6 +125,27 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
               : null,
         ),
         const SizedBox(height: 18),
+        if (canCreateGroupAssignment) ...[
+          GroupAssignmentPanel(
+            controller: assignments,
+            membership: membership,
+            onCreate: () => _createGroupAssignment(
+              context,
+              membership,
+              assignments,
+              session,
+              authorizedMembers,
+              authorizedUnits,
+            ),
+            onCancel: (group) => _cancelGroupAssignment(
+              context,
+              assignments,
+              session,
+              group,
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
         LayoutBuilder(
           builder: (context, constraints) {
             final columns = constraints.maxWidth >= 980
@@ -225,6 +249,79 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
         ),
       ],
     );
+  }
+
+  Future<void> _createGroupAssignment(
+    BuildContext context,
+    MembershipOperationsController membership,
+    AssignmentController assignments,
+    TgcgSessionController session,
+    List<TgcgMember> authorizedMembers,
+    List<CanonicalPollingUnit> authorizedUnits,
+  ) async {
+    final created = await showGroupAssignmentDialog(
+      context: context,
+      membership: membership,
+      assignments: assignments,
+      session: session,
+      authorizedMembers: authorizedMembers,
+      authorizedUnits: authorizedUnits,
+    );
+    if (created && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Group assignment created.')),
+      );
+    }
+  }
+
+  Future<void> _cancelGroupAssignment(
+    BuildContext context,
+    AssignmentController assignments,
+    TgcgSessionController session,
+    GroupAssignment group,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Cancel group assignment'),
+        content: Text(group.title),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Cancel group'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final authorizedScope =
+        stateCoordinatorGroupScope(context, session, listen: false);
+    if (authorizedScope == null) return;
+
+    try {
+      await assignments.cancelGroupAssignment(
+        groupAssignmentId: group.id,
+        cancelledBy: session.accessId.isEmpty
+            ? session.operatorName
+            : session.accessId,
+        cancelledByRole: TgcgRole.stateCoordinator,
+        authorizedScope: authorizedScope,
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Group assignment cancelled.')),
+      );
+    } on StateError catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    }
   }
 
   Future<void> _setStaffingRequirement(
@@ -1330,7 +1427,9 @@ class _AssignmentList extends StatelessWidget {
                             ],
                           ),
                         ),
-                        if (canManage && !assignment.isTerminal)
+                        if (canManage &&
+                            !assignment.isTerminal &&
+                            !assignment.belongsToGroup)
                           PopupMenuButton<_AssignmentMenuAction>(
                             tooltip: 'Assignment actions',
                             onSelected: (action) async {
@@ -1341,18 +1440,19 @@ class _AssignmentList extends StatelessWidget {
                                 await _cancel(context, assignment);
                               }
                             },
-                            itemBuilder: (context) => const [
-                              PopupMenuItem(
-                                value: _AssignmentMenuAction.reassign,
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.swap_horiz_rounded, size: 18),
-                                    SizedBox(width: 8),
-                                    Text('Reassign'),
-                                  ],
+                            itemBuilder: (context) => [
+                              if (!assignment.belongsToGroup)
+                                const PopupMenuItem(
+                                  value: _AssignmentMenuAction.reassign,
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.swap_horiz_rounded, size: 18),
+                                      SizedBox(width: 8),
+                                      Text('Reassign'),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              PopupMenuItem(
+                              const PopupMenuItem(
                                 value: _AssignmentMenuAction.cancel,
                                 child: Row(
                                   children: [

@@ -60,11 +60,19 @@ Members may hold multiple compatible roles simultaneously. Effective access is t
 Assignments are separate from roles.
 
 - A member may have multiple active assignments.
-- Coordinators create assignments only within their authorized level and scope.
-- An assignment may be tied to a polling unit or may be location-flexible for special work.
+- Coordinators create individual assignments only within their authorized level and scope.
+- An individual assignment may be tied to a polling unit or may be location-flexible for special work.
+- The State Coordinator may create a group assignment spanning one or more selected Kaduna geographic targets.
+- Group membership may be selected manually or derived from the selected geography.
+- Group movement may be together, manually distributed member-by-member, or automatically distributed across the selected targets.
+- Every group has one chairman, selected by the State Coordinator or assigned automatically by the system.
+- Only the group chairman submits the group assignment; members do not submit separate completion records.
+- Group cancellation is handled at the group level by the State Coordinator so child assignments close consistently.
+- Group GPS telemetry, AI-derived records and operational intelligence are internal system data and are not exposed on member-facing group assignment screens.
+- Temporary capabilities on a group assignment remain constrained to the group's selected geographic targets, including when the group moves together.
 - The coordinator can grant only the temporary app capabilities needed for the assignment and only from authority they already possess.
 - Assignment-only access disappears automatically when the assignment is completed, cancelled or removed.
-- GPS is required for assignment evidence capture and assignment completion.
+- GPS remains required for evidence capture and individual assignment completion; group submission is chairman-controlled while member telemetry is retained internally.
 - Role and assignment history remain auditable after deactivation.
 
 ## Product principles

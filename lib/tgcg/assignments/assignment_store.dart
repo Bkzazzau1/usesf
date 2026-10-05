@@ -30,6 +30,10 @@ const Set<TgcgCapability> assignmentGrantableCapabilities = {
   TgcgCapability.viewEvidence,
 };
 
+const Set<TgcgCapability> groupAssignmentRestrictedCapabilities = {
+  TgcgCapability.viewMediaIntelligence,
+};
+
 enum AssignmentStatus {
   assigned,
   accepted,
@@ -60,6 +64,19 @@ enum AssignmentPresence {
   insideGeofence,
   outsideGeofence,
   stale,
+}
+
+enum GroupAssignmentDistribution {
+  together,
+  manual,
+  automatic,
+}
+
+enum GroupAssignmentStatus {
+  assigned,
+  active,
+  submitted,
+  cancelled,
 }
 
 class PollingUnitCoverageSnapshot {
@@ -126,6 +143,82 @@ class AssignmentEvent {
   final String? detail;
 }
 
+class GroupAssignment {
+  const GroupAssignment({
+    required this.id,
+    required this.title,
+    required this.chairmanMemberId,
+    required this.memberIds,
+    required this.targetScopes,
+    required this.distribution,
+    required this.assignedBy,
+    required this.assignedAt,
+    required this.status,
+    required this.priority,
+    this.instructions,
+    this.dueAt,
+    this.submittedAt,
+    this.submittedBy,
+    this.cancelledAt,
+    this.cancelledBy,
+    this.systemIntelligenceRestricted = true,
+  });
+
+  final String id;
+  final String title;
+  final String chairmanMemberId;
+  final List<String> memberIds;
+  final List<GeographicScope> targetScopes;
+  final GroupAssignmentDistribution distribution;
+  final String assignedBy;
+  final DateTime assignedAt;
+  final GroupAssignmentStatus status;
+  final AssignmentPriority priority;
+  final String? instructions;
+  final DateTime? dueAt;
+  final DateTime? submittedAt;
+  final String? submittedBy;
+  final DateTime? cancelledAt;
+  final String? cancelledBy;
+
+  /// GPS, AI-derived records and operational intelligence are coordinator /
+  /// backend data. Group members never receive these records through the
+  /// member-facing assignment surface.
+  final bool systemIntelligenceRestricted;
+
+  bool get isTerminal =>
+      status == GroupAssignmentStatus.submitted ||
+      status == GroupAssignmentStatus.cancelled;
+
+  GroupAssignment copyWith({
+    String? chairmanMemberId,
+    GroupAssignmentStatus? status,
+    DateTime? submittedAt,
+    String? submittedBy,
+    DateTime? cancelledAt,
+    String? cancelledBy,
+  }) =>
+      GroupAssignment(
+        id: id,
+        title: title,
+        chairmanMemberId: chairmanMemberId ?? this.chairmanMemberId,
+        memberIds: memberIds,
+        targetScopes: targetScopes,
+        distribution: distribution,
+        assignedBy: assignedBy,
+        assignedAt: assignedAt,
+        status: status ?? this.status,
+        priority: priority,
+        instructions: instructions,
+        dueAt: dueAt,
+        submittedAt: submittedAt ?? this.submittedAt,
+        submittedBy: submittedBy ?? this.submittedBy,
+        cancelledAt: cancelledAt ?? this.cancelledAt,
+        cancelledBy: cancelledBy ?? this.cancelledBy,
+        systemIntelligenceRestricted: systemIntelligenceRestricted,
+      );
+}
+
 class MemberAssignment {
   const MemberAssignment({
     required this.id,
@@ -151,6 +244,9 @@ class MemberAssignment {
     this.requiredEvidence = const [],
     this.grantedCapabilities = const {},
     this.evidence = const [],
+    this.groupAssignmentId,
+    this.isGroupChairman = false,
+    this.systemIntelligenceRestricted = false,
   });
 
   final String id;
@@ -176,6 +272,11 @@ class MemberAssignment {
   final List<EvidenceType> requiredEvidence;
   final Set<TgcgCapability> grantedCapabilities;
   final List<EvidenceAttachment> evidence;
+  final String? groupAssignmentId;
+  final bool isGroupChairman;
+  final bool systemIntelligenceRestricted;
+
+  bool get belongsToGroup => groupAssignmentId != null;
 
   bool get isTerminal =>
       status == AssignmentStatus.completed ||
@@ -212,6 +313,9 @@ class MemberAssignment {
     AssignmentLocationPing? lastLocation,
     Set<TgcgCapability>? grantedCapabilities,
     List<EvidenceAttachment>? evidence,
+    String? groupAssignmentId,
+    bool? isGroupChairman,
+    bool? systemIntelligenceRestricted,
   }) =>
       MemberAssignment(
         id: id,
@@ -239,6 +343,10 @@ class MemberAssignment {
         grantedCapabilities:
             grantedCapabilities ?? this.grantedCapabilities,
         evidence: evidence ?? this.evidence,
+        groupAssignmentId: groupAssignmentId ?? this.groupAssignmentId,
+        isGroupChairman: isGroupChairman ?? this.isGroupChairman,
+        systemIntelligenceRestricted:
+            systemIntelligenceRestricted ?? this.systemIntelligenceRestricted,
       );
 }
 
@@ -248,12 +356,14 @@ class AssignmentController extends ChangeNotifier {
     required ManagedDeviceController devices,
     required OfflinePersistenceController persistence,
     List<MemberAssignment> assignments = const [],
+    List<GroupAssignment> groupAssignments = const [],
     List<AssignmentEvent> events = const [],
     Map<String, int> minimumStaffingByPollingUnit = const {},
   })  : _membership = membership,
         _devices = devices,
         _persistence = persistence,
         _assignments = List<MemberAssignment>.of(assignments),
+        _groupAssignments = List<GroupAssignment>.of(groupAssignments),
         _events = List<AssignmentEvent>.of(events),
         _minimumStaffingByPollingUnit =
             Map<String, int>.of(minimumStaffingByPollingUnit);
@@ -273,14 +383,21 @@ class AssignmentController extends ChangeNotifier {
   final ManagedDeviceController _devices;
   final OfflinePersistenceController _persistence;
   final List<MemberAssignment> _assignments;
+  final List<GroupAssignment> _groupAssignments;
   final List<AssignmentEvent> _events;
   final Map<String, int> _minimumStaffingByPollingUnit;
 
   List<MemberAssignment> get assignments =>
       List.unmodifiable(_assignments);
+  List<GroupAssignment> get groupAssignments =>
+      List.unmodifiable(_groupAssignments);
+
   Future<void> hydrateFromOffline() async {
     final assignmentRows = await _persistence.readEntities(
       entityType: 'member_assignment',
+    );
+    final groupRows = await _persistence.readEntities(
+      entityType: 'group_assignment',
     );
     final eventRows = await _persistence.readEntities(
       entityType: 'assignment_event',
@@ -395,6 +512,10 @@ class AssignmentController extends ChangeNotifier {
         requiredEvidence: List.unmodifiable(requiredEvidence),
         grantedCapabilities: Set.unmodifiable(grantedCapabilities),
         evidence: List.unmodifiable(evidence),
+        groupAssignmentId: _clean(row['groupAssignmentId']?.toString()),
+        isGroupChairman: row['isGroupChairman'] == true,
+        systemIntelligenceRestricted:
+            row['systemIntelligenceRestricted'] == true,
       );
 
       final index = _assignments.indexWhere((item) => item.id == id);
@@ -402,6 +523,71 @@ class AssignmentController extends ChangeNotifier {
         _assignments.add(restored);
       } else {
         _assignments[index] = restored;
+      }
+      changed = true;
+    }
+
+    for (final row in groupRows) {
+      final id = row['id']?.toString();
+      final title = row['title']?.toString();
+      final chairmanMemberId = row['chairmanMemberId']?.toString();
+      final assignedBy = row['assignedBy']?.toString();
+      final assignedAt = _date(row['assignedAt']);
+      final status = _groupAssignmentStatus(row['status']);
+      final distribution = _groupAssignmentDistribution(row['distribution']);
+      final priority = _assignmentPriority(row['priority']);
+      final memberIds = row['memberIds'] is List
+          ? (row['memberIds'] as List)
+              .map((item) => item.toString())
+              .where((item) => item.isNotEmpty)
+              .toList(growable: false)
+          : const <String>[];
+      final targetScopes = <GeographicScope>[];
+      final targetsRaw = row['targetScopes'];
+      if (targetsRaw is List) {
+        for (final value in targetsRaw) {
+          final target = geographicScopeFromJson(value);
+          if (target != null) targetScopes.add(target);
+        }
+      }
+      if (id == null ||
+          title == null ||
+          chairmanMemberId == null ||
+          assignedBy == null ||
+          assignedAt == null ||
+          status == null ||
+          distribution == null ||
+          priority == null ||
+          memberIds.isEmpty ||
+          targetScopes.isEmpty) {
+        continue;
+      }
+
+      final restored = GroupAssignment(
+        id: id,
+        title: title,
+        chairmanMemberId: chairmanMemberId,
+        memberIds: List.unmodifiable(memberIds),
+        targetScopes: List.unmodifiable(targetScopes),
+        distribution: distribution,
+        assignedBy: assignedBy,
+        assignedAt: assignedAt,
+        status: status,
+        priority: priority,
+        instructions: _clean(row['instructions']?.toString()),
+        dueAt: _date(row['dueAt']),
+        submittedAt: _date(row['submittedAt']),
+        submittedBy: _clean(row['submittedBy']?.toString()),
+        cancelledAt: _date(row['cancelledAt']),
+        cancelledBy: _clean(row['cancelledBy']?.toString()),
+        systemIntelligenceRestricted:
+            row['systemIntelligenceRestricted'] != false,
+      );
+      final index = _groupAssignments.indexWhere((item) => item.id == id);
+      if (index < 0) {
+        _groupAssignments.add(restored);
+      } else {
+        _groupAssignments[index] = restored;
       }
       changed = true;
     }
@@ -449,6 +635,9 @@ class AssignmentController extends ChangeNotifier {
       _assignments.sort(
         (a, b) => b.assignedAt.compareTo(a.assignedAt),
       );
+      _groupAssignments.sort(
+        (a, b) => b.assignedAt.compareTo(a.assignedAt),
+      );
       _events.sort(
         (a, b) => a.createdAt.compareTo(b.createdAt),
       );
@@ -458,6 +647,19 @@ class AssignmentController extends ChangeNotifier {
 
 
   List<AssignmentEvent> get events => List.unmodifiable(_events);
+
+  GroupAssignment? groupAssignmentById(String id) {
+    for (final group in _groupAssignments) {
+      if (group.id == id) return group;
+    }
+    return null;
+  }
+
+  List<MemberAssignment> assignmentsForGroup(String groupAssignmentId) =>
+      _assignments
+          .where((item) => item.groupAssignmentId == groupAssignmentId)
+          .toList()
+        ..sort((a, b) => a.assignedAt.compareTo(b.assignedAt));
 
   MemberAssignment? assignmentById(String id) {
     for (final assignment in _assignments) {
@@ -638,6 +840,7 @@ class AssignmentController extends ChangeNotifier {
     required String title,
     required String memberId,
     String? pollingUnitId,
+    GeographicScope? targetScopeOverride,
     required String assignedBy,
     GeographicScope? authorizedScope,
     AssignmentPriority priority = AssignmentPriority.normal,
@@ -649,12 +852,22 @@ class AssignmentController extends ChangeNotifier {
     /// Capabilities the assigning coordinator holds through roles covering
     /// [authorizedScope]. A coordinator can never grant more than this.
     required Set<TgcgCapability> assignerCapabilities,
+    String? groupAssignmentId,
+    bool isGroupChairman = false,
+    bool systemIntelligenceRestricted = false,
   }) async {
     final member = _membership.memberById(memberId);
     if (member == null) {
       throw ArgumentError('Unknown USESF member: $memberId');
     }
 
+    final restricted =
+        grantedCapabilities.intersection(groupAssignmentRestrictedCapabilities);
+    if (groupAssignmentId != null && restricted.isNotEmpty) {
+      throw StateError(
+        'Internal intelligence capabilities cannot be granted to group members.',
+      );
+    }
     final notGrantable =
         grantedCapabilities.difference(assignmentGrantableCapabilities);
     if (notGrantable.isNotEmpty) {
@@ -687,6 +900,16 @@ class AssignmentController extends ChangeNotifier {
         'The selected polling unit is outside the coordinator authorization scope.',
       );
     }
+    if (targetScopeOverride != null &&
+        authorizedScope != null &&
+        !GeographyRegistry.scopeContains(
+          authorizedScope,
+          targetScopeOverride,
+        )) {
+      throw StateError(
+        'The selected assignment area is outside the coordinator authorization scope.',
+      );
+    }
 
     final memberScope = _membership.registrationScopeForMember(memberId);
     if (authorizedScope != null &&
@@ -710,8 +933,11 @@ class AssignmentController extends ChangeNotifier {
       }
     }
 
-    final assignmentScope =
-        unit?.scope ?? authorizedScope ?? memberScope ?? GeographicScope.kaduna;
+    final assignmentScope = unit?.scope ??
+        targetScopeOverride ??
+        authorizedScope ??
+        memberScope ??
+        GeographicScope.kaduna;
     final locationMode = unit == null
         ? AssignmentLocationMode.none
         : AssignmentLocationMode.pollingUnit;
@@ -735,6 +961,9 @@ class AssignmentController extends ChangeNotifier {
       requiredEvidence: List.unmodifiable(requiredEvidence),
       grantedCapabilities: Set.unmodifiable(grantedCapabilities),
       evidence: const [],
+      groupAssignmentId: _clean(groupAssignmentId),
+      isGroupChairman: isGroupChairman,
+      systemIntelligenceRestricted: systemIntelligenceRestricted,
     );
     _assignments.insert(0, assignment);
     await _appendEvent(
@@ -750,6 +979,316 @@ class AssignmentController extends ChangeNotifier {
     return assignment;
   }
 
+  Future<GroupAssignment> createGroupAssignment({
+    required String title,
+    required List<String> memberIds,
+    required List<GeographicScope> targetScopes,
+    required GroupAssignmentDistribution distribution,
+    required String assignedBy,
+    required TgcgRole assignedByRole,
+    required GeographicScope authorizedScope,
+    String? chairmanMemberId,
+    Map<String, GeographicScope> manualTargetsByMember = const {},
+    AssignmentPriority priority = AssignmentPriority.normal,
+    String? instructions,
+    DateTime? dueAt,
+    Set<TgcgCapability> grantedCapabilities = const {},
+    required Set<TgcgCapability> assignerCapabilities,
+  }) async {
+    if (assignedByRole != TgcgRole.stateCoordinator ||
+        authorizedScope.level != GeographyLevel.state ||
+        authorizedScope.stateId != GeographicScope.kaduna.stateId) {
+      throw StateError(
+        'Only the Kaduna State Coordinator can create group assignments.',
+      );
+    }
+
+    final uniqueMemberIds = memberIds
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+    if (uniqueMemberIds.isEmpty) {
+      throw StateError('Select at least one member.');
+    }
+
+    final uniqueTargets = <String, GeographicScope>{};
+    for (final target in targetScopes) {
+      if (!GeographyRegistry.scopeContains(authorizedScope, target)) {
+        throw StateError(
+          'Every group target must be inside the State Coordinator scope.',
+        );
+      }
+      uniqueTargets[scopeStorageKey(target)] = target;
+    }
+    final targets = uniqueTargets.values.toList(growable: false);
+    if (targets.isEmpty) {
+      throw StateError('Select at least one target area.');
+    }
+
+    for (final memberId in uniqueMemberIds) {
+      final member = _membership.memberById(memberId);
+      if (member == null) {
+        throw ArgumentError('Unknown USESF member: $memberId');
+      }
+      final homeScope = _membership.registrationScopeForMember(memberId);
+      if (homeScope != null &&
+          !GeographyRegistry.scopeContains(authorizedScope, homeScope)) {
+        throw StateError(
+          'Every selected member must be inside the State Coordinator scope.',
+        );
+      }
+    }
+
+    final restrictedGroupCapabilities =
+        grantedCapabilities.intersection(groupAssignmentRestrictedCapabilities);
+    if (restrictedGroupCapabilities.isNotEmpty) {
+      throw StateError(
+        'Internal intelligence capabilities cannot be granted to group members.',
+      );
+    }
+    final notGrantable =
+        grantedCapabilities.difference(assignmentGrantableCapabilities);
+    if (notGrantable.isNotEmpty) {
+      throw StateError(
+        'These capabilities cannot be granted through an assignment: '
+        '${notGrantable.map((item) => item.name).join(', ')}.',
+      );
+    }
+    final notHeld = grantedCapabilities.difference(assignerCapabilities);
+    if (notHeld.isNotEmpty) {
+      throw StateError(
+        'You cannot grant capabilities you do not hold in this area: '
+        '${notHeld.map((item) => item.name).join(', ')}.',
+      );
+    }
+
+    final chairman = _clean(chairmanMemberId) ??
+        _automaticGroupChairman(uniqueMemberIds);
+    if (!uniqueMemberIds.contains(chairman)) {
+      throw StateError('The group chairman must be a selected member.');
+    }
+
+    final plannedTargets = <String, GeographicScope?>{};
+    for (var index = 0; index < uniqueMemberIds.length; index++) {
+      final memberId = uniqueMemberIds[index];
+      GeographicScope? target;
+      switch (distribution) {
+        case GroupAssignmentDistribution.together:
+          target = null;
+          break;
+        case GroupAssignmentDistribution.manual:
+          target = manualTargetsByMember[memberId];
+          if (target == null) {
+            throw StateError(
+              'Every member needs a target in manual distribution mode.',
+            );
+          }
+          if (!uniqueTargets.containsKey(scopeStorageKey(target))) {
+            throw StateError(
+              'A manual member target is not part of this group assignment.',
+            );
+          }
+          break;
+        case GroupAssignmentDistribution.automatic:
+          target = _automaticGroupTarget(memberId, targets, index);
+          break;
+      }
+      plannedTargets[memberId] = target;
+
+      if (target?.level == GeographyLevel.pollingUnit &&
+          target?.pollingUnitId != null) {
+        final duplicate = activeAssignmentsForMember(memberId).any(
+          (item) =>
+              item.locationMode == AssignmentLocationMode.pollingUnit &&
+              item.targetPollingUnitId == target!.pollingUnitId,
+        );
+        if (duplicate) {
+          throw StateError(
+            'A selected member already has an active assignment for one of the target polling units.',
+          );
+        }
+      }
+    }
+
+    final now = DateTime.now().toUtc();
+    final group = GroupAssignment(
+      id: 'GRP-${now.microsecondsSinceEpoch}',
+      title: title.trim().isEmpty ? 'Group Assignment' : title.trim(),
+      chairmanMemberId: chairman,
+      memberIds: List.unmodifiable(uniqueMemberIds),
+      targetScopes: List.unmodifiable(targets),
+      distribution: distribution,
+      assignedBy: assignedBy,
+      assignedAt: now,
+      status: GroupAssignmentStatus.assigned,
+      priority: priority,
+      instructions: _clean(instructions),
+      dueAt: dueAt?.toUtc(),
+      systemIntelligenceRestricted: true,
+    );
+    _groupAssignments.insert(0, group);
+    await _persistGroupAssignment(group);
+
+    for (final memberId in uniqueMemberIds) {
+      final target = plannedTargets[memberId];
+      final pollingUnitId =
+          target?.level == GeographyLevel.pollingUnit
+              ? target?.pollingUnitId
+              : null;
+      await createAssignment(
+        title: group.title,
+        memberId: memberId,
+        pollingUnitId: pollingUnitId,
+        targetScopeOverride: distribution == GroupAssignmentDistribution.together
+            ? authorizedScope
+            : target,
+        assignedBy: assignedBy,
+        authorizedScope: authorizedScope,
+        priority: priority,
+        instructions: instructions,
+        dueAt: dueAt,
+        grantedCapabilities: grantedCapabilities,
+        assignerCapabilities: assignerCapabilities,
+        groupAssignmentId: group.id,
+        isGroupChairman: memberId == chairman,
+        systemIntelligenceRestricted: true,
+      );
+    }
+
+    notifyListeners();
+    return group;
+  }
+
+  Future<GroupAssignment> cancelGroupAssignment({
+    required String groupAssignmentId,
+    required String cancelledBy,
+    required TgcgRole cancelledByRole,
+    required GeographicScope authorizedScope,
+  }) async {
+    if (cancelledByRole != TgcgRole.stateCoordinator ||
+        authorizedScope.level != GeographyLevel.state ||
+        authorizedScope.stateId != GeographicScope.kaduna.stateId) {
+      throw StateError(
+        'Only the Kaduna State Coordinator can cancel group assignments.',
+      );
+    }
+
+    final groupIndex =
+        _groupAssignments.indexWhere((item) => item.id == groupAssignmentId);
+    if (groupIndex < 0) {
+      throw ArgumentError('Unknown group assignment: $groupAssignmentId');
+    }
+    final current = _groupAssignments[groupIndex];
+    if (current.isTerminal) {
+      throw StateError('This group assignment is already closed.');
+    }
+    for (final target in current.targetScopes) {
+      if (!GeographyRegistry.scopeContains(authorizedScope, target)) {
+        throw StateError(
+          'This group assignment is outside the coordinator authorization scope.',
+        );
+      }
+    }
+
+    final now = DateTime.now().toUtc();
+    for (final child in assignmentsForGroup(groupAssignmentId)) {
+      if (child.isTerminal) continue;
+      final index = _assignments.indexWhere((item) => item.id == child.id);
+      if (index < 0) continue;
+      final updated = child.copyWith(
+        status: AssignmentStatus.cancelled,
+        cancelledAt: now,
+      );
+      _assignments[index] = updated;
+      await _appendEvent(
+        updated,
+        action: 'group_cancelled',
+        actorId: cancelledBy,
+        detail: 'Group assignment cancelled by State Coordinator.',
+      );
+      await _persistAssignment(updated);
+    }
+
+    final cancelled = current.copyWith(
+      status: GroupAssignmentStatus.cancelled,
+      cancelledAt: now,
+      cancelledBy: cancelledBy,
+    );
+    _groupAssignments[groupIndex] = cancelled;
+    await _persistGroupAssignment(cancelled);
+    notifyListeners();
+    return cancelled;
+  }
+
+  Future<GroupAssignment> submitGroupAssignment({
+    required String groupAssignmentId,
+    required String chairmanMemberId,
+  }) async {
+    final groupIndex =
+        _groupAssignments.indexWhere((item) => item.id == groupAssignmentId);
+    if (groupIndex < 0) {
+      throw ArgumentError('Unknown group assignment: $groupAssignmentId');
+    }
+    final current = _groupAssignments[groupIndex];
+    if (current.isTerminal) {
+      throw StateError('This group assignment is already closed.');
+    }
+    if (current.chairmanMemberId != chairmanMemberId) {
+      throw StateError(
+        'Only the group chairman can submit this assignment.',
+      );
+    }
+
+    final children = assignmentsForGroup(groupAssignmentId);
+    MemberAssignment? chairmanAssignment;
+    for (final child in children) {
+      if (child.memberId == chairmanMemberId) {
+        chairmanAssignment = child;
+        break;
+      }
+    }
+    if (chairmanAssignment == null) {
+      throw StateError('The chairman assignment record is missing.');
+    }
+    if (chairmanAssignment.status == AssignmentStatus.assigned ||
+        chairmanAssignment.status == AssignmentStatus.reassigned ||
+        chairmanAssignment.isTerminal) {
+      throw StateError(
+        'The chairman must accept the assignment before submitting the group.',
+      );
+    }
+
+    final now = DateTime.now().toUtc();
+    for (final child in children) {
+      if (child.isTerminal) continue;
+      final index = _assignments.indexWhere((item) => item.id == child.id);
+      if (index < 0) continue;
+      final updated = child.copyWith(
+        status: AssignmentStatus.completed,
+        completedAt: now,
+      );
+      _assignments[index] = updated;
+      await _appendEvent(
+        updated,
+        action: 'group_submitted',
+        actorId: chairmanMemberId,
+        detail: 'Group assignment submitted by chairman.',
+      );
+      await _persistAssignment(updated);
+    }
+
+    final submitted = current.copyWith(
+      status: GroupAssignmentStatus.submitted,
+      submittedAt: now,
+      submittedBy: chairmanMemberId,
+    );
+    _groupAssignments[groupIndex] = submitted;
+    await _persistGroupAssignment(submitted);
+    notifyListeners();
+    return submitted;
+  }
+
   Future<MemberAssignment> transition({
     required String assignmentId,
     required AssignmentStatus status,
@@ -762,6 +1301,11 @@ class AssignmentController extends ChangeNotifier {
       throw ArgumentError('Unknown assignment: $assignmentId');
     }
     final current = _assignments[index];
+    if (current.groupAssignmentId != null) {
+      throw StateError(
+        'Group assignment membership cannot be changed through individual reassignment.',
+      );
+    }
     if (authorizedScope != null &&
         !GeographyRegistry.scopeContains(
           authorizedScope,
@@ -769,6 +1313,12 @@ class AssignmentController extends ChangeNotifier {
         )) {
       throw StateError(
         'This assignment is outside the coordinator authorization scope.',
+      );
+    }
+    if (current.groupAssignmentId != null &&
+        status == AssignmentStatus.completed) {
+      throw StateError(
+        'Group assignments are submitted only by the group chairman.',
       );
     }
     if (!_canTransition(current.status, status)) {
@@ -805,6 +1355,12 @@ class AssignmentController extends ChangeNotifier {
       action: status.name,
       actorId: actorId,
     );
+    if (updated.groupAssignmentId != null &&
+        status != AssignmentStatus.cancelled &&
+        status != AssignmentStatus.declined &&
+        status != AssignmentStatus.reassigned) {
+      await _markGroupActive(updated.groupAssignmentId!);
+    }
     notifyListeners();
     await _persistAssignment(updated);
     return updated;
@@ -864,6 +1420,9 @@ class AssignmentController extends ChangeNotifier {
       requiredEvidence: current.requiredEvidence,
       grantedCapabilities: current.grantedCapabilities,
       evidence: current.evidence,
+      groupAssignmentId: current.groupAssignmentId,
+      isGroupChairman: current.isGroupChairman,
+      systemIntelligenceRestricted: current.systemIntelligenceRestricted,
     );
     _assignments[index] = updated;
     await _appendEvent(
@@ -1167,6 +1726,10 @@ class AssignmentController extends ChangeNotifier {
               assignment.grantedCapabilities.map((item) => item.name).toList(),
           'evidence':
               assignment.evidence.map(evidenceToJson).toList(growable: false),
+          'groupAssignmentId': assignment.groupAssignmentId,
+          'isGroupChairman': assignment.isGroupChairman,
+          'systemIntelligenceRestricted':
+              assignment.systemIntelligenceRestricted,
           'lastLocation': assignment.lastLocation == null
               ? null
               : {
@@ -1183,6 +1746,71 @@ class AssignmentController extends ChangeNotifier {
         },
       );
 
+  Future<void> _persistGroupAssignment(GroupAssignment group) =>
+      _persistence.persistMutation(
+        entityType: 'group_assignment',
+        entityId: group.id,
+        mutationType: SyncMutationType.upsert,
+        scopeKey: scopeStorageKey(GeographicScope.kaduna),
+        ownerId: group.chairmanMemberId,
+        payload: {
+          'id': group.id,
+          'title': group.title,
+          'chairmanMemberId': group.chairmanMemberId,
+          'memberIds': group.memberIds,
+          'targetScopes':
+              group.targetScopes.map(geographicScopeToJson).toList(),
+          'distribution': group.distribution.name,
+          'assignedBy': group.assignedBy,
+          'assignedAt': group.assignedAt.toIso8601String(),
+          'status': group.status.name,
+          'priority': group.priority.name,
+          'instructions': group.instructions,
+          'dueAt': group.dueAt?.toIso8601String(),
+          'submittedAt': group.submittedAt?.toIso8601String(),
+          'submittedBy': group.submittedBy,
+          'cancelledAt': group.cancelledAt?.toIso8601String(),
+          'cancelledBy': group.cancelledBy,
+          'systemIntelligenceRestricted':
+              group.systemIntelligenceRestricted,
+        },
+      );
+
+  Future<void> _markGroupActive(String groupAssignmentId) async {
+    final index =
+        _groupAssignments.indexWhere((item) => item.id == groupAssignmentId);
+    if (index < 0) return;
+    final current = _groupAssignments[index];
+    if (current.status != GroupAssignmentStatus.assigned) return;
+    final updated = current.copyWith(status: GroupAssignmentStatus.active);
+    _groupAssignments[index] = updated;
+    await _persistGroupAssignment(updated);
+  }
+
+  String _automaticGroupChairman(List<String> memberIds) {
+    for (final memberId in memberIds) {
+      if (_devices.deviceForMember(memberId) != null) return memberId;
+    }
+    return memberIds.first;
+  }
+
+  GeographicScope _automaticGroupTarget(
+    String memberId,
+    List<GeographicScope> targets,
+    int index,
+  ) {
+    final home = _membership.registrationScopeForMember(memberId);
+    if (home != null) {
+      for (final target in targets) {
+        if (GeographyRegistry.scopeContains(target, home) ||
+            GeographyRegistry.scopeContains(home, target)) {
+          return target;
+        }
+      }
+    }
+    return targets[index % targets.length];
+  }
+
   static bool _hasFreshAssignmentLocation(
     MemberAssignment assignment, {
     Duration maxAge = const Duration(minutes: 2),
@@ -1191,6 +1819,24 @@ class AssignmentController extends ChangeNotifier {
     if (ping == null) return false;
     final age = DateTime.now().toUtc().difference(ping.capturedAt).abs();
     return age <= maxAge && ping.accuracyMeters.isFinite;
+  }
+
+  static GroupAssignmentDistribution? _groupAssignmentDistribution(
+    Object? value,
+  ) {
+    final name = value?.toString();
+    for (final item in GroupAssignmentDistribution.values) {
+      if (item.name == name) return item;
+    }
+    return null;
+  }
+
+  static GroupAssignmentStatus? _groupAssignmentStatus(Object? value) {
+    final name = value?.toString();
+    for (final item in GroupAssignmentStatus.values) {
+      if (item.name == name) return item;
+    }
+    return null;
   }
 
   static AssignmentLocationMode? _assignmentLocationMode(Object? value) {
