@@ -1046,6 +1046,7 @@ class AssignmentController extends ChangeNotifier {
       switch (distribution) {
         case GroupAssignmentDistribution.together:
           target = null;
+          break;
         case GroupAssignmentDistribution.manual:
           target = manualTargetsByMember[memberId];
           if (target == null) {
@@ -1058,8 +1059,10 @@ class AssignmentController extends ChangeNotifier {
               'A manual member target is not part of this group assignment.',
             );
           }
+          break;
         case GroupAssignmentDistribution.automatic:
           target = _automaticGroupTarget(memberId, targets, index);
+          break;
       }
       plannedTargets[memberId] = target;
 
