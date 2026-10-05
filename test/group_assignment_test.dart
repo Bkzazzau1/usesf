@@ -160,6 +160,26 @@ void main() {
       expect(assignments.assignments, isEmpty);
     });
 
+    test('individual assignments can still grant media intelligence',
+        () async {
+      final assignment = await assignments.createAssignment(
+        title: 'Media duty',
+        memberId: 'MEM-0001',
+        assignedBy: 'STATE-COORD',
+        authorizedScope: GeographicScope.kaduna,
+        grantedCapabilities: const {
+          TgcgCapability.viewMediaIntelligence,
+        },
+        assignerCapabilities: const {
+          TgcgCapability.viewMediaIntelligence,
+        },
+      );
+      expect(
+        assignment.grantedCapabilities,
+        contains(TgcgCapability.viewMediaIntelligence),
+      );
+    });
+
     test('only chairman submits and individual completion is blocked',
         () async {
       final group = await createGroup(
