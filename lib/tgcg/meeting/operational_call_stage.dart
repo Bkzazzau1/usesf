@@ -110,6 +110,16 @@ class _OperationalCallStageState extends State<OperationalCallStage> {
                     ),
                   ),
                   TgcgStatusPill(
+                    label:
+                        'GPS ${call.gpsRecipientCount}/${call.recipientMemberIds.length}',
+                    color: call.hasGpsForAllRecipients
+                        ? TgcgColors.success
+                        : TgcgColors.warning,
+                    icon: Icons.gps_fixed_rounded,
+                    compact: true,
+                  ),
+                  const SizedBox(width: 7),
+                  TgcgStatusPill(
                     label: status,
                     color: call.status == OperationalCallStatus.active
                         ? TgcgColors.success
@@ -246,12 +256,30 @@ class IncomingOperationalCallCard extends StatelessWidget {
           ),
           const SizedBox(width: 11),
           Expanded(
-            child: Text(
-              call.callerName,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  call.callerName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  call.gpsForMember(memberId) == null
+                      ? 'GPS unavailable'
+                      : 'GPS active • location attached',
+                  style: TextStyle(
+                    color: call.gpsForMember(memberId) == null
+                        ? TgcgColors.warning
+                        : TgcgColors.gold200,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
           ),
           IconButton.filledTonal(
