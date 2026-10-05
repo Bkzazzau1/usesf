@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../access/access_policy.dart';
+import '../assignments/assignment_store.dart';
+import '../domain/permissions.dart';
 import '../field/field_operations_store.dart';
 import '../geography/geography_registry.dart';
 import '../membership/membership_store.dart';
@@ -22,16 +25,26 @@ class _AiDataAnalyticsPageState extends State<AiDataAnalyticsPage> {
   Widget build(BuildContext context) {
     final session = TgcgSession.of(context);
     final membership = MembershipOperations.of(context);
+    final assignments = Assignments.of(context);
     final field = FieldOperations.of(context);
     final results = ResultOperations.of(context);
     final offline = OfflinePersistence.of(context);
-    final scope = session.scope;
+    final scope = TgcgAccessPolicy.authorizingScope(
+          context,
+          TgcgCapability.viewGeography,
+        ) ??
+        session.scope;
 
     final incidents = field.incidentsForScope(scope);
     final reports = field.reportsForScope(scope);
     final submissions = results.submissionsForScope(scope);
     final reviewQueue = results.reviewQueueForScope(scope);
-    final agents = membership.agentsForScope(scope);
+    final activeAssignments = assignments
+        .assignmentsForScope(scope)
+        .where((item) => !item.isTerminal)
+        .toList(growable: false);
+    final assignedMembers =
+        activeAssignments.map((item) => item.memberId).toSet().length;
     final members = membership.membersForScope(scope);
     final unresolved = incidents
         .where((item) =>
@@ -53,8 +66,12 @@ class _AiDataAnalyticsPageState extends State<AiDataAnalyticsPage> {
         );
     final unresolvedWithEvidence =
         unresolved.where((item) => item.evidence.isNotEmpty).length;
-    final approvedAgents = agents
-        .where((item) => item.status == AccreditationStatus.approved)
+    final presentAssignments = activeAssignments
+        .where(
+          (item) =>
+              assignments.presenceFor(item) ==
+              AssignmentPresence.insideGeofence,
+        )
         .length;
     final pendingSync = offline.pendingOutbox.length;
 
@@ -63,7 +80,7 @@ class _AiDataAnalyticsPageState extends State<AiDataAnalyticsPage> {
           (zone) => _zoneSummary(
             zone: zone,
             sessionScope: scope,
-            membership: membership,
+            assignments: assignments,
             field: field,
             results: results,
           ),
@@ -88,7 +105,7 @@ class _AiDataAnalyticsPageState extends State<AiDataAnalyticsPage> {
           eyebrow: 'AI-ASSISTED OPERATIONAL ANALYTICS',
           title: 'AI Data Analytics Centre',
           subtitle:
-              '${scope.label}: verification workload, incident pressure, evidence quality, field activity and data-integrity indicators.',
+              '${scope.label}: $assignedMembers assigned members, verification workload, incident pressure, evidence quality and data-integrity indicators.',
           trailing: const TgcgStatusPill(
             label: 'HUMAN REVIEW',
             color: TgcgColors.ai,
@@ -98,7 +115,7 @@ class _AiDataAnalyticsPageState extends State<AiDataAnalyticsPage> {
         const SizedBox(height: 18),
         _MetricGrid(
           operationalRecords:
-              incidents.length + reports.length + submissions.length + agents.length,
+              incidents.length + reports.length + submissions.length + activeAssignments.length,
           reviewQueue: reviewQueue.length,
           highPriority: highPriority.length,
           pendingSync: pendingSync,
@@ -114,8 +131,8 @@ class _AiDataAnalyticsPageState extends State<AiDataAnalyticsPage> {
           reviewQueue: reviewQueue.length,
           unresolved: unresolved.length,
           unresolvedWithEvidence: unresolvedWithEvidence,
-          approvedAgents: approvedAgents,
-          totalAgents: agents.length,
+          presentAssignments: presentAssignments,
+          activeAssignments: activeAssignments.length,
           pendingSync: pendingSync,
           zones: zones,
         ),
@@ -160,7 +177,7 @@ class _AiDataAnalyticsPageState extends State<AiDataAnalyticsPage> {
         const SizedBox(height: 16),
         _CoveragePanel(
           members: members.length,
-          agents: agents.length,
+          assignments: activeAssignments.length,
           reports: reports.length,
           results: submissions.length,
           incidents: incidents.length,
@@ -311,8 +328,8 @@ class _InsightPanel extends StatelessWidget {
     required this.reviewQueue,
     required this.unresolved,
     required this.unresolvedWithEvidence,
-    required this.approvedAgents,
-    required this.totalAgents,
+    required this.presentAssignments,
+    required this.activeAssignments,
     required this.pendingSync,
     required this.zones,
   });
@@ -321,8 +338,8 @@ class _InsightPanel extends StatelessWidget {
   final int reviewQueue;
   final int unresolved;
   final int unresolvedWithEvidence;
-  final int approvedAgents;
-  final int totalAgents;
+  final int presentAssignments;
+  final int activeAssignments;
   final int pendingSync;
   final List<_ZoneSummary> zones;
 
@@ -361,12 +378,12 @@ class _InsightPanel extends StatelessWidget {
             : TgcgColors.info,
       ),
       _Insight(
-        icon: Icons.badge_outlined,
-        title: 'Operational readiness',
-        text: totalAgents == 0
-            ? 'No accredited agents are assigned in this scope.'
-            : '$approvedAgents of $totalAgents assigned agents are approved.${busiest == null ? '' : ' Highest recorded activity is ${busiest.name}.'}${pendingSync == 0 ? '' : ' $pendingSync local mutation${pendingSync == 1 ? '' : 's'} await sync.'}',
-        color: approvedAgents == totalAgents && totalAgents > 0
+        icon: Icons.assignment_turned_in_outlined,
+        title: 'Operational deployment',
+        text: activeAssignments == 0
+            ? 'No active assignments are recorded in this scope.'
+            : '$presentAssignments of $activeAssignments active assignments have fresh in-geofence presence.${busiest == null ? '' : ' Highest recorded activity is ${busiest.name}.'}${pendingSync == 0 ? '' : ' $pendingSync local mutation${pendingSync == 1 ? '' : 's'} await sync.'}',
+        color: presentAssignments == activeAssignments && activeAssignments > 0
             ? TgcgColors.success
             : TgcgColors.primary,
       ),
@@ -499,13 +516,13 @@ class _DistributionPanel extends StatelessWidget {
       title: 'Geographic operational distribution',
       subtitle: switch (focus) {
         _AnalyticsFocus.overview =>
-          'Combined operational activity from approved agents, reports, incidents and result submissions.',
+          'Combined operational activity from active assignments, reports, incidents and result submissions.',
         _AnalyticsFocus.incidents =>
           'Unresolved field incidents by senatorial zone.',
         _AnalyticsFocus.verification =>
           'Result submissions requiring human integrity review.',
         _AnalyticsFocus.fieldActivity =>
-          'Approved agent assignments and field reports.',
+          'Active member assignments and field reports.',
       },
       trailing: TgcgStatusPill(
         label: '${zones.length} SENATORIAL ZONE${zones.length == 1 ? '' : 'S'}',
@@ -610,7 +627,7 @@ class _ZoneBar extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(left: 118),
             child: Text(
-              '${zone.agents} agents • ${zone.reports} reports • ${zone.unresolved} unresolved • ${zone.results} results • ${zone.review} review',
+              '${zone.assignments} assignments • ${zone.reports} reports • ${zone.unresolved} unresolved • ${zone.results} results • ${zone.review} review',
               style: const TextStyle(
                 color: TgcgColors.muted,
                 fontSize: 8.8,
@@ -913,7 +930,7 @@ class _QueueRow extends StatelessWidget {
 class _CoveragePanel extends StatelessWidget {
   const _CoveragePanel({
     required this.members,
-    required this.agents,
+    required this.assignments,
     required this.reports,
     required this.results,
     required this.incidents,
@@ -921,7 +938,7 @@ class _CoveragePanel extends StatelessWidget {
   });
 
   final int members;
-  final int agents;
+  final int assignments;
   final int reports;
   final int results;
   final int incidents;
@@ -931,7 +948,7 @@ class _CoveragePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final values = <(String, int, IconData)>[
       ('Members', members, Icons.groups_2_outlined),
-      ('Agents', agents, Icons.badge_outlined),
+      ('Assignments', assignments, Icons.assignment_outlined),
       ('Reports', reports, Icons.description_outlined),
       ('Results', results, Icons.ballot_outlined),
       ('Incidents', incidents, Icons.warning_amber_outlined),
@@ -999,7 +1016,7 @@ class _CoveragePanel extends StatelessWidget {
 class _ZoneSummary {
   const _ZoneSummary({
     required this.name,
-    required this.agents,
+    required this.assignments,
     required this.reports,
     required this.unresolved,
     required this.highPriority,
@@ -1008,20 +1025,20 @@ class _ZoneSummary {
   });
 
   final String name;
-  final int agents;
+  final int assignments;
   final int reports;
   final int unresolved;
   final int highPriority;
   final int results;
   final int review;
 
-  int get activity => agents + reports + unresolved + results + review;
+  int get activity => assignments + reports + unresolved + results + review;
 
   int valueFor(_AnalyticsFocus focus) => switch (focus) {
         _AnalyticsFocus.overview => activity,
         _AnalyticsFocus.incidents => unresolved,
         _AnalyticsFocus.verification => review,
-        _AnalyticsFocus.fieldActivity => agents + reports,
+        _AnalyticsFocus.fieldActivity => assignments + reports,
       };
 }
 
@@ -1043,7 +1060,7 @@ List<CanonicalSenatorialDistrict> _visibleZones(
 _ZoneSummary _zoneSummary({
   required CanonicalSenatorialDistrict zone,
   required GeographicScope sessionScope,
-  required MembershipOperationsController membership,
+  required AssignmentController assignments,
   required FieldOperationsController field,
   required ResultOperationsController results,
 }) {
@@ -1059,9 +1076,9 @@ _ZoneSummary _zoneSummary({
 
   return _ZoneSummary(
     name: zone.name,
-    agents: membership
-        .agentsForScope(scope)
-        .where((item) => item.status == AccreditationStatus.approved)
+    assignments: assignments
+        .assignmentsForScope(scope)
+        .where((item) => !item.isTerminal)
         .length,
     reports: field.reportsForScope(scope).length,
     unresolved: unresolved.length,
