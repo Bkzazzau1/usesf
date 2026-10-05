@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../access/access_policy.dart';
+import '../assignments/assignment_store.dart';
+import '../domain/permissions.dart';
 import '../field/field_operations_store.dart';
 import '../geography/geography_registry.dart';
 import '../geography/kaduna_map.dart';
@@ -24,17 +27,24 @@ class _LiveOperationsPageState extends State<LiveOperationsPage> {
     final session = TgcgSession.of(context);
     final field = FieldOperations.of(context);
     final membership = MembershipOperations.of(context);
+    final assignments = Assignments.of(context);
     final results = ResultOperations.of(context);
     final emergency = EmergencyResponse.of(context);
     final geography = membership.geography;
+    final scope = TgcgAccessPolicy.authorizingScope(
+          context,
+          TgcgCapability.viewGeography,
+        ) ??
+        session.scope;
 
     final snapshots = geography.lgas
-        .where((lga) => _lgaVisibleToScope(session.scope, lga))
+        .where((lga) => _lgaVisibleToScope(scope, lga))
         .map(
           (lga) => _LgaSnapshot.build(
             lga: lga,
             field: field,
             membership: membership,
+            assignments: assignments,
             results: results,
             emergency: emergency,
           ),
@@ -60,9 +70,9 @@ class _LiveOperationsPageState extends State<LiveOperationsPage> {
       0,
       (total, item) => total + item.results.length,
     );
-    final approvedAgents = snapshots.fold<int>(
+    final activeAssignments = snapshots.fold<int>(
       0,
-      (total, item) => total + item.approvedAgents,
+      (total, item) => total + item.activeAssignments,
     );
     final attentionLgas = snapshots
         .where(
@@ -77,7 +87,7 @@ class _LiveOperationsPageState extends State<LiveOperationsPage> {
           eyebrow: 'KADUNA STATE OPERATIONAL PICTURE',
           title: 'Kaduna Situation Map',
           subtitle:
-              '${session.scope.label}: LGA-by-LGA incidents, emergency response, field activity and submission status.',
+              '${scope.label}: LGA-by-LGA incidents, emergency response, member assignments and submission status.',
           trailing: const TgcgStatusPill(
             label: 'CURRENT VIEW',
             color: TgcgColors.success,
@@ -91,7 +101,7 @@ class _LiveOperationsPageState extends State<LiveOperationsPage> {
           openIncidents: openIncidents,
           activeResponses: activeResponses,
           resultSubmissions: resultSubmissions,
-          approvedAgents: approvedAgents,
+          activeAssignments: activeAssignments,
         ),
         const SizedBox(height: 16),
         LayoutBuilder(
@@ -168,8 +178,8 @@ class _LgaSnapshot {
   const _LgaSnapshot({
     required this.lga,
     required this.members,
-    required this.agents,
-    required this.approvedAgents,
+    required this.activeAssignments,
+    required this.presentAssignments,
     required this.incidents,
     required this.reports,
     required this.results,
@@ -179,8 +189,8 @@ class _LgaSnapshot {
 
   final CanonicalLga lga;
   final int members;
-  final int agents;
-  final int approvedAgents;
+  final int activeAssignments;
+  final int presentAssignments;
   final List<FieldIncident> incidents;
   final List<FieldReport> reports;
   final List<ElectionResultSubmission> results;
@@ -219,6 +229,7 @@ class _LgaSnapshot {
     required CanonicalLga lga,
     required FieldOperationsController field,
     required MembershipOperationsController membership,
+    required AssignmentController assignments,
     required ResultOperationsController results,
     required EmergencyResponseController emergency,
   }) {
@@ -226,7 +237,17 @@ class _LgaSnapshot {
     final reports = field.reportsForScope(lga.scope);
     final submissions = results.submissionsForScope(lga.scope);
     final dispatches = emergency.dispatchesForScope(lga.scope);
-    final agents = membership.agentsForScope(lga.scope);
+    final activeAssignments = assignments
+        .assignmentsForScope(lga.scope)
+        .where((item) => !item.isTerminal)
+        .toList(growable: false);
+    final presentAssignments = activeAssignments
+        .where(
+          (item) =>
+              assignments.presenceFor(item) ==
+              AssignmentPresence.insideGeofence,
+        )
+        .length;
     final members = membership.memberCountForScope(lga.scope);
     final open = incidents
         .where(
@@ -264,7 +285,7 @@ class _LgaSnapshot {
     } else if (open.isNotEmpty || activeDispatches.isNotEmpty) {
       condition = _SituationCondition.elevated;
     } else if (members > 0 ||
-        agents.isNotEmpty ||
+        activeAssignments.isNotEmpty ||
         reports.isNotEmpty ||
         submissions.isNotEmpty ||
         dispatches.isNotEmpty) {
@@ -274,10 +295,8 @@ class _LgaSnapshot {
     return _LgaSnapshot(
       lga: lga,
       members: members,
-      agents: agents.length,
-      approvedAgents: agents
-          .where((item) => item.status == AccreditationStatus.approved)
-          .length,
+      activeAssignments: activeAssignments.length,
+      presentAssignments: presentAssignments,
       incidents: incidents,
       reports: reports,
       results: submissions,
@@ -294,7 +313,7 @@ class _TopMetrics extends StatelessWidget {
     required this.openIncidents,
     required this.activeResponses,
     required this.resultSubmissions,
-    required this.approvedAgents,
+    required this.activeAssignments,
   });
 
   final int lgas;
@@ -302,7 +321,7 @@ class _TopMetrics extends StatelessWidget {
   final int openIncidents;
   final int activeResponses;
   final int resultSubmissions;
-  final int approvedAgents;
+  final int activeAssignments;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -366,10 +385,10 @@ class _TopMetrics extends StatelessWidget {
           ),
           TgcgMetricCard(
             width: width,
-            label: 'Approved agents',
-            value: '$approvedAgents',
-            detail: 'Accredited in current scope',
-            icon: Icons.badge_outlined,
+            label: 'Active assignments',
+            value: '$activeAssignments',
+            detail: 'Open member duties in current scope',
+            icon: Icons.assignment_turned_in_outlined,
             tone: TgcgMetricTone.success,
           ),
         ],
@@ -660,9 +679,9 @@ class _InspectorMetrics extends StatelessWidget {
           ),
           _MiniMetric(
             width: width,
-            label: 'Approved agents',
-            value: '${snapshot.approvedAgents}',
-            icon: Icons.badge_outlined,
+            label: 'Member presence',
+            value: '${snapshot.presentAssignments}/${snapshot.activeAssignments}',
+            icon: Icons.gps_fixed_rounded,
             color: TgcgColors.success,
           ),
           _MiniMetric(
@@ -945,9 +964,9 @@ class _ZoneOverview extends StatelessWidget {
                 0,
                 (total, item) => total + item.activeDispatches.length,
               );
-              final agents = items.fold<int>(
+              final assignments = items.fold<int>(
                 0,
-                (total, item) => total + item.approvedAgents,
+                (total, item) => total + item.activeAssignments,
               );
               final condition = items.fold<_SituationCondition>(
                 _SituationCondition.noData,
@@ -1015,7 +1034,7 @@ class _ZoneOverview extends StatelessWidget {
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        '$responses response • $agents approved agents',
+                        '$responses response • $assignments active assignments',
                         style: const TextStyle(
                           color: TgcgColors.muted,
                           fontSize: 8.5,
