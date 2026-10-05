@@ -189,6 +189,40 @@ void main() {
       );
     });
 
+    test('distributed member access stays inside that member target',
+        () async {
+      final kadunaNorth = geography.lga('KD-KADUNA-NORTH')!.scope;
+      final zaria = geography.lga('KD-ZARIA')!.scope;
+      await createGroup(
+        distribution: GroupAssignmentDistribution.manual,
+        manualTargets: {
+          'MEM-0001': zaria,
+          'MEM-0002': kadunaNorth,
+        },
+        grants: const {TgcgCapability.viewDiscussionRoom},
+      );
+
+      final access = EffectiveMemberAccess.resolve(
+        memberId: 'MEM-0001',
+        governance: GovernanceOperationsController.prototypeSeed(),
+        assignments: assignments,
+      );
+      expect(
+        access.allows(
+          TgcgCapability.viewDiscussionRoom,
+          targetScope: zaria,
+        ),
+        isTrue,
+      );
+      expect(
+        access.allows(
+          TgcgCapability.viewDiscussionRoom,
+          targetScope: kadunaNorth,
+        ),
+        isFalse,
+      );
+    });
+
     test('group assignments cannot expose internal media intelligence',
         () async {
       await expectLater(
