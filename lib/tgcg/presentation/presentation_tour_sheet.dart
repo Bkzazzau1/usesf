@@ -44,7 +44,7 @@ Future<void> showPresentationTour(
       number: 3,
       title: 'PVC Member Enrolment',
       subtitle: 'Scan PVC, extract identity and confirm enrolment.',
-      module: TgcgModule.accreditation,
+      module: TgcgModule.memberEnrollment,
       icon: Icons.how_to_reg_outlined,
     ),
     PresentationTourStep(
