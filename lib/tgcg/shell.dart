@@ -76,18 +76,13 @@ class _TgcgShellState extends State<TgcgShell> {
           : allowed.first;
     }
 
-    final canCaptureEvidence = TgcgAccessPolicy.allows(
-      context,
-      TgcgCapability.captureEvidence,
-    );
-    final canViewEvidence = TgcgAccessPolicy.allows(
+    final evidenceRole = TgcgAccessPolicy.roleFor(
       context,
       TgcgCapability.viewEvidence,
     );
     final evidenceIntelligence =
         allowed.contains(TgcgModule.evidenceCapture) &&
-        canViewEvidence &&
-        !canCaptureEvidence;
+        evidenceRole == TgcgRole.stateCoordinator;
     final destinations = _destinations
         .where((item) => allowed.contains(item.module))
         .map(
@@ -210,13 +205,14 @@ class _TgcgShellState extends State<TgcgShell> {
         TgcgModule.alertCenter => const AlertCenterPage(),
         TgcgModule.fieldMonitoring => const FieldMonitoringPage(),
         TgcgModule.evidenceCapture =>
-          TgcgAccessPolicy.allows(
+          TgcgAccessPolicy.roleFor(
             context,
-            TgcgCapability.captureEvidence,
+            TgcgCapability.viewEvidence,
             listen: false,
-          )
-              ? const EvidenceCapturePage()
-              : const EvidenceIntelligencePage(),
+          ) ==
+              TgcgRole.stateCoordinator
+          ? const EvidenceIntelligencePage()
+          : const EvidenceCapturePage(),
         TgcgModule.situationRoom => const SituationRoomPage(),
         TgcgModule.securityResponse => const SecurityResponsePortalPage(),
         TgcgModule.resultCapture => const ResultCapturePage(),
