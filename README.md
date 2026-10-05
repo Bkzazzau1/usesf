@@ -68,6 +68,13 @@ Assignments are separate from roles.
 - Every group has one chairman, selected by the State Coordinator or assigned automatically by the system.
 - Only the group chairman submits the group assignment; members do not submit separate completion records.
 - Group cancellation is handled at the group level by the State Coordinator so child assignments close consistently.
+- From Assignment Control, the State Coordinator may initiate direct audio/video call sessions to any active registered Kaduna member, including members without a current assignment.
+- Assignment-linked calls retain call metadata such as participants, assignment/group linkage, state, answer time and end time; media itself is not recorded by this workflow.
+- Group Assignment Control supports a direct chairman call and a conference invitation to the selected group members.
+- Incoming operational calls are surfaced globally for signed-in members, regardless of which authorized module they are currently viewing.
+- Remote audio/video transport still requires the production signaling/WebRTC provider; the current Flutter layer provides call-session orchestration, incoming-call state and local camera/call controls.
+- If a polling unit has no operational coordinate, the State Coordinator may enter latitude/longitude from Assignment Control. The coordinate becomes a persistent reusable reference coordinate with an audit mutation.
+- Manual Assignment Control coordinate entry never silently overwrites an existing reference or field-verified operational coordinate.
 - Group GPS telemetry, AI-derived records and operational intelligence are internal system data and are not exposed on member-facing group assignment screens.
 - Temporary capabilities on a group assignment remain constrained to the group's selected geographic targets, including when the group moves together.
 - The coordinator can grant only the temporary app capabilities needed for the assignment and only from authority they already possess.
