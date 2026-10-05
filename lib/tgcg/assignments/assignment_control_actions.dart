@@ -207,6 +207,7 @@ Future<bool> showPollingUnitCoordinateDialog(
   required MembershipOperationsController membership,
   required CanonicalPollingUnit unit,
   required String actorId,
+  required GeographicScope stateScope,
 }) async {
   final current = membership.geography.pollingUnit(unit.code) ?? unit;
   final ready = current.operationalLatitude != null &&
@@ -283,6 +284,8 @@ Future<bool> showPollingUnitCoordinateDialog(
                   latitude: lat,
                   longitude: lng,
                   recordedBy: actorId,
+                  recordedByRole: TgcgRole.stateCoordinator,
+                  authorizedScope: stateScope,
                 );
                 if (dialogContext.mounted) {
                   Navigator.pop(dialogContext, true);
