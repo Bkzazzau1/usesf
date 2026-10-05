@@ -623,6 +623,8 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     final availableCapabilities = _assignmentGrantOptions(
       _delegableCapabilities(context, session),
     );
+    final coordinateStateScope =
+        stateCoordinatorGroupScope(context, session, listen: false);
     final title = TextEditingController(text: 'Field Duty Assignment');
     final instructions = TextEditingController();
 
@@ -728,6 +730,46 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                     onChanged: (value) =>
                         setDialogState(() => pollingUnitId = value),
                   ),
+                  if (coordinateStateScope != null &&
+                      pollingUnitId != null) ...[
+                    const SizedBox(height: 10),
+                    Builder(
+                      builder: (context) {
+                        final unit = membership.geography
+                            .pollingUnit(pollingUnitId!);
+                        if (unit == null) return const SizedBox.shrink();
+                        final ready = unit.operationalLatitude != null &&
+                            unit.operationalLongitude != null;
+                        return Align(
+                          alignment: Alignment.centerLeft,
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              final changed =
+                                  await showPollingUnitCoordinateDialog(
+                                context,
+                                membership: membership,
+                                unit: unit,
+                                actorId: session.accessId.isEmpty
+                                    ? session.operatorName
+                                    : session.accessId,
+                              );
+                              if (changed && dialogContext.mounted) {
+                                setDialogState(() {});
+                              }
+                            },
+                            icon: Icon(
+                              ready
+                                  ? Icons.gps_fixed_rounded
+                                  : Icons.add_location_alt_outlined,
+                            ),
+                            label: Text(
+                              ready ? 'Polling-unit GPS' : 'Add GPS',
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                   ],
                   const SizedBox(height: 12),
                   DropdownButtonFormField<AssignmentPriority>(
