@@ -113,8 +113,8 @@ class GovernanceOperationsController extends ChangeNotifier {
         ),
         SyncOutboxItem(
           id: 'OUT-0003',
-          entityType: 'agent_assignment',
-          entityId: 'AG-KD-001',
+          entityType: 'member_assignment',
+          entityId: 'ASN-DEMO-001',
           mutationType: SyncMutationType.update,
           payloadJson: '{"entity":"agent_assignment","id":"AG-KD-001"}',
           mutationVersion: 2,

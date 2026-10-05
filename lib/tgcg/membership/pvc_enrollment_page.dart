@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../access/access_policy.dart';
 import '../domain/permissions.dart';
 import '../geography/geography_registry.dart';
 import '../session.dart';
@@ -46,17 +47,41 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
   Widget build(BuildContext context) {
     final session = TgcgSession.of(context);
     final store = MembershipOperations.of(context);
-    _selectedLgaId ??= store.geography.lgas.first.id;
-    final lgaPollingUnits = store.geography.pollingUnits
+    final membershipScopes = TgcgAccessPolicy.scopesFor(
+      context,
+      TgcgCapability.manageMembership,
+    );
+    final authorizedUnits = store.geography.pollingUnits
+        .where(
+          (unit) => membershipScopes.any(
+            (scope) => TgcgPermissionPolicy.scopeAllows(scope, unit.scope),
+          ),
+        )
+        .toList(growable: false);
+    final authorizedLgaIds =
+        authorizedUnits.map((unit) => unit.scope.lgaId).whereType<String>().toSet();
+    final authorizedLgas = store.geography.lgas
+        .where((lga) => authorizedLgaIds.contains(lga.id))
+        .toList(growable: false);
+    if (authorizedLgas.isNotEmpty &&
+        !authorizedLgas.any((lga) => lga.id == _selectedLgaId)) {
+      _selectedLgaId = authorizedLgas.first.id;
+      _selectedPollingUnitId = null;
+    }
+    final lgaPollingUnits = authorizedUnits
         .where((unit) => unit.scope.lgaId == _selectedLgaId)
         .toList(growable: false);
-    final canManage = TgcgPermissionPolicy.allows(
-      session.role!,
+    final canManage = TgcgAccessPolicy.allows(
+      context,
+      TgcgCapability.manageMembership,
+    );
+    final membershipRole = TgcgAccessPolicy.roleFor(
+      context,
       TgcgCapability.manageMembership,
     );
     final canCreateWithoutPvc =
-        session.role == TgcgRole.stateCoordinator ||
-        session.role == TgcgRole.stateAdministrator;
+        membershipRole == TgcgRole.stateCoordinator ||
+        membershipRole == TgcgRole.stateAdministrator;
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 36),
       children: [
@@ -89,7 +114,7 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
               email: _email,
               voterId: _voterId,
               password: _password,
-              lgas: store.geography.lgas,
+              lgas: authorizedLgas,
               pollingUnits: lgaPollingUnits,
               selectedLgaId: _selectedLgaId!,
               selectedPollingUnitId: _selectedPollingUnitId,
@@ -169,9 +194,14 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
 
   Future<void> _createMember(MembershipOperationsController store) async {
     final session = TgcgSession.of(context, listen: false);
+    final membershipRole = TgcgAccessPolicy.roleFor(
+      context,
+      TgcgCapability.manageMembership,
+      listen: false,
+    );
     final canCreateWithoutPvc =
-        session.role == TgcgRole.stateCoordinator ||
-        session.role == TgcgRole.stateAdministrator;
+        membershipRole == TgcgRole.stateCoordinator ||
+        membershipRole == TgcgRole.stateAdministrator;
     final voterId = _voterId.text.trim();
     final hasPvc = _scan != null;
 

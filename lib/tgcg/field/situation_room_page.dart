@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../access/access_policy.dart';
 import '../domain/permissions.dart';
 import '../session.dart';
 import '../geography/kaduna_map.dart';
@@ -20,8 +21,33 @@ class _SituationRoomPageState extends State<SituationRoomPage> {
   Widget build(BuildContext context) {
     final session = TgcgSession.of(context);
     final store = FieldOperations.of(context);
-    final incidents = store.incidentsForScope(session.scope);
-    final reports = store.reportsForScope(session.scope);
+    final situationScopes = TgcgAccessPolicy.scopesForAny(
+      context,
+      const [
+        TgcgCapability.viewSituationRoom,
+        TgcgCapability.viewIncidents,
+      ],
+    );
+    final effectiveScopes = situationScopes.isEmpty
+        ? <GeographicScope>[session.scope]
+        : situationScopes;
+    final incidents = store.incidents
+        .where(
+          (item) => effectiveScopes.any(
+            (scope) => TgcgPermissionPolicy.scopeAllows(scope, item.scope),
+          ),
+        )
+        .toList(growable: false);
+    final reports = store.reports
+        .where(
+          (item) => effectiveScopes.any(
+            (scope) => TgcgPermissionPolicy.scopeAllows(scope, item.scope),
+          ),
+        )
+        .toList(growable: false);
+    final commandScope = effectiveScopes.length == 1
+        ? effectiveScopes.first
+        : GeographicScope.kaduna;
     final open =
         incidents
             .where(
@@ -69,7 +95,7 @@ class _SituationRoomPageState extends State<SituationRoomPage> {
           eyebrow: 'Live command centre',
           title: 'Situation Room',
           subtitle:
-              '${session.scope.label}: real-time incident command, evidence review and field coordination.',
+              '${effectiveScopes.length} authorized scope${effectiveScopes.length == 1 ? '' : 's'}: real-time incident command, evidence review and field coordination.',
           trailing: const Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -105,14 +131,13 @@ class _SituationRoomPageState extends State<SituationRoomPage> {
               onSelect: (id) => setState(() => selectedIncidentId = id),
             );
             final map = _CommandMap(
-              scope: session.scope,
+              scope: commandScope,
               incidents: open,
               selectedIncidentId: selectedIncidentId,
               onSelect: (id) => setState(() => selectedIncidentId = id),
             );
             final inspector = _IncidentInspector(
               incident: selected,
-              role: session.role!,
             );
 
             if (constraints.maxWidth < 1180) {
@@ -745,10 +770,9 @@ class _MapLegend extends StatelessWidget {
 }
 
 class _IncidentInspector extends StatelessWidget {
-  const _IncidentInspector({required this.incident, required this.role});
+  const _IncidentInspector({required this.incident});
 
   final FieldIncident? incident;
-  final TgcgRole role;
 
   @override
   Widget build(BuildContext context) {
@@ -767,17 +791,20 @@ class _IncidentInspector extends StatelessWidget {
     }
 
     final color = _severityColor(item.severity);
-    final canAcknowledge = TgcgPermissionPolicy.allows(
-      role,
+    final canAcknowledge = TgcgAccessPolicy.allows(
+      context,
       TgcgCapability.acknowledgeIncident,
+      targetScope: item.scope,
     );
-    final canAssign = TgcgPermissionPolicy.allows(
-      role,
+    final canAssign = TgcgAccessPolicy.allows(
+      context,
       TgcgCapability.assignIncident,
+      targetScope: item.scope,
     );
-    final canClose = TgcgPermissionPolicy.allows(
-      role,
+    final canClose = TgcgAccessPolicy.allows(
+      context,
       TgcgCapability.closeIncident,
+      targetScope: item.scope,
     );
 
     return TgcgSectionCard(

@@ -55,8 +55,18 @@ class _TgcgShellState extends State<TgcgShell> {
   Widget build(BuildContext context) {
     final session = TgcgSession.of(context);
     final capabilities = TgcgAccessPolicy.capabilities(context);
+    final memberLayoutRole = session.role == TgcgRole.member
+        ? TgcgAccessPolicy.roleFor(
+              context,
+              TgcgCapability.viewGeography,
+            ) ??
+            TgcgRole.member
+        : session.role!;
     final allowed = session.role == TgcgRole.member
-        ? modulesForCapabilities(capabilities)
+        ? modulesForCapabilities(
+            capabilities,
+            role: memberLayoutRole,
+          )
         : allowedModules(session.role!);
     if (!allowed.contains(selectedModule)) {
       selectedModule = allowed.contains(TgcgModule.overview)
@@ -159,7 +169,7 @@ class _TgcgShellState extends State<TgcgShell> {
         TgcgModule.overview => session.role == TgcgRole.member
             ? const MemberShell()
             : TgcgDashboardPage(onOpenModule: _select),
-        TgcgModule.accreditation => PvcEnrollmentPage(
+        TgcgModule.memberEnrollment => PvcEnrollmentPage(
             onOpenAssignments: () => _select(TgcgModule.assignmentControl),
           ),
         TgcgModule.membershipNetwork => MemberOperationsPage(
@@ -211,7 +221,7 @@ const _destinations = <_Destination>[
   _Destination(TgcgModule.mediaIntelligence, 'Media Intelligence', Icons.insights_outlined, _NavGroup.command),
   _Destination(TgcgModule.geography, 'Geographic Operations', Icons.public_rounded, _NavGroup.command),
   _Destination(TgcgModule.assignmentControl, 'Assignment Control', Icons.assignment_ind_outlined, _NavGroup.fieldOperations),
-  _Destination(TgcgModule.accreditation, 'Member Enrolment', Icons.how_to_reg_outlined, _NavGroup.fieldOperations),
+  _Destination(TgcgModule.memberEnrollment, 'Member Enrolment', Icons.how_to_reg_outlined, _NavGroup.fieldOperations),
   _Destination(TgcgModule.aiVerification, 'AI Verification', Icons.auto_awesome_rounded, _NavGroup.fieldOperations),
   _Destination(TgcgModule.fieldMonitoring, 'Field Monitoring', Icons.sensors_outlined, _NavGroup.fieldOperations),
   _Destination(TgcgModule.evidenceCapture, 'Evidence Capture', Icons.perm_media_outlined, _NavGroup.fieldOperations),
@@ -387,7 +397,19 @@ class _OperatorCard extends StatelessWidget {
   final TgcgSessionController session;
 
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) {
+    final accessSummary = TgcgAccessPolicy.accessSummary(context);
+    final accessScopes = TgcgAccessPolicy.scopesForAny(
+      context,
+      TgcgAccessPolicy.capabilities(context),
+    );
+    final scopeSummary = accessScopes.length > 1
+        ? '${accessScopes.length} authorized scopes'
+        : accessScopes.isEmpty
+            ? session.scope.label
+            : accessScopes.first.label;
+
+    return Container(
         padding: const EdgeInsets.all(11),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: .045),
@@ -425,7 +447,7 @@ class _OperatorCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        roleLabel(session.role!),
+                        accessSummary,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(color: Color(0xFFA4AAB9), fontSize: 9.5),
@@ -448,7 +470,7 @@ class _OperatorCard extends StatelessWidget {
                 const SizedBox(width: 5),
                 Expanded(
                   child: Text(
-                    session.scope.label,
+                    scopeSummary,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(color: Color(0xFF8C94A6), fontSize: 9.5),
@@ -459,6 +481,7 @@ class _OperatorCard extends StatelessWidget {
           ],
         ),
       );
+  }
 }
 
 class _CommandBar extends StatelessWidget {
@@ -478,6 +501,16 @@ class _CommandBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final session = TgcgSession.of(context);
     final pending = OfflinePersistence.of(context).pendingOutbox.length;
+    final accessSummary = TgcgAccessPolicy.accessSummary(context);
+    final scopes = TgcgAccessPolicy.scopesForAny(
+      context,
+      TgcgAccessPolicy.capabilities(context),
+    );
+    final scopeSummary = scopes.length > 1
+        ? '${scopes.length} authorized scopes'
+        : scopes.isEmpty
+            ? session.scope.label
+            : scopes.first.label;
     return Container(
       height: 68,
       padding: const EdgeInsets.symmetric(horizontal: 22),
@@ -505,7 +538,7 @@ class _CommandBar extends StatelessWidget {
               child: const TextField(
                 readOnly: true,
                 decoration: InputDecoration(
-                  hintText: 'Search agents, polling units, incidents or results',
+                  hintText: 'Search members, assignments, polling units or incidents',
                   prefixIcon: Icon(Icons.search_rounded, size: 20),
                   isDense: true,
                 ),
@@ -542,7 +575,7 @@ class _CommandBar extends StatelessWidget {
           ],
           const SizedBox(width: 4),
           Tooltip(
-            message: '${roleLabel(session.role!)} • ${session.scope.label}',
+            message: '$accessSummary • $scopeSummary',
             child: Container(
               width: 36,
               height: 36,
@@ -635,7 +668,7 @@ String _groupLabel(_NavGroup group) => switch (group) {
 
 String _moduleLabel(TgcgModule module) => switch (module) {
       TgcgModule.overview => 'Command Overview',
-      TgcgModule.accreditation => 'Member Enrolment',
+      TgcgModule.memberEnrollment => 'Member Enrolment',
       TgcgModule.membershipNetwork => 'Registered Members',
       TgcgModule.roleAssignment => 'Role Assignment',
       TgcgModule.geography => 'Geographic Operations',

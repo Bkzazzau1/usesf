@@ -70,8 +70,8 @@ class _AlertCenterPageState extends State<AlertCenterPage> {
     ),
     _OpsAlert(
       id: 'ALT-004',
-      title: 'Polling-unit agent checked in',
-      detail: 'Assigned device and field account are active for election-day duty.',
+      title: 'Assigned member checked in',
+      detail: 'Assigned device and member account are active for the current field duty.',
       location: 'Kaduna North • PU 001',
       time: '11 min ago',
       severity: _AlertSeverity.success,

@@ -12,7 +12,7 @@ void main() {
       expect(modules, contains(TgcgModule.resultCapture));
       expect(modules, contains(TgcgModule.communications));
 
-      expect(modules, isNot(contains(TgcgModule.accreditation)));
+      expect(modules, isNot(contains(TgcgModule.memberEnrollment)));
       expect(modules, isNot(contains(TgcgModule.collation)));
       expect(modules, isNot(contains(TgcgModule.governance)));
     });
@@ -22,7 +22,7 @@ void main() {
       expect(modules, containsAll(TgcgModule.values));
     });
 
-    test('read only executive has no submission or accreditation routes', () {
+    test('read only executive has no submission or member-enrolment routes', () {
       final modules = allowedModules(TgcgRole.readOnlyExecutive);
 
       expect(modules, contains(TgcgModule.overview));
@@ -31,7 +31,7 @@ void main() {
       expect(modules, contains(TgcgModule.reports));
       expect(modules, contains(TgcgModule.governance));
 
-      expect(modules, isNot(contains(TgcgModule.accreditation)));
+      expect(modules, isNot(contains(TgcgModule.memberEnrollment)));
       expect(modules, isNot(contains(TgcgModule.resultCapture)));
     });
   });

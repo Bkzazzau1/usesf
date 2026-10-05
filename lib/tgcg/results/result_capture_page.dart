@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../access/access_policy.dart';
 import '../domain/permissions.dart';
 import '../geography/geography_registry.dart';
 import '../membership/membership_store.dart';
@@ -24,7 +25,27 @@ class _ResultCapturePageState extends State<ResultCapturePage> {
     final session = TgcgSession.of(context);
     final store = ResultOperations.of(context);
     final offline = OfflinePersistence.of(context);
-    final allScoped = store.submissionsForScope(session.scope);
+    final resultScopes = TgcgAccessPolicy.scopesForAny(
+      context,
+      const [
+        TgcgCapability.submitElectionResult,
+        TgcgCapability.verifyElectionResult,
+        TgcgCapability.disputeElectionResult,
+      ],
+    );
+    final effectiveScopes = resultScopes.isEmpty
+        ? <GeographicScope>[session.scope]
+        : resultScopes;
+    final allScoped = store.submissions
+        .where(
+          (item) => effectiveScopes.any(
+            (scope) => TgcgPermissionPolicy.scopeAllows(
+              scope,
+              item.pollingUnitScope,
+            ),
+          ),
+        )
+        .toList(growable: false);
     var submissions = List<ElectionResultSubmission>.from(allScoped);
 
     if (statusFilter != null) {
@@ -38,9 +59,15 @@ class _ResultCapturePageState extends State<ResultCapturePage> {
           .toList(growable: false);
     }
 
-    final review = store.reviewQueueForScope(session.scope);
-    final canSubmit = TgcgPermissionPolicy.allows(
-      session.role!,
+    final reviewById = <String, ElectionResultSubmission>{};
+    for (final scope in effectiveScopes) {
+      for (final item in store.reviewQueueForScope(scope)) {
+        reviewById[item.id] = item;
+      }
+    }
+    final review = reviewById.values.toList(growable: false);
+    final canSubmit = TgcgAccessPolicy.allows(
+      context,
       TgcgCapability.submitElectionResult,
     );
 
@@ -51,7 +78,7 @@ class _ResultCapturePageState extends State<ResultCapturePage> {
           eyebrow: 'RESULT INTEGRITY',
           title: 'Result Capture & Verification',
           subtitle:
-              '${session.scope.label}: evidence-led capture, validation and human review for unofficial field results.',
+              '${effectiveScopes.length} authorized scope${effectiveScopes.length == 1 ? '' : 's'}: evidence-led capture, validation and human review for unofficial field results.',
           trailing: Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -318,7 +345,17 @@ class _CaptureWorkspaceState extends State<_CaptureWorkspace> {
     final session = TgcgSession.of(context);
     final membership = MembershipOperations.of(context);
     final results = ResultOperations.of(context);
-    final units = membership.geography.pollingUnitsWithin(session.scope);
+    final submitScopes = TgcgAccessPolicy.scopesFor(
+      context,
+      TgcgCapability.submitElectionResult,
+    );
+    final units = membership.geography.pollingUnits
+        .where(
+          (unit) => submitScopes.any(
+            (scope) => TgcgPermissionPolicy.scopeAllows(scope, unit.scope),
+          ),
+        )
+        .toList(growable: false);
 
     if (units.isNotEmpty &&
         !units.any((unit) => unit.code == selectedPollingUnitId)) {
@@ -1273,12 +1310,12 @@ class _ReviewQueue extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final session = TgcgSession.of(context);
-    final canVerify = TgcgPermissionPolicy.allows(
-      session.role!,
+    final canVerify = TgcgAccessPolicy.allows(
+      context,
       TgcgCapability.verifyElectionResult,
     );
-    final canDispute = TgcgPermissionPolicy.allows(
-      session.role!,
+    final canDispute = TgcgAccessPolicy.allows(
+      context,
       TgcgCapability.disputeElectionResult,
     );
 
@@ -1408,11 +1445,27 @@ class _ReviewTileState extends State<_ReviewTile> {
     setState(() => busy = true);
     try {
       final session = widget.session;
+      final role = TgcgAccessPolicy.roleFor(
+        context,
+        TgcgCapability.verifyElectionResult,
+        targetScope: widget.item.pollingUnitScope,
+        listen: false,
+      );
+      final scope = TgcgAccessPolicy.authorizingScope(
+        context,
+        TgcgCapability.verifyElectionResult,
+        targetScope: widget.item.pollingUnitScope,
+        listen: false,
+      );
+      if (role == null || scope == null) {
+        if (mounted) _showDenied(context);
+        return;
+      }
       final ok = await ResultOperations.of(context, listen: false).verify(
         submissionId: widget.item.id,
         verifierId: session.accessId.isEmpty ? session.operatorName : session.accessId,
-        role: session.role!,
-        userScope: session.scope,
+        role: role,
+        userScope: scope,
       );
       if (!mounted) return;
       if (!ok) _showDenied(context);
@@ -1453,12 +1506,28 @@ class _ReviewTileState extends State<_ReviewTile> {
     setState(() => busy = true);
     try {
       final session = widget.session;
+      final role = TgcgAccessPolicy.roleFor(
+        context,
+        TgcgCapability.disputeElectionResult,
+        targetScope: widget.item.pollingUnitScope,
+        listen: false,
+      );
+      final scope = TgcgAccessPolicy.authorizingScope(
+        context,
+        TgcgCapability.disputeElectionResult,
+        targetScope: widget.item.pollingUnitScope,
+        listen: false,
+      );
+      if (role == null || scope == null) {
+        if (mounted) _showDenied(context);
+        return;
+      }
       final ok = await ResultOperations.of(context, listen: false).dispute(
         submissionId: widget.item.id,
         reviewerId: session.accessId.isEmpty ? session.operatorName : session.accessId,
         reason: reason,
-        role: session.role!,
-        userScope: session.scope,
+        role: role,
+        userScope: scope,
       );
       if (!mounted) return;
       if (!ok) _showDenied(context);

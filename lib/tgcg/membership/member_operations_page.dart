@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../access/access_policy.dart';
 import '../assignments/assignment_store.dart';
 import '../devices/managed_device_store.dart';
 import '../domain/permissions.dart';
+import '../governance/governance_store.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
 import 'membership_store.dart';
@@ -30,11 +32,36 @@ class _MemberOperationsPageState extends State<MemberOperationsPage> {
     final membership = MembershipOperations.of(context);
     final assignments = Assignments.of(context);
     final devices = ManagedDevices.of(context);
+    final governance = GovernanceOperations.of(context);
+
+    final memberScopes = <GeographicScope>[
+      ...TgcgAccessPolicy.scopesFor(
+        context,
+        TgcgCapability.manageMembership,
+      ),
+      ...TgcgAccessPolicy.scopesFor(
+        context,
+        TgcgCapability.manageAssignments,
+      ),
+      ...TgcgAccessPolicy.scopesFor(
+        context,
+        TgcgCapability.manageRoleAssignments,
+      ),
+    ];
+    final effectiveMemberScopes =
+        memberScopes.isEmpty ? <GeographicScope>[session.scope] : memberScopes;
+
+    bool memberVisible(TgcgMember member) {
+      final scope = membership.registrationScopeForMember(member.id);
+      return scope != null &&
+          effectiveMemberScopes.any(
+            (authority) =>
+                TgcgPermissionPolicy.scopeAllows(authority, scope),
+          );
+    }
 
     final visibleMembers = membership.members.where((member) {
-      final scope = membership.registrationScopeForMember(member.id);
-      if (scope == null) return false;
-      if (!TgcgPermissionPolicy.scopeAllows(session.scope, scope)) return false;
+      if (!memberVisible(member)) return false;
 
       final active = assignments.activeAssignmentsForMember(member.id);
       final managedDevice = devices.deviceForMember(member.id);
@@ -72,11 +99,8 @@ class _MemberOperationsPageState extends State<MemberOperationsPage> {
         ? null
         : membership.memberById(selectedMemberId!);
 
-    final scopedMembers = membership.members.where((member) {
-      final scope = membership.registrationScopeForMember(member.id);
-      return scope != null &&
-          TgcgPermissionPolicy.scopeAllows(session.scope, scope);
-    }).toList(growable: false);
+    final scopedMembers =
+        membership.members.where(memberVisible).toList(growable: false);
     final scopedMemberIds = scopedMembers.map((member) => member.id).toSet();
     final scopedAssignments = assignments.assignments
         .where((item) => scopedMemberIds.contains(item.memberId))
@@ -99,14 +123,12 @@ class _MemberOperationsPageState extends State<MemberOperationsPage> {
         .where((member) => devices.deviceForMember(member.id) != null)
         .length;
 
-    final canAssign = TgcgPermissionPolicy.may(
-      session.role!,
-      session.scope,
-      TgcgCapability.manageAgentAssignments,
+    final canAssign = TgcgAccessPolicy.allows(
+      context,
+      TgcgCapability.manageAssignments,
     );
-    final canEnroll = TgcgPermissionPolicy.may(
-      session.role!,
-      session.scope,
+    final canEnroll = TgcgAccessPolicy.allows(
+      context,
       TgcgCapability.manageMembership,
     );
 
@@ -117,7 +139,7 @@ class _MemberOperationsPageState extends State<MemberOperationsPage> {
           eyebrow: 'ONE MEMBER REGISTRY',
           title: 'Member Operations',
           subtitle:
-              '${session.scope.label}: every person follows the same enrolment process. Jobs, field duties and temporary deployment are attached later as assignments without creating a second member identity.',
+              '${effectiveMemberScopes.length} authorized scope${effectiveMemberScopes.length == 1 ? '' : 's'}: one permanent member identity with roles and assignments attached separately.',
           trailing: Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -125,7 +147,7 @@ class _MemberOperationsPageState extends State<MemberOperationsPage> {
               if (canEnroll)
                 OutlinedButton.icon(
                   onPressed: () =>
-                      widget.onOpenModule(TgcgModule.accreditation),
+                      widget.onOpenModule(TgcgModule.memberEnrollment),
                   icon: const Icon(Icons.person_add_alt_1_rounded),
                   label: const Text('Enrol member'),
                 ),
@@ -227,6 +249,7 @@ class _MemberOperationsPageState extends State<MemberOperationsPage> {
               membership: membership,
               assignments: assignments,
               devices: devices,
+              governance: governance,
               canAssign: canAssign,
               onOpenAssignments: () =>
                   widget.onOpenModule(TgcgModule.assignmentControl),
@@ -486,6 +509,7 @@ class _MemberInspector extends StatelessWidget {
     required this.membership,
     required this.assignments,
     required this.devices,
+    required this.governance,
     required this.canAssign,
     required this.onOpenAssignments,
   });
@@ -494,6 +518,7 @@ class _MemberInspector extends StatelessWidget {
   final MembershipOperationsController membership;
   final AssignmentController assignments;
   final ManagedDeviceController devices;
+  final GovernanceOperationsController governance;
   final bool canAssign;
   final VoidCallback onOpenAssignments;
 
@@ -517,9 +542,7 @@ class _MemberInspector extends StatelessWidget {
     final device = devices.deviceForMember(member.id);
     final history = assignments.assignmentsForMember(member.id);
     final active = history.where((item) => !item.isTerminal).toList();
-    final operationalProfiles = membership.agents
-        .where((item) => item.memberId == member.id)
-        .toList(growable: false);
+    final activeRoles = governance.activeRolesForMember(member.id);
 
     return TgcgSectionCard(
       padding: EdgeInsets.zero,
@@ -633,10 +656,10 @@ class _MemberInspector extends StatelessWidget {
                       'No organization-managed phone is currently bound.',
                 ),
                 const SizedBox(height: 12),
-                const _InspectorTitle('Operational qualifications'),
-                if (operationalProfiles.isEmpty)
+                const _InspectorTitle('Active roles'),
+                if (activeRoles.isEmpty)
                   const Text(
-                    'No special operational qualification is recorded. This does not prevent the member from receiving a normal assignment.',
+                    'No active role is attached. The member can still receive authorized assignments.',
                     style: TextStyle(
                       color: TgcgColors.muted,
                       fontSize: 10.5,
@@ -644,20 +667,20 @@ class _MemberInspector extends StatelessWidget {
                     ),
                   )
                 else
-                  ...operationalProfiles.map(
-                    (profile) => Padding(
+                  ...activeRoles.map(
+                    (record) => Padding(
                       padding: const EdgeInsets.only(bottom: 7),
                       child: Row(
                         children: [
                           Icon(
-                            roleIcon(profile.role),
+                            roleIcon(record.role),
                             size: 17,
                             color: TgcgColors.primary,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              roleLabel(profile.role),
+                              roleLabel(record.role) + ' • ' + record.scope.label,
                               style: const TextStyle(
                                 color: TgcgColors.ink,
                                 fontSize: 10.5,
@@ -665,12 +688,9 @@ class _MemberInspector extends StatelessWidget {
                               ),
                             ),
                           ),
-                          TgcgStatusPill(
-                            label: profile.status.name.toUpperCase(),
-                            color: profile.status ==
-                                    AccreditationStatus.approved
-                                ? TgcgColors.success
-                                : TgcgColors.warning,
+                          const TgcgStatusPill(
+                            label: 'ACTIVE',
+                            color: TgcgColors.success,
                             compact: true,
                           ),
                         ],

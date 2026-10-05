@@ -12,21 +12,6 @@ abstract interface class MembershipRepository {
     String? email,
   });
 
-  Future<AccreditedAgent> accreditAgent({
-    required String memberId,
-    required String agentId,
-    required TgcgRole role,
-    required GeographicScope scope,
-    String? registeredPhoneNumber,
-    String? deviceId,
-    String? simFingerprint,
-  });
-
-  Future<List<AccreditedAgent>> listAgents({
-    GeographicScope? scope,
-    TgcgRole? role,
-    AccreditationStatus? status,
-  });
 }
 
 abstract interface class IncidentRepository {

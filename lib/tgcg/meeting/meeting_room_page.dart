@@ -298,7 +298,11 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
       kind: kind,
       status: _MeetingStatus.live,
       participants: [
-        _Participant(name: session.operatorName, role: roleLabel(session.role!)),
+        _Participant(name: session.operatorName, role: TgcgAccessPolicy.actorLabelFor(
+          context,
+          TgcgCapability.startMeeting,
+          listen: false,
+        )),
         const _Participant(name: 'State Operations Desk', role: 'Operations'),
         if (kind == _MeetingKind.conference)
           const _Participant(name: 'Technical Support', role: 'Support Desk'),
@@ -327,7 +331,11 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
       kind: video ? _MeetingKind.video : _MeetingKind.audio,
       status: _MeetingStatus.live,
       participants: [
-        _Participant(name: session.operatorName, role: roleLabel(session.role!)),
+        _Participant(name: session.operatorName, role: TgcgAccessPolicy.actorLabelFor(
+          context,
+          TgcgCapability.startMeeting,
+          listen: false,
+        )),
         person,
       ],
     );
@@ -450,7 +458,11 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
             participants: [
               _Participant(
                 name: session.operatorName,
-                role: roleLabel(session.role!),
+                role: TgcgAccessPolicy.actorLabelFor(
+          context,
+          TgcgCapability.startMeeting,
+          listen: false,
+        ),
               ),
             ],
           ),

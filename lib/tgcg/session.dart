@@ -7,7 +7,7 @@ export 'domain/models.dart';
 
 enum TgcgModule {
   overview,
-  accreditation,
+  memberEnrollment,
   membershipNetwork,
   roleAssignment,
   geography,
@@ -248,9 +248,8 @@ Set<TgcgModule> modulesForCapabilities(
   final modules = <TgcgModule>{TgcgModule.overview};
   bool has(TgcgCapability capability) => capabilities.contains(capability);
 
-  if (has(TgcgCapability.manageMembership) ||
-      has(TgcgCapability.accreditAgents)) {
-    modules.add(TgcgModule.accreditation);
+  if (has(TgcgCapability.manageMembership)) {
+    modules.add(TgcgModule.memberEnrollment);
   }
   if (role == TgcgRole.stateAdministrator) {
     modules.add(TgcgModule.membershipNetwork);
@@ -261,14 +260,15 @@ Set<TgcgModule> modulesForCapabilities(
   }
   if (has(TgcgCapability.viewGeography)) {
     modules.add(TgcgModule.geography);
-    if (role != TgcgRole.pollingUnitAgent && role != TgcgRole.observer) {
+    if (role != TgcgRole.member &&
+        role != TgcgRole.pollingUnitAgent &&
+        role != TgcgRole.observer) {
       modules.add(TgcgModule.liveOperations);
       modules.add(TgcgModule.aiAnalytics);
       modules.add(TgcgModule.alertCenter);
     }
   }
-  if (has(TgcgCapability.manageAssignments) ||
-      has(TgcgCapability.manageAgentAssignments)) {
+  if (has(TgcgCapability.manageAssignments)) {
     modules.add(TgcgModule.assignmentControl);
   }
   if (has(TgcgCapability.viewIncidents) ||

@@ -131,27 +131,34 @@ class ReportOperationsController extends ChangeNotifier {
     required TgcgRole role,
     required GeographicScope userScope,
     required GeographicScope targetScope,
+    Set<TgcgCapability>? effectiveCapabilities,
   }) {
-    if (!TgcgPermissionPolicy.may(
-      role,
-      userScope,
-      TgcgCapability.exportReports,
-      targetScope: targetScope,
-    )) {
+    final scopedCapabilities = effectiveCapabilities;
+    if (scopedCapabilities == null) {
+      if (!TgcgPermissionPolicy.may(
+        role,
+        userScope,
+        TgcgCapability.exportReports,
+        targetScope: targetScope,
+      )) {
+        return false;
+      }
+    } else if (!scopedCapabilities.contains(TgcgCapability.exportReports)) {
       return false;
     }
     if (!GeographyRegistry.scopeContains(userScope, targetScope)) return false;
 
-    bool allows(TgcgCapability capability) =>
-        TgcgPermissionPolicy.allows(role, capability);
+    bool allows(TgcgCapability capability) => scopedCapabilities != null
+        ? scopedCapabilities.contains(capability)
+        : TgcgPermissionPolicy.allows(role, capability);
 
     return switch (kind) {
       ReportKind.incidentSummary => allows(TgcgCapability.viewIncidents),
       ReportKind.fieldActivity => allows(TgcgCapability.viewIncidents),
       ReportKind.accreditationReadiness =>
         allows(TgcgCapability.manageMembership) ||
-            allows(TgcgCapability.accreditAgents) ||
-            allows(TgcgCapability.manageAgentAssignments),
+            allows(TgcgCapability.manageAssignments) ||
+            allows(TgcgCapability.manageRoleAssignments),
       ReportKind.verifiedCollation => allows(TgcgCapability.viewCollation),
       ReportKind.evidencePackage => allows(TgcgCapability.viewEvidence),
       ReportKind.auditTrail => allows(TgcgCapability.viewAudit),
@@ -168,6 +175,7 @@ class ReportOperationsController extends ChangeNotifier {
     required String actorId,
     required TgcgRole role,
     required GeographicScope userScope,
+    Set<TgcgCapability>? effectiveCapabilities,
     int? recordCount,
   }) {
     if (!canExportKind(
@@ -175,6 +183,7 @@ class ReportOperationsController extends ChangeNotifier {
       role: role,
       userScope: userScope,
       targetScope: targetScope,
+      effectiveCapabilities: effectiveCapabilities,
     )) {
       return null;
     }
