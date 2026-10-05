@@ -74,7 +74,7 @@ Future<void> showSubmittedAssignmentAiReport(
   final children = group == null
       ? [assignment!]
       : assignments.assignmentsForGroup(group.id);
-  final report = _buildReport(
+  final report = buildSubmittedAiReport(
     children: children,
     title: group?.title ?? assignment!.title,
     assignments: assignments,
@@ -199,7 +199,7 @@ Future<void> showSubmittedAssignmentAiReport(
   );
 }
 
-SubmittedAiReport _buildReport({
+SubmittedAiReport buildSubmittedAiReport({
   required List<MemberAssignment> children,
   required String title,
   required AssignmentController assignments,
