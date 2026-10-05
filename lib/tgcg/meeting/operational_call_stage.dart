@@ -296,16 +296,23 @@ class IncomingOperationalCallCard extends StatelessWidget {
           IconButton.filled(
             tooltip: 'Answer',
             onPressed: () async {
-              await calls.answerCall(
-                callId: call.id,
-                memberId: memberId,
-              );
-              if (!context.mounted) return;
-              await Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => OperationalCallStage(callId: call.id),
-                ),
-              );
+              try {
+                await calls.answerCall(
+                  callId: call.id,
+                  memberId: memberId,
+                );
+                if (!context.mounted) return;
+                await Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => OperationalCallStage(callId: call.id),
+                  ),
+                );
+              } on StateError catch (error) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(error.message)),
+                );
+              }
             },
             icon: Icon(
               call.kind == OperationalCallKind.audio
