@@ -138,13 +138,13 @@ class TgcgAccessPolicy {
         .length;
     if (roleCount == 0 && assignmentCount == 0) return 'Member';
     if (roleCount == 0) {
-      return '\$assignmentCount active assignment\${assignmentCount == 1 ? '' : 's'}';
+      return '$assignmentCount active assignment${assignmentCount == 1 ? '' : 's'}';
     }
     if (assignmentCount == 0) {
-      return '\$roleCount active role\${roleCount == 1 ? '' : 's'}';
+      return '$roleCount active role${roleCount == 1 ? '' : 's'}';
     }
-    return '\$roleCount role\${roleCount == 1 ? '' : 's'} • '
-        '\$assignmentCount assignment\${assignmentCount == 1 ? '' : 's'}';
+    return '$roleCount role${roleCount == 1 ? '' : 's'} • '
+        '$assignmentCount assignment${assignmentCount == 1 ? '' : 's'}';
   }
 
   static String actorLabelFor(
@@ -234,10 +234,10 @@ class TgcgAccessPolicy {
   }
 
   static String _scopeKey(GeographicScope scope) =>
-      '\${scope.level.name}:\${scope.country}:\${scope.zoneId ?? ''}:'
-      '\${scope.stateId ?? ''}:\${scope.senatorialDistrictId ?? ''}:'
-      '\${scope.lgaId ?? ''}:\${scope.wardId ?? ''}:'
-      '\${scope.pollingUnitId ?? ''}';
+      '${scope.level.name}:${scope.country}:${scope.zoneId ?? ''}:'
+      '${scope.stateId ?? ''}:${scope.senatorialDistrictId ?? ''}:'
+      '${scope.lgaId ?? ''}:${scope.wardId ?? ''}:'
+      '${scope.pollingUnitId ?? ''}';
 
   static int _roleRank(TgcgRole role) => switch (role) {
         TgcgRole.stateAdministrator => 100,
