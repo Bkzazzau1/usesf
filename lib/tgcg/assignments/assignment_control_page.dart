@@ -1288,7 +1288,8 @@ String _assignmentCapabilityLabel(TgcgCapability capability) =>
       TgcgCapability.viewMeetingRoom => 'Meeting rooms',
       TgcgCapability.startMeeting => 'Start meetings',
       TgcgCapability.joinMeeting => 'Join meetings',
-      TgcgCapability.viewEvidence => 'Evidence',
+      TgcgCapability.viewEvidence => 'View evidence',
+      TgcgCapability.captureEvidence => 'Capture evidence',
       _ => capability.name,
     };
 
