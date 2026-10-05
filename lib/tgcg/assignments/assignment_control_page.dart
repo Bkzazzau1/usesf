@@ -1463,6 +1463,13 @@ class _AssignmentList extends StatelessWidget {
                 children: assignments.map((assignment) {
                   final member = membership.memberById(assignment.memberId);
                   final presence = controller.presenceFor(assignment);
+                  final targetUnit = assignment.targetPollingUnitId == null
+                      ? null
+                      : membership.geography
+                          .pollingUnit(assignment.targetPollingUnitId!);
+                  final coordinateReady =
+                      targetUnit?.operationalLatitude != null &&
+                          targetUnit?.operationalLongitude != null;
                   return Container(
                     width: double.infinity,
                     margin: const EdgeInsets.only(bottom: 9),
@@ -1527,6 +1534,19 @@ class _AssignmentList extends StatelessWidget {
                                     color: _presenceColor(presence),
                                     compact: true,
                                   ),
+                                  if (targetUnit != null)
+                                    TgcgStatusPill(
+                                      label: coordinateReady
+                                          ? 'GPS READY'
+                                          : 'GPS MISSING',
+                                      color: coordinateReady
+                                          ? TgcgColors.success
+                                          : TgcgColors.warning,
+                                      icon: coordinateReady
+                                          ? Icons.gps_fixed_rounded
+                                          : Icons.location_off_outlined,
+                                      compact: true,
+                                    ),
                                   if (assignment.deviceId != null)
                                     TgcgStatusPill(
                                       label: assignment.deviceId!,
