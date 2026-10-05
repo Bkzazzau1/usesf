@@ -3,6 +3,8 @@ import 'package:flutter/widgets.dart';
 import '../assignments/assignment_store.dart';
 import '../devices/managed_device_store.dart';
 import '../domain/local_id.dart';
+import '../domain/models.dart';
+import '../geography/geography_registry.dart';
 import '../offline/offline_payloads.dart';
 import '../offline/offline_persistence.dart';
 
@@ -316,6 +318,7 @@ class AssignmentEdgeAiController extends ChangeNotifier {
   Future<AssignmentEdgeAiProfile> updateProfile({
     required String assignmentId,
     required String updatedBy,
+    required GeographicScope authorizedScope,
     bool? enabled,
     AssignmentEdgeAiMode? mode,
     Set<AssignmentEdgeAiCapability>? capabilities,
@@ -323,6 +326,14 @@ class AssignmentEdgeAiController extends ChangeNotifier {
     final assignment = _assignments.assignmentById(assignmentId);
     if (assignment == null) {
       throw ArgumentError('Unknown assignment: $assignmentId');
+    }
+    if (!GeographyRegistry.scopeContains(
+      authorizedScope,
+      assignment.targetScope,
+    )) {
+      throw StateError(
+        'This assignment is outside the coordinator authorization scope.',
+      );
     }
     final current = profileFor(assignmentId);
     final updated = current.copyWith(
@@ -375,10 +386,23 @@ class AssignmentEdgeAiController extends ChangeNotifier {
   Future<AssignmentEdgeAiEvent> resolveEvent({
     required String eventId,
     required String resolvedBy,
+    required GeographicScope authorizedScope,
   }) async {
     final index = _events.indexWhere((item) => item.id == eventId);
     if (index < 0) throw ArgumentError('Unknown AI event: $eventId');
     final current = _events[index];
+    final assignment = _assignments.assignmentById(current.assignmentId);
+    if (assignment == null) {
+      throw StateError('The assignment for this AI event is unavailable.');
+    }
+    if (!GeographyRegistry.scopeContains(
+      authorizedScope,
+      assignment.targetScope,
+    )) {
+      throw StateError(
+        'This AI event is outside the coordinator authorization scope.',
+      );
+    }
     if (!current.isOpen) return current;
     final updated = current.copyWith(
       resolvedAt: DateTime.now().toUtc(),
@@ -429,7 +453,7 @@ class AssignmentEdgeAiController extends ChangeNotifier {
               label: 'GPS missing',
             ),
           );
-          score -= 22;
+          score -= 25;
           break;
         case AssignmentPresence.stale:
           findings.add(
@@ -495,7 +519,7 @@ class AssignmentEdgeAiController extends ChangeNotifier {
               label: 'Device heartbeat stale',
             ),
           );
-          score -= 16;
+          score -= 20;
         }
         final battery = device.batteryPercent;
         if (battery != null && battery <= 15) {
