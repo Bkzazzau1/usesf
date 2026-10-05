@@ -471,16 +471,20 @@ class _MemberRow extends StatelessWidget {
     final contact = member.phoneNumber.trim().isNotEmpty
         ? member.phoneNumber
         : member.email ?? 'No contact';
-    final statusColor = switch (member.accountStatus) {
-      MemberAccountStatus.pendingActivation => TgcgColors.warning,
-      MemberAccountStatus.active => TgcgColors.success,
-      MemberAccountStatus.blocked => TgcgColors.danger,
-    };
-    final statusLabel = switch (member.accountStatus) {
-      MemberAccountStatus.pendingActivation => 'PENDING',
-      MemberAccountStatus.active => 'ACTIVE',
-      MemberAccountStatus.blocked => 'BLOCKED',
-    };
+    final statusColor = member.isBlocked
+        ? TgcgColors.danger
+        : switch (member.accountStatus) {
+            MemberAccountStatus.pendingActivation => TgcgColors.warning,
+            MemberAccountStatus.active => TgcgColors.success,
+            MemberAccountStatus.blocked => TgcgColors.danger,
+          };
+    final statusLabel = member.isBlocked
+        ? 'BLOCKED'
+        : switch (member.accountStatus) {
+            MemberAccountStatus.pendingActivation => 'PENDING',
+            MemberAccountStatus.active => 'ACTIVE',
+            MemberAccountStatus.blocked => 'BLOCKED',
+          };
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
