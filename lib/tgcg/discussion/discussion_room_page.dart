@@ -200,7 +200,10 @@ class _DiscussionRoomPageState extends State<DiscussionRoomPage> {
                   _PostComposer(
                     controller: postController,
                     operatorName: session.operatorName,
-                    role: roleLabel(session.role!),
+                    role: TgcgAccessPolicy.actorLabelFor(
+                      context,
+                      TgcgCapability.createDiscussionThread,
+                    ),
                     onPost: () => _publishPost(session),
                   ),
                   const SizedBox(height: 14),
@@ -261,12 +264,24 @@ class _DiscussionRoomPageState extends State<DiscussionRoomPage> {
   void _publishPost(TgcgSessionController session) {
     final text = postController.text.trim();
     if (text.isEmpty) return;
+    final scope = TgcgAccessPolicy.authorizingScope(
+          context,
+          TgcgCapability.createDiscussionThread,
+          listen: false,
+        ) ??
+        session.scope;
+    final actorLabel = TgcgAccessPolicy.actorLabelFor(
+      context,
+      TgcgCapability.createDiscussionThread,
+      targetScope: scope,
+      listen: false,
+    );
     setState(() {
       final post = _SocialPost(
         id: 'POST-${1000 + posts.length + 1}',
         author: session.operatorName,
-        role: roleLabel(session.role!),
-        scope: session.scope.label,
+        role: actorLabel,
+        scope: scope.label,
         body: text,
         time: _timeNow(),
         category: 'Operations',
@@ -286,7 +301,11 @@ class _DiscussionRoomPageState extends State<DiscussionRoomPage> {
       post.comments.add(
         _SocialComment(
           author: session.operatorName,
-          role: roleLabel(session.role!),
+          role: TgcgAccessPolicy.actorLabelFor(
+            context,
+            TgcgCapability.postDiscussionReply,
+            listen: false,
+          ),
           body: text,
           time: _timeNow(),
         ),
@@ -746,12 +765,17 @@ class _ProfileCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    roleLabel(session.role!),
+                    TgcgAccessPolicy.accessSummary(context),
                     style: const TextStyle(color: TgcgColors.muted, fontSize: 10),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    session.scope.label,
+                    TgcgAccessPolicy.scopesForAny(
+        context,
+        TgcgAccessPolicy.capabilities(context),
+      ).length > 1
+          ? 'Multiple authorized scopes'
+          : session.scope.label,
                     style: const TextStyle(color: TgcgColors.muted, fontSize: 9.5),
                   ),
                 ],
