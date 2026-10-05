@@ -86,13 +86,6 @@ enum IncidentStatus {
   closed,
 }
 
-enum AccreditationStatus {
-  pending,
-  approved,
-  suspended,
-  revoked,
-}
-
 enum EvidenceType {
   photo,
   video,
@@ -206,38 +199,6 @@ class TgcgMember {
   final RecordOrigin origin;
 
   bool get isBlocked => accountStatus == MemberAccountStatus.blocked;
-}
-
-class AccreditedAgent {
-  const AccreditedAgent({
-    required this.id,
-    required this.memberId,
-    required this.agentId,
-    required this.role,
-    required this.scope,
-    required this.status,
-    required this.createdAt,
-    this.registeredPhoneNumber,
-    this.deviceId,
-    this.simFingerprint,
-    this.biometricEnrolled = false,
-    this.trainingCompleted = false,
-    this.origin = RecordOrigin.localEntry,
-  });
-
-  final String id;
-  final String memberId;
-  final String agentId;
-  final TgcgRole role;
-  final GeographicScope scope;
-  final AccreditationStatus status;
-  final DateTime createdAt;
-  final String? registeredPhoneNumber;
-  final String? deviceId;
-  final String? simFingerprint;
-  final bool biometricEnrolled;
-  final bool trainingCompleted;
-  final RecordOrigin origin;
 }
 
 class EvidenceAttachment {
