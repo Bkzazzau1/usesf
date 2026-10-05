@@ -32,9 +32,15 @@ Member
 
 A person is registered once as a member. Agent, coordinator and functional responsibilities are roles attached to that member rather than separate identities.
 
-Normal self-registration requires PVC/VIN capture and a live selfie. The PVC image is used for extraction and is not retained. Structured PVC/VIN and home polling-unit data remain attached to the member profile. State Coordinator and backend System Admin are the authorized exception for creating a member without PVC.
+Normal self-registration requires PVC/VIN capture and a live selfie. The PVC image is used for extraction and is not retained. Structured PVC/VIN and home polling-unit data remain attached to the member profile.
 
-A member signs in with PVC/VIN, phone number or email plus password. Phone and email are optional at initial registration. A verified email becomes the password-recovery anchor and can only be changed by the backend System Admin.
+The Kaduna State Coordinator has a separate command enrolment workflow. The coordinator may create a permanent member identity using full name plus at least one contact method (phone or email), without PVC, selfie, password or home polling unit. The new identity is created in Pending Activation state at Kaduna State scope and may receive authorized roles immediately.
+
+A coordinator-created member activates the same permanent identity later by finding the account with phone or email and setting the first password. Password creation changes Pending Activation to Active; role assignments made before activation remain attached to the same member. Identity review does not bypass first-password activation.
+
+A member signs in with PVC/VIN, phone number or email plus password. Phone and email are optional for normal PVC-based registration, while State Coordinator quick enrolment requires at least one of them. A verified email becomes the password-recovery anchor and can only be changed by the backend System Admin.
+
+Phone numbers and email addresses supplied during member creation are checked against existing member identities to reduce duplicate enrolment.
 
 A member with neither an active role nor an active assignment remains in the restricted waiting workspace.
 

@@ -79,7 +79,6 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
       TgcgCapability.manageMembership,
     );
     final canCreateWithoutPvc =
-        membershipRole == TgcgRole.stateCoordinator ||
         membershipRole == TgcgRole.stateAdministrator;
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 36),
@@ -88,7 +87,7 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
           eyebrow: 'PVC IDENTITY ENROLMENT',
           title: 'Member Enrolment',
           subtitle:
-              'Create the permanent member identity and home polling-unit relationship. Normal registration uses PVC; State Coordinator may create a member manually without it.',
+              'Create the permanent member identity and home polling-unit relationship from PVC registration.',
           trailing: TgcgStatusPill(
             label: '${store.members.length} MEMBERS',
             color: TgcgColors.primary,
@@ -199,7 +198,6 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
       listen: false,
     );
     final canCreateWithoutPvc =
-        membershipRole == TgcgRole.stateCoordinator ||
         membershipRole == TgcgRole.stateAdministrator;
     final voterId = _voterId.text.trim();
     final hasPvc = _scan != null;
@@ -364,7 +362,7 @@ class _ScannerPanel extends StatelessWidget {
   Widget build(BuildContext context) => TgcgSectionCard(
         title: 'PVC recognition',
         subtitle:
-            'Capture the card for normal enrolment. State-level authorized manual creation may proceed without a PVC.',
+            'Capture the card for PVC-based enrolment.',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -497,7 +495,7 @@ class _IdentityForm extends StatelessWidget {
   Widget build(BuildContext context) => TgcgSectionCard(
         title: 'Confirm identity',
         subtitle:
-            'Review the PVC information when available. State-level membership authority can also create a member manually without a PVC.',
+            'Review the PVC identity information before creating the member.',
         child: Column(
           children: [
             TextField(
@@ -511,7 +509,7 @@ class _IdentityForm extends StatelessWidget {
               enabled: enabled,
               decoration: InputDecoration(
                 labelText: canCreateWithoutPvc
-                    ? 'PVC / VIN (optional for state-level manual creation)'
+                    ? 'PVC / VIN (optional for administrator manual creation)'
                     : 'PVC / VIN',
               ),
             ),

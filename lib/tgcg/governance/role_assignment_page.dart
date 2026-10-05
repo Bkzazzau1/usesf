@@ -8,7 +8,12 @@ import '../ui/tgcg_design.dart';
 import 'governance_store.dart';
 
 class RoleAssignmentPage extends StatefulWidget {
-  const RoleAssignmentPage({super.key});
+  const RoleAssignmentPage({
+    super.key,
+    this.initialMemberId,
+  });
+
+  final String? initialMemberId;
 
   @override
   State<RoleAssignmentPage> createState() => _RoleAssignmentPageState();
@@ -16,6 +21,13 @@ class RoleAssignmentPage extends StatefulWidget {
 
 class _RoleAssignmentPageState extends State<RoleAssignmentPage> {
   String? selectedMemberId;
+
+  @override
+  void initState() {
+    super.initState();
+    selectedMemberId = widget.initialMemberId;
+  }
+
   TgcgRole selectedRole = TgcgRole.stateCoordinator;
   String? selectedScopeKey;
   String search = '';

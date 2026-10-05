@@ -62,6 +62,7 @@ enum RecordOrigin {
 }
 
 enum MemberAccountStatus {
+  pendingActivation,
   active,
   blocked,
 }
@@ -198,7 +199,12 @@ class TgcgMember {
   final RecordStatus status;
   final RecordOrigin origin;
 
-  bool get isBlocked => accountStatus == MemberAccountStatus.blocked;
+  bool get isBlocked =>
+      accountStatus == MemberAccountStatus.blocked ||
+      identityReview == MemberIdentityReview.suspicious;
+  bool get isPendingActivation =>
+      accountStatus == MemberAccountStatus.pendingActivation;
+  bool get isActive => accountStatus == MemberAccountStatus.active;
 }
 
 class EvidenceAttachment {

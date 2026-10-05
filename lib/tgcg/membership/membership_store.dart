@@ -536,8 +536,12 @@ class MembershipOperationsController extends ChangeNotifier {
     required String memberId,
     required String password,
   }) async {
-    if (memberById(memberId) == null) {
+    final member = memberById(memberId);
+    if (member == null) {
       throw ArgumentError('Unknown member: $memberId');
+    }
+    if (member.isBlocked) {
+      throw StateError('Blocked member accounts cannot set a password.');
     }
     if (password.length < 8) {
       throw ArgumentError('Password must contain at least 8 characters.');
@@ -561,6 +565,23 @@ class MembershipOperationsController extends ChangeNotifier {
         'hash': credential.hash,
       }),
     );
+
+    if (member.accountStatus == MemberAccountStatus.pendingActivation) {
+      final index = _members.indexWhere((item) => item.id == memberId);
+      final activated = _copyMember(
+        member,
+        accountStatus: MemberAccountStatus.active,
+      );
+      final scope = _memberScopes[memberId] ?? GeographicScope.kaduna;
+      await _persistMemberState(
+        activated,
+        scope,
+        _memberPollingUnits[memberId],
+      );
+      if (index >= 0) {
+        _members[index] = activated;
+      }
+    }
     notifyListeners();
   }
 
@@ -723,8 +744,8 @@ class MembershipOperationsController extends ChangeNotifier {
     return updated;
   }
 
-  /// Backend identity-review operation. A suspicious finding blocks the
-  /// account immediately; a later verified finding reactivates the same member.
+  /// Backend identity-review operation. A suspicious finding blocks access
+  /// immediately without changing whether first-password activation is complete.
   Future<TgcgMember> setIdentityReview({
     required String memberId,
     required MemberIdentityReview review,
@@ -735,9 +756,6 @@ class MembershipOperationsController extends ChangeNotifier {
     final updated = _copyMember(
       current,
       identityReview: review,
-      accountStatus: review == MemberIdentityReview.suspicious
-          ? MemberAccountStatus.blocked
-          : MemberAccountStatus.active,
     );
     final scope = _memberScopes[memberId] ?? GeographicScope.kaduna;
     await _persistMemberState(
@@ -804,7 +822,25 @@ class MembershipOperationsController extends ChangeNotifier {
     String? homePollingUnitId,
     String? pvcPollingUnitCode,
     String? linkedBy,
+    MemberAccountStatus accountStatus = MemberAccountStatus.active,
   }) async {
+    final normalizedName = fullName.trim();
+    final normalizedPhone = _normalizePhone(phoneNumber);
+    final normalizedEmail = email?.trim().toLowerCase() ?? '';
+    if (normalizedName.isEmpty) {
+      throw ArgumentError('Member name is required.');
+    }
+    if (normalizedPhone.isNotEmpty && memberByPhone(phoneNumber) != null) {
+      throw StateError(
+        'This phone number is already registered to a USESF member.',
+      );
+    }
+    if (normalizedEmail.isNotEmpty && memberByEmail(normalizedEmail) != null) {
+      throw StateError(
+        'This email address is already registered to a USESF member.',
+      );
+    }
+
     final normalizedVin = _normalizePvcCredential(pvcVin ?? '');
     if (normalizedVin.isNotEmpty) {
       final existing = await memberByPvcVin(normalizedVin);
@@ -825,16 +861,16 @@ class MembershipOperationsController extends ChangeNotifier {
 
     final member = TgcgMember(
       id: 'MEM-${(_members.length + 1).toString().padLeft(4, '0')}',
-      fullName: fullName.trim(),
+      fullName: normalizedName,
       phoneNumber: phoneNumber.trim(),
-      email: email?.trim().isEmpty == true ? null : email?.trim(),
+      email: normalizedEmail.isEmpty ? null : email?.trim(),
       emailVerified: emailVerified,
       membershipNumber:
           'USESF-${(_members.length + 1).toString().padLeft(6, '0')}',
       pvcVin: normalizedVin.isEmpty ? null : normalizedVin,
       selfieReference:
           selfieReference?.trim().isEmpty == true ? null : selfieReference?.trim(),
-      accountStatus: MemberAccountStatus.active,
+      accountStatus: accountStatus,
       identityReview: MemberIdentityReview.pending,
       createdAt: DateTime.now().toUtc(),
       status: RecordStatus.submitted,
@@ -865,6 +901,60 @@ class MembershipOperationsController extends ChangeNotifier {
       _memberPollingUnits[member.id] = homeLink;
     }
     notifyListeners();
+    return member;
+  }
+
+  Future<TgcgMember> createStateCoordinatorMember({
+    required String fullName,
+    String phoneNumber = '',
+    String? email,
+    required String createdBy,
+    required TgcgRole createdByRole,
+    required GeographicScope authorizedScope,
+  }) async {
+    if (createdByRole != TgcgRole.stateCoordinator ||
+        authorizedScope.level != GeographyLevel.state ||
+        authorizedScope.stateId != GeographicScope.kaduna.stateId) {
+      throw StateError(
+        'Only the Kaduna State Coordinator can use quick member enrolment.',
+      );
+    }
+
+    final normalizedPhone = _normalizePhone(phoneNumber);
+    final normalizedEmail = email?.trim().toLowerCase() ?? '';
+    if (fullName.trim().isEmpty) {
+      throw ArgumentError('Enter the member full name.');
+    }
+    if (normalizedPhone.isEmpty && normalizedEmail.isEmpty) {
+      throw ArgumentError('Enter a phone number or email address.');
+    }
+
+    final member = await createMember(
+      fullName: fullName,
+      phoneNumber: phoneNumber,
+      email: email,
+      registrationScope: authorizedScope,
+      linkedBy: createdBy,
+      accountStatus: MemberAccountStatus.pendingActivation,
+    );
+
+    final now = DateTime.now().toUtc();
+    await _persistence.persistMutation(
+      entityType: 'member_creation_audit',
+      entityId: newLocalId(member.id, now),
+      mutationType: SyncMutationType.create,
+      scopeKey: scopeStorageKey(authorizedScope),
+      ownerId: member.id,
+      payload: {
+        'memberId': member.id,
+        'membershipNumber': member.membershipNumber,
+        'createdBy': createdBy,
+        'createdByRole': createdByRole.name,
+        'createdAt': now.toIso8601String(),
+        'method': 'state_coordinator_quick_enrolment',
+        'accountStatus': member.accountStatus.name,
+      },
+    );
     return member;
   }
 

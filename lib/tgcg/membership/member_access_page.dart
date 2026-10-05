@@ -16,6 +16,7 @@ class MemberAccessPage extends StatefulWidget {
 class _MemberAccessPageState extends State<MemberAccessPage> {
   final _identifier = TextEditingController();
   final _password = TextEditingController();
+  final _confirmPassword = TextEditingController();
 
   _MemberAccessMethod _method = _MemberAccessMethod.vin;
   TgcgMember? _member;
@@ -26,6 +27,7 @@ class _MemberAccessPageState extends State<MemberAccessPage> {
   void dispose() {
     _identifier.dispose();
     _password.dispose();
+    _confirmPassword.dispose();
     super.dispose();
   }
 
@@ -89,6 +91,7 @@ class _MemberAccessPageState extends State<MemberAccessPage> {
                                 _member = null;
                                 _identifier.clear();
                                 _password.clear();
+                                _confirmPassword.clear();
                                 _message = null;
                               }),
                     ),
@@ -152,17 +155,22 @@ class _MemberAccessPageState extends State<MemberAccessPage> {
                   else ...[
                     TgcgSectionCard(
                       title: 'Account found',
-                      subtitle:
-                          'Confirm the profile, then enter the member password.',
                       trailing: TgcgStatusPill(
-                        label:
-                            _member!.isBlocked ? 'BLOCKED' : 'ACCOUNT MATCHED',
+                        label: _member!.isBlocked
+                            ? 'BLOCKED'
+                            : _member!.isPendingActivation
+                                ? 'PENDING ACTIVATION'
+                                : 'ACCOUNT MATCHED',
                         color: _member!.isBlocked
                             ? TgcgColors.danger
-                            : TgcgColors.success,
+                            : _member!.isPendingActivation
+                                ? TgcgColors.warning
+                                : TgcgColors.success,
                         icon: _member!.isBlocked
                             ? Icons.block_rounded
-                            : Icons.check_circle_outline_rounded,
+                            : _member!.isPendingActivation
+                                ? Icons.schedule_rounded
+                                : Icons.check_circle_outline_rounded,
                         compact: true,
                       ),
                       child: Column(
@@ -211,45 +219,96 @@ class _MemberAccessPageState extends State<MemberAccessPage> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    TgcgSectionCard(
-                      title: 'Enter password',
-                      subtitle:
-                          'Your member account remains the same even when roles and assignments change.',
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          TextField(
-                            controller: _password,
-                            enabled: !_busy && !_member!.isBlocked,
-                            obscureText: true,
-                            onSubmitted: (_) => _authenticate(membership),
-                            decoration: const InputDecoration(
-                              labelText: 'Password',
-                              prefixIcon: Icon(Icons.lock_outline_rounded),
+                    if (_member!.isPendingActivation)
+                      TgcgSectionCard(
+                        title: 'Activate account',
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            TextField(
+                              controller: _password,
+                              enabled: !_busy && !_member!.isBlocked,
+                              obscureText: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Create password',
+                                helperText: 'Use at least 8 characters.',
+                                prefixIcon: Icon(Icons.lock_outline_rounded),
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 10),
-                          FilledButton.icon(
-                            onPressed: _busy || _member!.isBlocked
-                                ? null
-                                : () => _authenticate(membership),
-                            icon: const Icon(Icons.login_rounded),
-                            label: const Text('Continue'),
-                          ),
-                          const SizedBox(height: 8),
-                          TextButton(
-                            onPressed: _busy
-                                ? null
-                                : () => setState(() {
-                                      _member = null;
-                                      _password.clear();
-                                      _message = null;
-                                    }),
-                            child: const Text('Use another account'),
-                          ),
-                        ],
+                            const SizedBox(height: 10),
+                            TextField(
+                              controller: _confirmPassword,
+                              enabled: !_busy && !_member!.isBlocked,
+                              obscureText: true,
+                              onSubmitted: (_) => _activate(membership),
+                              decoration: const InputDecoration(
+                                labelText: 'Confirm password',
+                                prefixIcon:
+                                    Icon(Icons.lock_reset_outlined),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            FilledButton.icon(
+                              onPressed: _busy || _member!.isBlocked
+                                  ? null
+                                  : () => _activate(membership),
+                              icon: const Icon(Icons.verified_user_outlined),
+                              label: const Text('Activate & continue'),
+                            ),
+                            const SizedBox(height: 8),
+                            TextButton(
+                              onPressed: _busy
+                                  ? null
+                                  : () => setState(() {
+                                        _member = null;
+                                        _password.clear();
+                                        _confirmPassword.clear();
+                                        _message = null;
+                                      }),
+                              child: const Text('Use another account'),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      TgcgSectionCard(
+                        title: 'Enter password',
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            TextField(
+                              controller: _password,
+                              enabled: !_busy && !_member!.isBlocked,
+                              obscureText: true,
+                              onSubmitted: (_) => _authenticate(membership),
+                              decoration: const InputDecoration(
+                                labelText: 'Password',
+                                prefixIcon: Icon(Icons.lock_outline_rounded),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            FilledButton.icon(
+                              onPressed: _busy || _member!.isBlocked
+                                  ? null
+                                  : () => _authenticate(membership),
+                              icon: const Icon(Icons.login_rounded),
+                              label: const Text('Continue'),
+                            ),
+                            const SizedBox(height: 8),
+                            TextButton(
+                              onPressed: _busy
+                                  ? null
+                                  : () => setState(() {
+                                        _member = null;
+                                        _password.clear();
+                                        _confirmPassword.clear();
+                                        _message = null;
+                                      }),
+                              child: const Text('Use another account'),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
                   ],
                   if (_message != null) ...[
                     const SizedBox(height: 12),
@@ -307,8 +366,69 @@ class _MemberAccessPageState extends State<MemberAccessPage> {
         } else if (member.isBlocked) {
           _message =
               'This member account is blocked and cannot sign in. Contact the authorized support channel.';
+        } else if (member.isPendingActivation) {
+          _message = null;
         }
       });
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _activate(
+    MembershipOperationsController membership,
+  ) async {
+    final member = _member;
+    if (member == null || member.isBlocked || !member.isPendingActivation) {
+      return;
+    }
+
+    final password = _password.text;
+    if (password.length < 8) {
+      setState(() {
+        _message = 'Password must contain at least 8 characters.';
+      });
+      return;
+    }
+    if (password != _confirmPassword.text) {
+      setState(() {
+        _message = 'The passwords do not match.';
+      });
+      return;
+    }
+
+    setState(() {
+      _busy = true;
+      _message = null;
+    });
+
+    try {
+      await membership.setMemberPassword(
+        memberId: member.id,
+        password: password,
+      );
+      if (!mounted) return;
+
+      final activated = membership.memberById(member.id);
+      if (activated == null || !activated.isActive) {
+        setState(() {
+          _message = 'Account activation could not be completed.';
+        });
+        return;
+      }
+
+      setState(() => _member = activated);
+      await _authenticate(membership);
+    } on StateError catch (error) {
+      if (mounted) {
+        setState(() => _message = error.message);
+      }
+    } on ArgumentError catch (error) {
+      if (mounted) {
+        setState(
+          () => _message = error.message?.toString() ?? error.toString(),
+        );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -319,6 +439,12 @@ class _MemberAccessPageState extends State<MemberAccessPage> {
   ) async {
     final member = _member;
     if (member == null || member.isBlocked) return;
+    if (member.isPendingActivation) {
+      setState(() {
+        _message = 'Activate this account by creating a password first.';
+      });
+      return;
+    }
 
     final password = _password.text;
     if (password.isEmpty) {
