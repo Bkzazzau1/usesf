@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../access/access_policy.dart';
+import '../assignments/assignment_store.dart';
 import '../collation/collation_engine.dart';
+import '../domain/permissions.dart';
 import '../field/field_operations_store.dart';
 import '../governance/governance_store.dart';
 import '../membership/membership_store.dart';
@@ -26,33 +29,53 @@ class _ReportsPageState extends State<ReportsPage> {
     final session = TgcgSession.of(context);
     final field = FieldOperations.of(context);
     final membership = MembershipOperations.of(context);
+    final assignments = Assignments.of(context);
     final results = ResultOperations.of(context);
     final governance = GovernanceOperations.of(context);
     final reportStore = ReportOperations.of(context);
-    final scope = session.scope;
-    final role = session.role!;
+    final exportScopes = TgcgAccessPolicy.scopesFor(
+      context,
+      TgcgCapability.exportReports,
+    );
+    final scope = TgcgAccessPolicy.authorizingScope(
+          context,
+          TgcgCapability.exportReports,
+        ) ??
+        session.scope;
+    final role = TgcgAccessPolicy.roleFor(
+          context,
+          TgcgCapability.exportReports,
+          targetScope: scope,
+        ) ??
+        session.role!;
+    final effectiveCapabilities = TgcgAccessPolicy.capabilitiesForTarget(
+      context,
+      scope,
+    );
 
     bool canExport(ReportKind kind) => reportStore.canExportKind(
           kind: kind,
           role: role,
           userScope: scope,
           targetScope: scope,
+          effectiveCapabilities: effectiveCapabilities,
         );
 
     final incidents = field.incidentsForScope(scope);
     final fieldReports = field.reportsForScope(scope);
-    final agents = membership.agentsForScope(scope);
-    final approvedAgents = agents
-        .where((agent) => agent.status == AccreditationStatus.approved)
+    final members = membership.membersForScope(scope);
+    final activeAssignments = assignments.assignmentsForScope(scope)
+        .where((item) => !item.isTerminal)
         .toList(growable: false);
-    final readyAgents = approvedAgents
-        .where(
-          (agent) =>
-              agent.trainingCompleted &&
-              agent.biometricEnrolled &&
-              agent.deviceId != null &&
-              agent.simFingerprint != null,
-        )
+    final activeRoleRecords = governance.roleAssignmentsForScope(scope)
+        .where((item) => item.active)
+        .toList(growable: false);
+    final operationalMemberIds = <String>{
+      ...activeAssignments.map((item) => item.memberId),
+      ...activeRoleRecords.map((item) => item.subjectId),
+    };
+    final operationalMembers = members
+        .where((member) => operationalMemberIds.contains(member.id))
         .toList(growable: false);
     final scopedResults = results.submissionsForScope(scope);
     final collation = CollationEngine.prototypeSeed().summarize(
@@ -116,24 +139,24 @@ class _ReportsPageState extends State<ReportsPage> {
       ),
       _ReportDescriptor(
         kind: ReportKind.accreditationReadiness,
-        title: 'Accreditation & Readiness',
+        title: 'Membership & Deployment Readiness',
         subtitle:
-            'Agent accreditation, assignment, training, identity and device readiness.',
-        icon: Icons.badge_outlined,
+            'Member coverage, active roles and open operational assignments.',
+        icon: Icons.groups_2_outlined,
         recordCount: canExport(ReportKind.accreditationReadiness)
-            ? agents.length
+            ? members.length
             : 0,
         detail: canExport(ReportKind.accreditationReadiness)
-            ? '${approvedAgents.length} approved • ${readyAgents.length} operationally ready'
-            : 'Additional accreditation permission required',
+            ? '${operationalMembers.length} operational members • ${activeAssignments.length} active assignments'
+            : 'Additional membership or assignment permission required',
         formats: const [ExportFormat.pdf, ExportFormat.csv, ExportFormat.json],
         enabled: canExport(ReportKind.accreditationReadiness),
         tone: TgcgMetricTone.success,
         previewRows: canExport(ReportKind.accreditationReadiness)
             ? [
-                _PreviewRow('Agents', '${agents.length}'),
-                _PreviewRow('Approved', '${approvedAgents.length}'),
-                _PreviewRow('Fully ready', '${readyAgents.length}'),
+                _PreviewRow('Members', '${members.length}'),
+                _PreviewRow('Active roles', '${activeRoleRecords.length}'),
+                _PreviewRow('Active assignments', '${activeAssignments.length}'),
               ]
             : const [],
       ),
@@ -220,7 +243,10 @@ class _ReportsPageState extends State<ReportsPage> {
     ];
 
     final selected = descriptors.firstWhere((item) => item.kind == selectedKind);
-    final visibleJobs = reportStore.jobsForScope(scope, role: role);
+    final visibleJobs = reportStore
+        .jobsForScope(scope)
+        .where((job) => canExport(job.kind))
+        .toList(growable: false);
     var history = List<ReportExportJob>.from(visibleJobs);
     if (historyKindFilter != null) {
       history = history
@@ -331,14 +357,32 @@ class _ReportsPageState extends State<ReportsPage> {
   ) {
     final session = TgcgSession.of(context, listen: false);
     final store = ReportOperations.of(context, listen: false);
+    final scope = TgcgAccessPolicy.authorizingScope(
+      context,
+      TgcgCapability.exportReports,
+      listen: false,
+    );
+    if (scope == null) return;
+    final role = TgcgAccessPolicy.roleFor(
+      context,
+      TgcgCapability.exportReports,
+      targetScope: scope,
+      listen: false,
+    );
+    if (role == null) return;
     final job = store.requestExport(
       kind: descriptor.kind,
       format: format,
-      targetScope: session.scope,
+      targetScope: scope,
       actorId:
           session.accessId.isEmpty ? session.operatorName : session.accessId,
-      role: session.role!,
-      userScope: session.scope,
+      role: role,
+      userScope: scope,
+      effectiveCapabilities: TgcgAccessPolicy.capabilitiesForTarget(
+        context,
+        scope,
+        listen: false,
+      ),
       recordCount: descriptor.recordCount,
     );
 
@@ -1219,7 +1263,7 @@ IconData _jobIcon(ExportJobStatus status) => switch (status) {
 String _kindLabel(ReportKind kind) => switch (kind) {
       ReportKind.incidentSummary => 'Incident Summary',
       ReportKind.fieldActivity => 'Field Activity',
-      ReportKind.accreditationReadiness => 'Accreditation & Readiness',
+      ReportKind.accreditationReadiness => 'Membership & Deployment',
       ReportKind.verifiedCollation => 'Verified Collation',
       ReportKind.evidencePackage => 'Evidence Package',
       ReportKind.auditTrail => 'Audit Trail',
