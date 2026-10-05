@@ -946,7 +946,16 @@ class MembershipOperationsController extends ChangeNotifier {
     required double latitude,
     required double longitude,
     required String recordedBy,
+    required TgcgRole recordedByRole,
+    required GeographicScope authorizedScope,
   }) async {
+    if (recordedByRole != TgcgRole.stateCoordinator ||
+        authorizedScope.level != GeographyLevel.state ||
+        authorizedScope.stateId != GeographicScope.kaduna.stateId) {
+      throw StateError(
+        'Only the Kaduna State Coordinator can add manual polling-unit coordinates.',
+      );
+    }
     if (latitude < -90 || latitude > 90) {
       throw ArgumentError('Latitude must be between -90 and 90.');
     }
@@ -957,6 +966,11 @@ class MembershipOperationsController extends ChangeNotifier {
     final current = _geography.pollingUnit(pollingUnitId);
     if (current == null) {
       throw ArgumentError('Unknown polling unit: $pollingUnitId');
+    }
+    if (!GeographyRegistry.scopeContains(authorizedScope, current.scope)) {
+      throw StateError(
+        'This polling unit is outside the State Coordinator scope.',
+      );
     }
     if (current.operationalLatitude != null &&
         current.operationalLongitude != null) {
