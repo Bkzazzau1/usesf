@@ -4,6 +4,7 @@ import '../access/access_policy.dart';
 import '../access/effective_member_access.dart';
 import '../devices/managed_device_store.dart';
 import '../domain/permissions.dart';
+import '../domain/models.dart';
 import '../geography/geography_registry.dart';
 import '../membership/membership_store.dart';
 import '../meeting/operational_call_store.dart';
