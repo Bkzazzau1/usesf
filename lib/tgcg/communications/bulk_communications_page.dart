@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../access/access_policy.dart';
 import '../domain/permissions.dart';
+import '../membership/membership_store.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
 import 'bulk_communications_store.dart';
@@ -36,15 +38,26 @@ class _BulkCommunicationsPageState extends State<BulkCommunicationsPage> {
   Widget build(BuildContext context) {
     final session = TgcgSession.of(context);
     final store = BulkCommunications.of(context);
-    final contacts = store.contactsForScope(session.scope);
-    final jobs = store.jobsForScope(session.scope);
-    final canSend = TgcgPermissionPolicy.allows(
-      session.role!,
+    final broadcastScopes = TgcgAccessPolicy.scopesFor(
+      context,
       TgcgCapability.sendBroadcast,
     );
-    final canManagePreferences = TgcgPermissionPolicy.allows(
-      session.role!,
+    final scope = TgcgAccessPolicy.authorizingScope(
+          context,
+          TgcgCapability.sendBroadcast,
+        ) ??
+        session.scope;
+    final contacts = store.contactsForScope(scope);
+    final jobs = store.jobsForScope(scope);
+    final canSend = TgcgAccessPolicy.allows(
+      context,
+      TgcgCapability.sendBroadcast,
+      targetScope: scope,
+    );
+    final canManagePreferences = TgcgAccessPolicy.allows(
+      context,
       TgcgCapability.manageMembership,
+      targetScope: scope,
     );
 
     return ListView(
@@ -54,7 +67,7 @@ class _BulkCommunicationsPageState extends State<BulkCommunicationsPage> {
           eyebrow: 'AUTHORIZED OUTBOUND COMMUNICATIONS',
           title: 'Bulk Communications Centre',
           subtitle:
-              '${session.scope.label}: consent-aware operational delivery, channel fallback, delivery jobs and provider readiness.',
+              '${broadcastScopes.length <= 1 ? scope.label : '${broadcastScopes.length} authorized scopes'}: consent-aware operational delivery, channel fallback, delivery jobs and provider readiness.',
           trailing: TgcgStatusPill(
             label: canSend ? 'AUTHORIZED' : 'READ ONLY',
             color: canSend ? TgcgColors.success : TgcgColors.muted,
@@ -65,14 +78,14 @@ class _BulkCommunicationsPageState extends State<BulkCommunicationsPage> {
         _MetricGrid(
           totalContacts: contacts.length,
           smsEligible: store.eligibleCount(
-            session.scope,
+            scope,
             BulkCommunicationChannel.sms,
           ),
           pushEligible: store.eligibleCount(
-            session.scope,
+            scope,
             BulkCommunicationChannel.push,
           ),
-          suppressed: store.suppressedCount(session.scope),
+          suppressed: store.suppressedCount(scope),
           queuedJobs: jobs
               .where((job) =>
                   job.state == BulkDeliveryJobState.queued ||
@@ -165,15 +178,28 @@ class _BulkCommunicationsPageState extends State<BulkCommunicationsPage> {
     required BulkCommunicationsController store,
     required TgcgSessionController session,
   }) async {
+    final scope = TgcgAccessPolicy.authorizingScope(
+      context,
+      TgcgCapability.sendBroadcast,
+      listen: false,
+    );
+    if (scope == null) return;
+    final role = TgcgAccessPolicy.roleFor(
+      context,
+      TgcgCapability.sendBroadcast,
+      targetScope: scope,
+      listen: false,
+    );
+    if (role == null) return;
     final job = await store.queueJob(
       title: titleController.text,
       body: bodyController.text,
       purpose: purpose,
-      targetScope: session.scope,
+      targetScope: scope,
       channels: selectedChannels,
       actorId: session.accessId.isEmpty ? session.operatorName : session.accessId,
-      actorRole: session.role!,
-      actorScope: session.scope,
+      actorRole: role,
+      actorScope: scope,
       scheduledFor: scheduledFor,
     );
     if (!context.mounted) return;
@@ -323,11 +349,35 @@ class _BulkCommunicationsPageState extends State<BulkCommunicationsPage> {
       sourceController.dispose();
       return;
     }
+    final memberScope = MembershipOperations.of(
+      context,
+      listen: false,
+    ).registrationScopeForMember(contact.memberId);
+    final actorScope = memberScope == null
+        ? null
+        : TgcgAccessPolicy.authorizingScope(
+            context,
+            TgcgCapability.manageMembership,
+            targetScope: memberScope,
+            listen: false,
+          );
+    final actorRole = memberScope == null
+        ? null
+        : TgcgAccessPolicy.roleFor(
+            context,
+            TgcgCapability.manageMembership,
+            targetScope: memberScope,
+            listen: false,
+          );
+    if (actorScope == null || actorRole == null) {
+      sourceController.dispose();
+      return;
+    }
     final ok = await store.recordPreference(
       memberId: contact.memberId,
       actorId: session.accessId.isEmpty ? session.operatorName : session.accessId,
-      actorRole: session.role!,
-      actorScope: session.scope,
+      actorRole: actorRole,
+      actorScope: actorScope,
       source: sourceController.text,
       smsOptIn: sms,
       pushOptIn: push,
