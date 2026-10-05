@@ -113,6 +113,8 @@ class _TgcgAppState extends State<TgcgApp> {
     );
     operationalCallController = OperationalCallController(
       membership: membershipOperationsController,
+      assignments: assignmentController,
+      devices: managedDeviceController,
       persistence: offlinePersistenceController,
     );
     governanceOperationsController = GovernanceOperationsController.prototypeSeed();
