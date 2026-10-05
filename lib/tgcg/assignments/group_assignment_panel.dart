@@ -44,11 +44,13 @@ class GroupAssignmentPanel extends StatelessWidget {
     required this.controller,
     required this.membership,
     required this.onCreate,
+    required this.onCancel,
   });
 
   final AssignmentController controller;
   final MembershipOperationsController membership;
   final VoidCallback onCreate;
+  final Future<void> Function(GroupAssignment group) onCancel;
 
   @override
   Widget build(BuildContext context) {
@@ -163,6 +165,27 @@ class GroupAssignmentPanel extends StatelessWidget {
                           ],
                         ),
                       ),
+                      if (!group.isTerminal)
+                        PopupMenuButton<String>(
+                          tooltip: 'Group actions',
+                          onSelected: (value) async {
+                            if (value == 'cancel') {
+                              await onCancel(group);
+                            }
+                          },
+                          itemBuilder: (context) => const [
+                            PopupMenuItem(
+                              value: 'cancel',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.cancel_outlined, size: 18),
+                                  SizedBox(width: 8),
+                                  Text('Cancel group'),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                     ],
                   ),
                 );
