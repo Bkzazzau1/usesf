@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../assignments/assignment_store.dart';
+import '../devices/managed_device_store.dart';
 import '../media/local_camera_view.dart';
 import '../membership/membership_store.dart';
 import '../session.dart';
@@ -228,11 +230,19 @@ class IncomingOperationalCallCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Rebuild while the phone receives new assignment/device heartbeats.
+    Assignments.of(context);
+    ManagedDevices.of(context);
     final calls = OperationalCalls.of(context);
     final incoming = calls.incomingForMember(memberId);
     if (incoming.isEmpty) return const SizedBox.shrink();
 
     final call = incoming.first;
+    final liveGps = calls.gpsSnapshotForMember(
+      memberId,
+      assignmentId: call.assignmentId,
+      groupAssignmentId: call.groupAssignmentId,
+    );
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 14),
@@ -268,11 +278,11 @@ class IncomingOperationalCallCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  call.gpsForMember(memberId) == null
-                      ? 'GPS unavailable'
+                  liveGps == null
+                      ? 'GPS inactive • waiting for fresh location'
                       : 'GPS active • location attached',
                   style: TextStyle(
-                    color: call.gpsForMember(memberId) == null
+                    color: liveGps == null
                         ? TgcgColors.warning
                         : TgcgColors.gold200,
                     fontSize: 10,
@@ -295,7 +305,9 @@ class IncomingOperationalCallCard extends StatelessWidget {
           const SizedBox(width: 7),
           IconButton.filled(
             tooltip: 'Answer',
-            onPressed: () async {
+            onPressed: liveGps == null
+                ? null
+                : () async {
               try {
                 await calls.answerCall(
                   callId: call.id,
