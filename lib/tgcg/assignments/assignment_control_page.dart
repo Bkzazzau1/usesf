@@ -752,6 +752,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                                 actorId: session.accessId.isEmpty
                                     ? session.operatorName
                                     : session.accessId,
+                                stateScope: coordinateStateScope,
                               );
                               if (changed && dialogContext.mounted) {
                                 setDialogState(() {});
@@ -1606,6 +1607,7 @@ class _AssignmentList extends StatelessWidget {
                                   membership: membership,
                                   unit: unit,
                                   actorId: actorId,
+                                  stateScope: stateCoordinatorScope!,
                                 );
                               } else if (action ==
                                   _AssignmentMenuAction.reassign) {
