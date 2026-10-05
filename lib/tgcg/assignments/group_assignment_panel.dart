@@ -225,6 +225,10 @@ Future<bool> showGroupAssignmentDialog({
   );
   final capabilityOptions = assignmentGrantableCapabilities
       .where(delegable.contains)
+      .where(
+        (capability) =>
+            !groupAssignmentRestrictedCapabilities.contains(capability),
+      )
       .toList(growable: false);
 
   final result = await showDialog<bool>(
