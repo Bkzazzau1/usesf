@@ -1,7 +1,6 @@
 import 'package:flutter/widgets.dart';
 
 import '../assignments/assignment_store.dart';
-import '../domain/models.dart';
 import '../domain/permissions.dart';
 import '../governance/governance_store.dart';
 import '../session.dart';

@@ -340,10 +340,6 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
               const SizedBox(height: 14),
               _roleScopeSelector(),
             ],
-            if (selectedRole == TgcgRole.securityOfficer) ...[
-              const SizedBox(height: 14),
-              _agencySelector(),
-            ],
             const SizedBox(height: 22),
             LayoutBuilder(
               builder: (context, constraints) {

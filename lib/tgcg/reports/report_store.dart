@@ -8,7 +8,7 @@ import '../governance/governance_store.dart';
 enum ReportKind {
   incidentSummary,
   fieldActivity,
-  accreditationReadiness,
+  membershipDeployment,
   verifiedCollation,
   evidencePackage,
   auditTrail,
@@ -155,7 +155,7 @@ class ReportOperationsController extends ChangeNotifier {
     return switch (kind) {
       ReportKind.incidentSummary => allows(TgcgCapability.viewIncidents),
       ReportKind.fieldActivity => allows(TgcgCapability.viewIncidents),
-      ReportKind.accreditationReadiness =>
+      ReportKind.membershipDeployment =>
         allows(TgcgCapability.manageMembership) ||
             allows(TgcgCapability.manageAssignments) ||
             allows(TgcgCapability.manageRoleAssignments),

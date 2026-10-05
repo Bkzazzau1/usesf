@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../access/access_policy.dart';
 import '../domain/permissions.dart';
 import '../field/field_operations_store.dart';
-import '../membership/membership_store.dart';
 import '../results/result_operations_store.dart';
 import '../session.dart';
 import '../sync/sync_models.dart';
@@ -57,7 +56,7 @@ class _GovernancePageState extends State<GovernancePage> {
       targetScope: scope,
     );
 
-    final agents = governance.roleAssignmentsForScope(scope)
+    final activeRoles = governance.roleAssignmentsForScope(scope)
         .where((item) => item.active)
         .toList(growable: false);
     final submissions = results.submissionsForScope(scope);
@@ -161,7 +160,7 @@ class _GovernancePageState extends State<GovernancePage> {
         ),
         const SizedBox(height: 16),
         _ControlSnapshot(
-          agents: agents.length,
+          activeRoles: activeRoles.length,
           incidents: incidents.length,
           reports: reports.length,
           results: submissions.length,
@@ -245,7 +244,7 @@ class _GovernancePageState extends State<GovernancePage> {
         ),
         const SizedBox(height: 16),
         _Provenance(
-          agents: agents.length,
+          activeRoles: activeRoles.length,
           incidents: incidents.length,
           reports: reports.length,
           results: submissions.length,
@@ -360,7 +359,7 @@ class _MetricGrid extends StatelessWidget {
 
 class _ControlSnapshot extends StatelessWidget {
   const _ControlSnapshot({
-    required this.agents,
+    required this.activeRoles,
     required this.incidents,
     required this.reports,
     required this.results,
@@ -369,7 +368,7 @@ class _ControlSnapshot extends StatelessWidget {
     required this.pending,
   });
 
-  final int agents;
+  final int activeRoles;
   final int incidents;
   final int reports;
   final int results;
@@ -427,7 +426,7 @@ class _ControlSnapshot extends StatelessWidget {
               spacing: 9,
               runSpacing: 9,
               children: [
-                _DarkStat('Active roles', '$agents'),
+                _DarkStat('Active roles', '$activeRoles'),
                 _DarkStat('Incidents', '$incidents'),
                 _DarkStat('Field reports', '$reports'),
                 _DarkStat('Results', '$results'),
@@ -971,14 +970,14 @@ class _SettingsPanel extends StatelessWidget {
 
 class _Provenance extends StatelessWidget {
   const _Provenance({
-    required this.agents,
+    required this.activeRoles,
     required this.incidents,
     required this.reports,
     required this.results,
     required this.evidence,
   });
 
-  final int agents;
+  final int activeRoles;
   final int incidents;
   final int reports;
   final int results;
@@ -993,7 +992,7 @@ class _Provenance extends StatelessWidget {
           spacing: 10,
           runSpacing: 10,
           children: [
-            _Chip('Active roles', '$agents', Icons.badge_outlined),
+            _Chip('Active roles', '$activeRoles', Icons.badge_outlined),
             _Chip('Incidents', '$incidents', Icons.warning_amber_rounded),
             _Chip('Field reports', '$reports', Icons.feed_outlined),
             _Chip('Result submissions', '$results', Icons.ballot_outlined),

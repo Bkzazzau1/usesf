@@ -10,6 +10,26 @@ import '../membership/membership_store.dart';
 import '../offline/offline_payloads.dart';
 import '../offline/offline_persistence.dart';
 
+/// Capabilities that an assignment may temporarily grant. Anything else
+/// (verification, broadcasts, membership or system administration) can only
+/// come from a role.
+const Set<TgcgCapability> assignmentGrantableCapabilities = {
+  TgcgCapability.viewGeography,
+  TgcgCapability.viewIncidents,
+  TgcgCapability.createIncident,
+  TgcgCapability.submitFieldReport,
+  TgcgCapability.viewCommunications,
+  TgcgCapability.sendOperationalMessage,
+  TgcgCapability.viewMediaIntelligence,
+  TgcgCapability.viewDiscussionRoom,
+  TgcgCapability.createDiscussionThread,
+  TgcgCapability.postDiscussionReply,
+  TgcgCapability.viewMeetingRoom,
+  TgcgCapability.startMeeting,
+  TgcgCapability.joinMeeting,
+  TgcgCapability.viewEvidence,
+};
+
 enum AssignmentStatus {
   assigned,
   accepted,
@@ -161,6 +181,13 @@ class MemberAssignment {
       status == AssignmentStatus.completed ||
       status == AssignmentStatus.cancelled ||
       status == AssignmentStatus.declined;
+
+  /// Whether this assignment currently confers its granted capabilities on
+  /// the holder. Terminal assignments never do, and neither does one that is
+  /// mid-handover (`reassigned`), so access is not retained by the outgoing
+  /// holder.
+  bool get confersAccess =>
+      !isTerminal && status != AssignmentStatus.reassigned;
 
   MemberAssignment copyWith({
     String? memberId,
@@ -452,6 +479,7 @@ class AssignmentController extends ChangeNotifier {
 
   Set<TgcgCapability> activeAssignmentCapabilitiesForMember(String memberId) =>
       activeAssignmentsForMember(memberId)
+          .where((item) => item.confersAccess)
           .expand((item) => item.grantedCapabilities)
           .toSet();
 
@@ -617,10 +645,30 @@ class AssignmentController extends ChangeNotifier {
     DateTime? dueAt,
     List<EvidenceType> requiredEvidence = const [],
     Set<TgcgCapability> grantedCapabilities = const {},
+
+    /// Capabilities the assigning coordinator holds through roles covering
+    /// [authorizedScope]. A coordinator can never grant more than this.
+    required Set<TgcgCapability> assignerCapabilities,
   }) async {
     final member = _membership.memberById(memberId);
     if (member == null) {
       throw ArgumentError('Unknown USESF member: $memberId');
+    }
+
+    final notGrantable =
+        grantedCapabilities.difference(assignmentGrantableCapabilities);
+    if (notGrantable.isNotEmpty) {
+      throw StateError(
+        'These capabilities cannot be granted through an assignment: '
+        '${notGrantable.map((item) => item.name).join(', ')}.',
+      );
+    }
+    final notHeld = grantedCapabilities.difference(assignerCapabilities);
+    if (notHeld.isNotEmpty) {
+      throw StateError(
+        'You cannot grant capabilities you do not hold in this area: '
+        '${notHeld.map((item) => item.name).join(', ')}.',
+      );
     }
 
     final normalizedPollingUnitId = _clean(pollingUnitId);

@@ -45,7 +45,6 @@ class _PvcEnrollmentPageState extends State<PvcEnrollmentPage> {
 
   @override
   Widget build(BuildContext context) {
-    final session = TgcgSession.of(context);
     final store = MembershipOperations.of(context);
     final membershipScopes = TgcgAccessPolicy.scopesFor(
       context,
@@ -732,7 +731,7 @@ class _AssignmentNextStepPanel extends StatelessWidget {
             ? null
             : FilledButton.icon(
                 onPressed: onOpenAssignments,
-                icon: const Icon(Icons.assignment_add_rounded),
+                icon: const Icon(Icons.assignment_ind_rounded),
                 label: const Text('Open Assignment Control'),
               ),
         child: const Wrap(

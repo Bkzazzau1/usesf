@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../access/access_policy.dart';
+import '../access/effective_member_access.dart';
 import '../devices/managed_device_store.dart';
 import '../domain/permissions.dart';
 import '../geography/geography_registry.dart';
@@ -458,14 +459,9 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     var locationBound = authorizedLgas.isNotEmpty;
     var priority = AssignmentPriority.normal;
     final selectedCapabilities = <TgcgCapability>{};
-    final capabilityRole = TgcgAccessPolicy.roleFor(
-          context,
-          TgcgCapability.manageAssignments,
-          listen: false,
-        ) ??
-        session.role!;
-    final availableCapabilities =
-        _assignmentGrantOptionsFor(capabilityRole);
+    final availableCapabilities = _assignmentGrantOptions(
+      _delegableCapabilities(context, session),
+    );
     final title = TextEditingController(text: 'Field Duty Assignment');
     final instructions = TextEditingController();
 
@@ -654,6 +650,16 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                   ? null
                   : () async {
                       try {
+                        final authorizedScope = _scopeCovering(
+                              assignmentScopes,
+                              locationBound && pollingUnitId != null
+                                  ? membership.geography
+                                      .pollingUnit(pollingUnitId!)
+                                      ?.scope
+                                  : membership
+                                      .registrationScopeForMember(memberId),
+                            ) ??
+                            assignmentScopes.first;
                         await assignments.createAssignment(
                           title: title.text,
                           memberId: memberId,
@@ -662,20 +668,16 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                           assignedBy: session.accessId.isEmpty
                               ? session.operatorName
                               : session.accessId,
-                          authorizedScope: _scopeCovering(
-                                assignmentScopes,
-                                locationBound && pollingUnitId != null
-                                    ? membership.geography
-                                        .pollingUnit(pollingUnitId!)
-                                        ?.scope
-                                    : membership
-                                        .registrationScopeForMember(memberId),
-                              ) ??
-                              assignmentScopes.first,
+                          authorizedScope: authorizedScope,
                           priority: priority,
                           instructions: instructions.text,
                           grantedCapabilities:
                               Set.unmodifiable(selectedCapabilities),
+                          assignerCapabilities: _delegableCapabilities(
+                            context,
+                            session,
+                            within: authorizedScope,
+                          ),
                         );
                         if (dialogContext.mounted) {
                           Navigator.pop(dialogContext, true);
@@ -919,26 +921,40 @@ GeographicScope? _scopeCovering(
   return null;
 }
 
-List<TgcgCapability> _assignmentGrantOptionsFor(TgcgRole role) {
-  const grantable = <TgcgCapability>[
-    TgcgCapability.viewGeography,
-    TgcgCapability.viewIncidents,
-    TgcgCapability.createIncident,
-    TgcgCapability.submitFieldReport,
-    TgcgCapability.viewCommunications,
-    TgcgCapability.sendOperationalMessage,
-    TgcgCapability.viewMediaIntelligence,
-    TgcgCapability.viewDiscussionRoom,
-    TgcgCapability.createDiscussionThread,
-    TgcgCapability.postDiscussionReply,
-    TgcgCapability.viewMeetingRoom,
-    TgcgCapability.startMeeting,
-    TgcgCapability.joinMeeting,
-    TgcgCapability.viewEvidence,
-  ];
-  final own = TgcgPermissionPolicy.capabilitiesFor(role);
-  return grantable.where(own.contains).toList(growable: false);
+/// Capabilities the signed-in coordinator may delegate: the union of their
+/// role capabilities (optionally only roles covering [within]). Capabilities
+/// held only through the coordinator's own assignments are not delegable, so
+/// temporary access cannot be passed down a chain.
+Set<TgcgCapability> _delegableCapabilities(
+  BuildContext context,
+  TgcgSessionController session, {
+  GeographicScope? within,
+}) {
+  final member = TgcgAccessPolicy.memberAccess(context, listen: false);
+  if (member == null) {
+    final role = session.role;
+    if (role == null) return const {};
+    if (within != null &&
+        !TgcgPermissionPolicy.scopeAllows(session.scope, within)) {
+      return const {};
+    }
+    return TgcgPermissionPolicy.capabilitiesFor(role);
+  }
+  return member.grants
+      .where((grant) => grant.source == EffectiveGrantSource.role)
+      .where(
+        (grant) =>
+            within == null ||
+            TgcgPermissionPolicy.scopeAllows(grant.scope, within),
+      )
+      .expand((grant) => grant.capabilities)
+      .toSet();
 }
+
+List<TgcgCapability> _assignmentGrantOptions(Set<TgcgCapability> own) =>
+    assignmentGrantableCapabilities
+        .where(own.contains)
+        .toList(growable: false);
 
 String _assignmentCapabilityLabel(TgcgCapability capability) =>
     switch (capability) {

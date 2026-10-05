@@ -33,10 +33,6 @@ class _ReportsPageState extends State<ReportsPage> {
     final results = ResultOperations.of(context);
     final governance = GovernanceOperations.of(context);
     final reportStore = ReportOperations.of(context);
-    final exportScopes = TgcgAccessPolicy.scopesFor(
-      context,
-      TgcgCapability.exportReports,
-    );
     final scope = TgcgAccessPolicy.authorizingScope(
           context,
           TgcgCapability.exportReports,
@@ -138,21 +134,21 @@ class _ReportsPageState extends State<ReportsPage> {
         ],
       ),
       _ReportDescriptor(
-        kind: ReportKind.accreditationReadiness,
+        kind: ReportKind.membershipDeployment,
         title: 'Membership & Deployment Readiness',
         subtitle:
             'Member coverage, active roles and open operational assignments.',
         icon: Icons.groups_2_outlined,
-        recordCount: canExport(ReportKind.accreditationReadiness)
+        recordCount: canExport(ReportKind.membershipDeployment)
             ? members.length
             : 0,
-        detail: canExport(ReportKind.accreditationReadiness)
+        detail: canExport(ReportKind.membershipDeployment)
             ? '${operationalMembers.length} operational members • ${activeAssignments.length} active assignments'
             : 'Additional membership or assignment permission required',
         formats: const [ExportFormat.pdf, ExportFormat.csv, ExportFormat.json],
-        enabled: canExport(ReportKind.accreditationReadiness),
+        enabled: canExport(ReportKind.membershipDeployment),
         tone: TgcgMetricTone.success,
-        previewRows: canExport(ReportKind.accreditationReadiness)
+        previewRows: canExport(ReportKind.membershipDeployment)
             ? [
                 _PreviewRow('Members', '${members.length}'),
                 _PreviewRow('Active roles', '${activeRoleRecords.length}'),
@@ -1263,7 +1259,7 @@ IconData _jobIcon(ExportJobStatus status) => switch (status) {
 String _kindLabel(ReportKind kind) => switch (kind) {
       ReportKind.incidentSummary => 'Incident Summary',
       ReportKind.fieldActivity => 'Field Activity',
-      ReportKind.accreditationReadiness => 'Membership & Deployment',
+      ReportKind.membershipDeployment => 'Membership & Deployment',
       ReportKind.verifiedCollation => 'Verified Collation',
       ReportKind.evidencePackage => 'Evidence Package',
       ReportKind.auditTrail => 'Audit Trail',

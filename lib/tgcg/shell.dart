@@ -9,6 +9,7 @@ import 'collation/collation_page.dart';
 import 'communications/bulk_communications_page.dart';
 import 'communications/communications_page.dart';
 import 'dashboard_page.dart';
+import 'domain/permissions.dart';
 import 'discussion/discussion_room_page.dart';
 import 'evidence/evidence_capture_page.dart';
 import 'field/field_monitoring_page.dart';

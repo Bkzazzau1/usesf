@@ -224,7 +224,7 @@ class CommunicationsController extends ChangeNotifier {
           id: 'MSG-0002',
           roomId: 'ROOM-KD',
           senderId: 'KD-COORD',
-          body: 'Polling-unit assignment review is in progress. Escalate any unassigned unit through the accreditation desk.',
+          body: 'Polling-unit assignment review is in progress. Escalate any unassigned unit to the LGA coordinator for assignment.',
           createdAt: now.subtract(const Duration(minutes: 19)),
           deliveryState: MessageDeliveryState.delivered,
         ),

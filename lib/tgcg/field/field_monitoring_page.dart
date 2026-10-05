@@ -25,7 +25,6 @@ class _FieldMonitoringPageState extends State<FieldMonitoringPage> {
 
   @override
   Widget build(BuildContext context) {
-    final session = TgcgSession.of(context);
     final store = FieldOperations.of(context);
     final fieldScopes = <GeographicScope>[
       ...TgcgAccessPolicy.scopesFor(context, TgcgCapability.viewIncidents),

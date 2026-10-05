@@ -680,7 +680,7 @@ class _MemberInspector extends StatelessWidget {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              roleLabel(record.role) + ' • ' + record.scope.label,
+                              '${roleLabel(record.role)} • ${record.scope.label}',
                               style: const TextStyle(
                                 color: TgcgColors.ink,
                                 fontSize: 10.5,

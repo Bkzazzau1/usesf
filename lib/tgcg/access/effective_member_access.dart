@@ -73,7 +73,9 @@ class EffectiveMemberAccess {
     }
 
     for (final assignment in assignments.activeAssignmentsForMember(memberId)) {
-      if (assignment.grantedCapabilities.isEmpty) continue;
+      if (!assignment.confersAccess || assignment.grantedCapabilities.isEmpty) {
+        continue;
+      }
       grants.add(
         EffectiveAccessGrant(
           source: EffectiveGrantSource.assignment,
