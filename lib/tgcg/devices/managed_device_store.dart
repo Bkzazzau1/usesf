@@ -107,17 +107,19 @@ class ManagedDeviceController extends ChangeNotifier {
     final now = DateTime.utc(2026, 9, 27, 8);
     final devices = <ManagedDevice>[];
 
-    for (final agent in membership.agents) {
-      final deviceId = agent.deviceId;
-      if (deviceId == null || deviceId.trim().isEmpty) continue;
-      if (devices.any((item) => item.id == deviceId)) continue;
+    const seedBindings = <(String, String, String)>[
+      ('MEM-0001', 'DEV-KD-001', 'USESF Field Phone • 001'),
+      ('MEM-0002', 'DEV-ZA-014', 'USESF Field Phone • 014'),
+    ];
+    for (final binding in seedBindings) {
+      if (membership.memberById(binding.$1) == null) continue;
       devices.add(
         ManagedDevice(
-          id: deviceId,
-          label: 'USESF Field Phone • ${agent.agentId}',
+          id: binding.$2,
+          label: binding.$3,
           status: ManagedDeviceStatus.assigned,
           registeredAt: now.subtract(const Duration(days: 15)),
-          assignedMemberId: agent.memberId,
+          assignedMemberId: binding.$1,
           assignedAt: now.subtract(const Duration(days: 14)),
           appVersion: '0.1.0',
           syncState: 'prototype',
