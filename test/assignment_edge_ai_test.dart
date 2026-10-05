@@ -157,6 +157,7 @@ void main() {
       await edgeAi.updateProfile(
         assignmentId: assignment.id,
         updatedBy: 'STATE-COORD',
+        authorizedScope: GeographicScope.kaduna,
         mode: AssignmentEdgeAiMode.event,
         capabilities: const {
           AssignmentEdgeAiCapability.gpsIntegrity,
@@ -171,6 +172,7 @@ void main() {
       await edgeAi.resolveEvent(
         eventId: event.id,
         resolvedBy: 'STATE-COORD',
+        authorizedScope: GeographicScope.kaduna,
       );
 
       final restored = AssignmentEdgeAiController(
@@ -197,6 +199,7 @@ void main() {
       await edgeAi.updateProfile(
         assignmentId: assignment.id,
         updatedBy: 'STATE-COORD',
+        authorizedScope: GeographicScope.kaduna,
         enabled: false,
       );
 
