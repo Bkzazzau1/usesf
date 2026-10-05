@@ -1,10 +1,12 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:usesf/tgcg/access/effective_member_access.dart';
 import 'package:usesf/tgcg/assignments/assignment_store.dart';
 import 'package:usesf/tgcg/devices/managed_device_store.dart';
 import 'package:usesf/tgcg/domain/models.dart';
 import 'package:usesf/tgcg/domain/permissions.dart';
 import 'package:usesf/tgcg/geography/geography_registry.dart';
+import 'package:usesf/tgcg/governance/governance_store.dart';
 import 'package:usesf/tgcg/membership/membership_store.dart';
 import 'package:usesf/tgcg/offline/offline_database_memory.dart';
 import 'package:usesf/tgcg/offline/offline_persistence.dart';
@@ -123,6 +125,45 @@ void main() {
               item.targetScope.level == GeographyLevel.state,
         ),
         isTrue,
+      );
+    });
+
+    test('move-together temporary access stays inside selected targets',
+        () async {
+      final group = await createGroup(
+        distribution: GroupAssignmentDistribution.together,
+        grants: const {TgcgCapability.viewDiscussionRoom},
+      );
+      final access = EffectiveMemberAccess.resolve(
+        memberId: 'MEM-0001',
+        governance: GovernanceOperationsController.prototypeSeed(),
+        assignments: assignments,
+      );
+
+      expect(
+        access.allows(
+          TgcgCapability.viewDiscussionRoom,
+          targetScope: geography.lga('KD-KADUNA-NORTH')!.scope,
+        ),
+        isTrue,
+      );
+      expect(
+        access.allows(
+          TgcgCapability.viewDiscussionRoom,
+          targetScope: geography.lga('KD-ZARIA')!.scope,
+        ),
+        isTrue,
+      );
+      expect(
+        access.allows(
+          TgcgCapability.viewDiscussionRoom,
+          targetScope: geography.lga('KD-JEMAA')!.scope,
+        ),
+        isFalse,
+      );
+      expect(
+        assignments.assignmentsForGroup(group.id).first.targetScope.level,
+        GeographyLevel.state,
       );
     });
 
