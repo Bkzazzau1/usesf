@@ -36,13 +36,8 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     );
     final canManageAssignments = assignmentScopes.isNotEmpty;
     final canManageDevices = deviceScopes.isNotEmpty;
-    final groupAssignmentRole = TgcgAccessPolicy.roleFor(
-      context,
-      TgcgCapability.manageAssignments,
-      targetScope: GeographicScope.kaduna,
-    );
     final canCreateGroupAssignment =
-        groupAssignmentRole == TgcgRole.stateCoordinator;
+        stateCoordinatorGroupScope(context, session) != null;
     final authorizedUnits = membership.geography.pollingUnits
         .where(
           (unit) => assignmentScopes.any(
