@@ -101,7 +101,46 @@ void main() {
     );
   });
 
-  test('recorded AI warning is included and reduces submitted score',
+  test('AI warning present before submission reduces historical score',
+      () {
+    final assignment = assignments.assignmentById('ASN-DEMO-0001')!;
+    final historicalEdgeAi = AssignmentEdgeAiController(
+      assignments: assignments,
+      devices: devices,
+      persistence: persistence,
+      events: [
+        AssignmentEdgeAiEvent(
+          id: 'AI-HIST-1',
+          assignmentId: assignment.id,
+          type: AssignmentEdgeAiEventType.imageQuality,
+          severity: AssignmentEdgeAiSeverity.warning,
+          createdAt: assignment.completedAt!.subtract(
+            const Duration(minutes: 1),
+          ),
+          source: 'edge-image',
+          confidence: .72,
+          summary: 'One frame was slightly blurred',
+          evidenceReference: 'EVD-DEMO-0001',
+        ),
+      ],
+    );
+
+    final report = buildSubmittedAiReport(
+      children: [assignment],
+      title: assignment.title,
+      assignments: assignments,
+      edgeAi: historicalEdgeAi,
+    );
+
+    expect(report.score, 95);
+    expect(report.memberAssessments.single.aiEvents, hasLength(1));
+    expect(
+      report.memberAssessments.single.aiEvents.single.summary,
+      'One frame was slightly blurred',
+    );
+  });
+
+  test('AI event created after submission does not rewrite old report',
       () async {
     final assignment = assignments.assignmentById('ASN-DEMO-0001')!;
     await edgeAi.recordEvent(
@@ -109,9 +148,7 @@ void main() {
       type: AssignmentEdgeAiEventType.imageQuality,
       severity: AssignmentEdgeAiSeverity.warning,
       source: 'edge-image',
-      confidence: .72,
-      summary: 'One frame was slightly blurred',
-      evidenceReference: 'EVD-DEMO-0001',
+      summary: 'Late review event',
     );
 
     final report = buildSubmittedAiReport(
@@ -121,12 +158,8 @@ void main() {
       edgeAi: edgeAi,
     );
 
-    expect(report.score, 95);
-    expect(report.memberAssessments.single.aiEvents, hasLength(1));
-    expect(
-      report.memberAssessments.single.aiEvents.single.summary,
-      'One frame was slightly blurred',
-    );
+    expect(report.score, 100);
+    expect(report.memberAssessments.single.aiEvents, isEmpty);
   });
 
   test('location-flexible submitted duty is not treated as missing geofence',
