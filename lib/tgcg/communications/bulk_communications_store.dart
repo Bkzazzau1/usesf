@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import '../devices/managed_device_store.dart';
 import '../domain/models.dart';
 import '../domain/permissions.dart';
 import '../governance/governance_store.dart';
@@ -154,12 +155,14 @@ class BulkDeliveryJob {
 class BulkCommunicationsController extends ChangeNotifier {
   BulkCommunicationsController._({
     required MembershipOperationsController membership,
+    required ManagedDeviceController devices,
     required GovernanceOperationsController governance,
     OfflinePersistenceController? persistence,
     Map<String, CommunicationPreference> preferences = const {},
     List<BulkDeliveryJob> jobs = const [],
     List<BulkDeliveryProvider> providers = const [],
   })  : _membership = membership,
+        _devices = devices,
         _governance = governance,
         _persistence = persistence,
         _preferences = Map.of(preferences),
@@ -168,11 +171,13 @@ class BulkCommunicationsController extends ChangeNotifier {
 
   factory BulkCommunicationsController.productionFoundation({
     required MembershipOperationsController membership,
+    required ManagedDeviceController devices,
     required GovernanceOperationsController governance,
     OfflinePersistenceController? persistence,
   }) {
     return BulkCommunicationsController._(
       membership: membership,
+      devices: devices,
       governance: governance,
       persistence: persistence,
       providers: const [
@@ -221,6 +226,7 @@ class BulkCommunicationsController extends ChangeNotifier {
   }
 
   final MembershipOperationsController _membership;
+  final ManagedDeviceController _devices;
   final GovernanceOperationsController _governance;
   final OfflinePersistenceController? _persistence;
   final Map<String, CommunicationPreference> _preferences;
@@ -254,12 +260,7 @@ class BulkCommunicationsController extends ChangeNotifier {
   CommunicationContact _contactForMember(TgcgMember member) {
     final scope = _membership.registrationScopeForMember(member.id) ??
         GeographicScope.kaduna;
-    final hasAppDevice = _membership.agents.any(
-      (agent) =>
-          agent.memberId == member.id &&
-          agent.status == AccreditationStatus.approved &&
-          agent.deviceId?.trim().isNotEmpty == true,
-    );
+    final hasAppDevice = _devices.deviceForMember(member.id) != null;
     final preference = _preferences[member.id] ??
         CommunicationPreference(
           memberId: member.id,
