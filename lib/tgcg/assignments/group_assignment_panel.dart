@@ -16,10 +16,8 @@ GeographicScope? stateCoordinatorGroupScope(
   bool listen = false,
 }) {
   if (session.role == TgcgRole.stateCoordinator &&
-      TgcgPermissionPolicy.scopeAllows(
-        session.scope,
-        GeographicScope.kaduna,
-      )) {
+      session.scope.level == GeographyLevel.state &&
+      session.scope.stateId == GeographicScope.kaduna.stateId) {
     return session.scope;
   }
 
@@ -28,6 +26,8 @@ GeographicScope? stateCoordinatorGroupScope(
   for (final grant in member.grants) {
     if (grant.source == EffectiveGrantSource.role &&
         grant.role == TgcgRole.stateCoordinator &&
+        grant.scope.level == GeographyLevel.state &&
+        grant.scope.stateId == GeographicScope.kaduna.stateId &&
         grant.allows(
           TgcgCapability.manageAssignments,
           targetScope: GeographicScope.kaduna,
@@ -179,7 +179,6 @@ Future<bool> showGroupAssignmentDialog({
   required TgcgSessionController session,
   required List<TgcgMember> authorizedMembers,
   required List<CanonicalPollingUnit> authorizedUnits,
-  required List<GeographicScope> assignmentScopes,
 }) async {
   if (authorizedMembers.isEmpty || authorizedUnits.isEmpty) return false;
 
@@ -205,11 +204,17 @@ Future<bool> showGroupAssignmentDialog({
   final manualTargetByMember = <String, String>{};
   final selectedCapabilities = <TgcgCapability>{};
 
-  List<_AreaOption> targetOptions() => _groupAreaOptions(
-        level: areaLevel,
+  final areaOptions = <_GroupAreaLevel, List<_AreaOption>>{
+    for (final level in _GroupAreaLevel.values)
+      level: _groupAreaOptions(
+        level: level,
         geography: membership.geography,
         authorizedUnits: authorizedUnits,
-      );
+      ),
+  };
+
+  List<_AreaOption> targetOptions() =>
+      areaOptions[areaLevel] ?? const <_AreaOption>[];
 
   List<GeographicScope> selectedTargets() {
     final options = targetOptions();
