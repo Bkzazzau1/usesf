@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../assignments/assignment_store.dart';
+import '../devices/managed_device_store.dart';
 import '../media/local_camera_view.dart';
 import '../membership/membership_store.dart';
 import '../session.dart';
@@ -110,6 +112,16 @@ class _OperationalCallStageState extends State<OperationalCallStage> {
                     ),
                   ),
                   TgcgStatusPill(
+                    label:
+                        'GPS ${call.gpsRecipientCount}/${call.recipientMemberIds.length}',
+                    color: call.hasGpsForAllRecipients
+                        ? TgcgColors.success
+                        : TgcgColors.warning,
+                    icon: Icons.gps_fixed_rounded,
+                    compact: true,
+                  ),
+                  const SizedBox(width: 7),
+                  TgcgStatusPill(
                     label: status,
                     color: call.status == OperationalCallStatus.active
                         ? TgcgColors.success
@@ -218,11 +230,19 @@ class IncomingOperationalCallCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Rebuild while the phone receives new assignment/device heartbeats.
+    Assignments.of(context);
+    ManagedDevices.of(context);
     final calls = OperationalCalls.of(context);
     final incoming = calls.incomingForMember(memberId);
     if (incoming.isEmpty) return const SizedBox.shrink();
 
     final call = incoming.first;
+    final liveGps = calls.gpsSnapshotForMember(
+      memberId,
+      assignmentId: call.assignmentId,
+      groupAssignmentId: call.groupAssignmentId,
+    );
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 14),
@@ -246,12 +266,30 @@ class IncomingOperationalCallCard extends StatelessWidget {
           ),
           const SizedBox(width: 11),
           Expanded(
-            child: Text(
-              call.callerName,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  call.callerName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  liveGps == null
+                      ? 'GPS inactive • waiting for fresh location'
+                      : 'GPS active • location attached',
+                  style: TextStyle(
+                    color: liveGps == null
+                        ? TgcgColors.warning
+                        : TgcgColors.gold200,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
           ),
           IconButton.filledTonal(
@@ -267,17 +305,26 @@ class IncomingOperationalCallCard extends StatelessWidget {
           const SizedBox(width: 7),
           IconButton.filled(
             tooltip: 'Answer',
-            onPressed: () async {
-              await calls.answerCall(
-                callId: call.id,
-                memberId: memberId,
-              );
-              if (!context.mounted) return;
-              await Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => OperationalCallStage(callId: call.id),
-                ),
-              );
+            onPressed: liveGps == null
+                ? null
+                : () async {
+              try {
+                await calls.answerCall(
+                  callId: call.id,
+                  memberId: memberId,
+                );
+                if (!context.mounted) return;
+                await Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => OperationalCallStage(callId: call.id),
+                  ),
+                );
+              } on StateError catch (error) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(error.message)),
+                );
+              }
             },
             icon: Icon(
               call.kind == OperationalCallKind.audio

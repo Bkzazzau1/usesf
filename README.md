@@ -74,9 +74,11 @@ Assignments are separate from roles.
 - Every group has one chairman, selected by the State Coordinator or assigned automatically by the system.
 - Only the group chairman submits the group assignment; members do not submit separate completion records.
 - Group cancellation is handled at the group level by the State Coordinator so child assignments close consistently.
-- From Assignment Control, the State Coordinator may initiate direct audio/video call sessions to any active registered Kaduna member, including members without a current assignment.
-- Assignment-linked calls retain call metadata such as participants, assignment/group linkage, state, answer time and end time; media itself is not recorded by this workflow.
-- Group Assignment Control supports a direct chairman call and a conference invitation to the selected group members.
+- From Assignment Control or Field Monitoring, the State Coordinator may initiate operational calls only to members with a fresh active GPS heartbeat. Members without a current assignment can still be called when a fresh managed-device GPS heartbeat is available.
+- Every operational call stores a per-recipient GPS snapshot with coordinates, capture time, device/source and assignment context where available; call start is rejected if any intended recipient lacks fresh GPS.
+- Operational-call GPS uses a seven-minute live-monitoring freshness window. When a member answers, GPS is refreshed again; a stale location blocks answering until a fresh heartbeat is available.
+- Assignment-linked calls retain participants, assignment/group linkage, GPS context, state, answer time and end time; media itself is not recorded by this workflow.
+- Field Monitoring lets the State Coordinator call a group chairman by audio/video, call any GPS-active individual group member, conference the whole GPS-active group, or call the holder of an individual assignment.
 - Incoming operational calls are surfaced globally for signed-in members, regardless of which authorized module they are currently viewing.
 - Remote audio/video transport still requires the production signaling/WebRTC provider; the current Flutter layer provides call-session orchestration, incoming-call state and local camera/call controls.
 - If a polling unit has no operational coordinate, the State Coordinator may enter latitude/longitude from Assignment Control. The coordinate becomes a persistent reusable reference coordinate with an audit mutation.
@@ -121,7 +123,7 @@ Assignments are separate from roles.
 3. Roles & Authorization
 4. Jobs & Assignment Control
 5. Kaduna geography and polling-unit registry
-6. Field Monitoring & Incident Capture
+6. Field Monitoring / State Field Command Monitoring
 7. Evidence Capture / State Evidence Intelligence
 8. Result Capture & Verification
 9. Collation

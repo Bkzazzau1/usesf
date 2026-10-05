@@ -384,6 +384,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
         stateScope: stateScope,
         member: chairman,
         kind: OperationalCallKind.video,
+        groupAssignmentId: group.id,
       );
     } on StateError catch (error) {
       if (!context.mounted) return;

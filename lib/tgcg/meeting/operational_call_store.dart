@@ -1,11 +1,13 @@
 import 'package:flutter/widgets.dart';
 
+import '../assignments/assignment_store.dart';
+import '../devices/managed_device_store.dart';
+import '../domain/local_id.dart';
 import '../domain/models.dart';
 import '../geography/geography_registry.dart';
 import '../membership/membership_store.dart';
 import '../offline/offline_payloads.dart';
 import '../offline/offline_persistence.dart';
-import '../domain/local_id.dart';
 
 enum OperationalCallKind { audio, video, conference }
 
@@ -18,6 +20,43 @@ enum OperationalCallStatus {
   missed,
 }
 
+enum OperationalCallGpsSource {
+  assignmentHeartbeat,
+  managedDeviceHeartbeat,
+}
+
+class OperationalCallGpsSnapshot {
+  const OperationalCallGpsSnapshot({
+    required this.memberId,
+    required this.latitude,
+    required this.longitude,
+    required this.capturedAt,
+    required this.source,
+    this.accuracyMeters,
+    this.deviceId,
+    this.assignmentId,
+    this.distanceFromTargetMeters,
+  });
+
+  final String memberId;
+  final double latitude;
+  final double longitude;
+  final DateTime capturedAt;
+  final OperationalCallGpsSource source;
+  final double? accuracyMeters;
+  final String? deviceId;
+  final String? assignmentId;
+  final double? distanceFromTargetMeters;
+
+  bool isFresh({
+    DateTime? now,
+    Duration maxAge = OperationalCallController.gpsFreshness,
+  }) {
+    final current = (now ?? DateTime.now()).toUtc();
+    return current.difference(capturedAt.toUtc()).abs() <= maxAge;
+  }
+}
+
 class OperationalCallSession {
   const OperationalCallSession({
     required this.id,
@@ -25,6 +64,7 @@ class OperationalCallSession {
     required this.callerId,
     required this.callerName,
     required this.recipientMemberIds,
+    required this.recipientGps,
     required this.createdAt,
     required this.status,
     this.assignmentId,
@@ -40,6 +80,7 @@ class OperationalCallSession {
   final String callerId;
   final String callerName;
   final List<String> recipientMemberIds;
+  final List<OperationalCallGpsSnapshot> recipientGps;
   final DateTime createdAt;
   final OperationalCallStatus status;
   final String? assignmentId;
@@ -53,8 +94,21 @@ class OperationalCallSession {
       status == OperationalCallStatus.ringing ||
       status == OperationalCallStatus.active;
 
+  bool get hasGpsForAllRecipients =>
+      recipientMemberIds.every((memberId) => gpsForMember(memberId) != null);
+
+  int get gpsRecipientCount =>
+      recipientMemberIds.where((memberId) => gpsForMember(memberId) != null).length;
+
   bool includesMember(String memberId) =>
       recipientMemberIds.contains(memberId);
+
+  OperationalCallGpsSnapshot? gpsForMember(String memberId) {
+    for (final snapshot in recipientGps) {
+      if (snapshot.memberId == memberId) return snapshot;
+    }
+    return null;
+  }
 
   bool awaitingMember(String memberId) =>
       isOpen &&
@@ -68,6 +122,7 @@ class OperationalCallSession {
     DateTime? endedAt,
     List<String>? joinedMemberIds,
     List<String>? declinedMemberIds,
+    List<OperationalCallGpsSnapshot>? recipientGps,
   }) =>
       OperationalCallSession(
         id: id,
@@ -75,6 +130,7 @@ class OperationalCallSession {
         callerId: callerId,
         callerName: callerName,
         recipientMemberIds: recipientMemberIds,
+        recipientGps: recipientGps ?? this.recipientGps,
         createdAt: createdAt,
         status: status ?? this.status,
         assignmentId: assignmentId,
@@ -90,13 +146,21 @@ class OperationalCallSession {
 class OperationalCallController extends ChangeNotifier {
   OperationalCallController({
     required MembershipOperationsController membership,
+    required AssignmentController assignments,
+    required ManagedDeviceController devices,
     required OfflinePersistenceController persistence,
     List<OperationalCallSession> calls = const [],
   })  : _membership = membership,
+        _assignments = assignments,
+        _devices = devices,
         _persistence = persistence,
         _calls = List<OperationalCallSession>.of(calls);
 
+  static const Duration gpsFreshness = Duration(minutes: 7);
+
   final MembershipOperationsController _membership;
+  final AssignmentController _assignments;
+  final ManagedDeviceController _devices;
   final OfflinePersistenceController _persistence;
   final List<OperationalCallSession> _calls;
 
@@ -120,6 +184,114 @@ class OperationalCallController extends ChangeNotifier {
           .where((call) => call.includesMember(memberId))
           .toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+  OperationalCallGpsSnapshot? gpsSnapshotForMember(
+    String memberId, {
+    String? assignmentId,
+    String? groupAssignmentId,
+    DateTime? now,
+  }) {
+    final current = (now ?? DateTime.now()).toUtc();
+    final assignmentCandidates = <MemberAssignment>[];
+
+    final explicitAssignment = assignmentId == null
+        ? null
+        : _assignments.assignmentById(assignmentId);
+    if (explicitAssignment != null &&
+        explicitAssignment.memberId == memberId &&
+        !explicitAssignment.isTerminal) {
+      assignmentCandidates.add(explicitAssignment);
+    }
+
+    if (groupAssignmentId != null) {
+      assignmentCandidates.addAll(
+        _assignments
+            .assignmentsForGroup(groupAssignmentId)
+            .where(
+              (item) =>
+                  item.memberId == memberId &&
+                  !item.isTerminal &&
+                  !assignmentCandidates.any((value) => value.id == item.id),
+            ),
+      );
+    }
+
+    assignmentCandidates.addAll(
+      _assignments.activeAssignmentsForMember(memberId).where(
+            (item) =>
+                !assignmentCandidates.any((value) => value.id == item.id),
+          ),
+    );
+
+    assignmentCandidates.sort((a, b) {
+      final aAt = a.lastLocation?.capturedAt ??
+          DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+      final bAt = b.lastLocation?.capturedAt ??
+          DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+      return bAt.compareTo(aAt);
+    });
+
+    for (final assignment in assignmentCandidates) {
+      final ping = assignment.lastLocation;
+      if (ping == null) continue;
+      if (current.difference(ping.capturedAt.toUtc()).abs() > gpsFreshness) {
+        continue;
+      }
+      if (!ping.latitude.isFinite || !ping.longitude.isFinite) continue;
+      if (!ping.accuracyMeters.isFinite) continue;
+      return OperationalCallGpsSnapshot(
+        memberId: memberId,
+        latitude: ping.latitude,
+        longitude: ping.longitude,
+        accuracyMeters: ping.accuracyMeters,
+        capturedAt: ping.capturedAt.toUtc(),
+        deviceId: ping.deviceId,
+        assignmentId: assignment.id,
+        distanceFromTargetMeters: ping.distanceFromTargetMeters,
+        source: OperationalCallGpsSource.assignmentHeartbeat,
+      );
+    }
+
+    final device = _devices.deviceForMember(memberId);
+    if (device == null ||
+        device.lastSeenAt == null ||
+        device.lastLatitude == null ||
+        device.lastLongitude == null) {
+      return null;
+    }
+    if (current.difference(device.lastSeenAt!.toUtc()).abs() > gpsFreshness) {
+      return null;
+    }
+    if (!device.lastLatitude!.isFinite || !device.lastLongitude!.isFinite) {
+      return null;
+    }
+    final accuracy = device.lastAccuracyMeters;
+    if (accuracy != null && !accuracy.isFinite) return null;
+
+    return OperationalCallGpsSnapshot(
+      memberId: memberId,
+      latitude: device.lastLatitude!,
+      longitude: device.lastLongitude!,
+      accuracyMeters: accuracy,
+      capturedAt: device.lastSeenAt!.toUtc(),
+      deviceId: device.id,
+      source: OperationalCallGpsSource.managedDeviceHeartbeat,
+    );
+  }
+
+  bool gpsActiveForMember(
+    String memberId, {
+    String? assignmentId,
+    String? groupAssignmentId,
+    DateTime? now,
+  }) =>
+      gpsSnapshotForMember(
+        memberId,
+        assignmentId: assignmentId,
+        groupAssignmentId: groupAssignmentId,
+        now: now,
+      ) !=
+      null;
 
   Future<void> hydrateFromOffline() async {
     final rows = await _persistence.readEntities(
@@ -150,12 +322,22 @@ class OperationalCallController extends ChangeNotifier {
         continue;
       }
 
+      final gps = <OperationalCallGpsSnapshot>[];
+      final rawGps = row['recipientGps'];
+      if (rawGps is List) {
+        for (final value in rawGps) {
+          final snapshot = _gpsSnapshot(value);
+          if (snapshot != null) gps.add(snapshot);
+        }
+      }
+
       final restored = OperationalCallSession(
         id: id,
         kind: kind,
         callerId: callerId,
         callerName: callerName,
         recipientMemberIds: recipients,
+        recipientGps: List.unmodifiable(gps),
         createdAt: createdAt,
         status: status,
         assignmentId: _clean(row['assignmentId']?.toString()),
@@ -190,6 +372,7 @@ class OperationalCallController extends ChangeNotifier {
     required TgcgRole callerRole,
     required GeographicScope authorizedScope,
     String? assignmentId,
+    String? groupAssignmentId,
   }) =>
       _startCall(
         recipientMemberIds: [recipientMemberId],
@@ -199,6 +382,7 @@ class OperationalCallController extends ChangeNotifier {
         callerRole: callerRole,
         authorizedScope: authorizedScope,
         assignmentId: assignmentId,
+        groupAssignmentId: groupAssignmentId,
       );
 
   Future<OperationalCallSession> startConference({
@@ -233,7 +417,7 @@ class OperationalCallController extends ChangeNotifier {
         authorizedScope.level != GeographyLevel.state ||
         authorizedScope.stateId != GeographicScope.kaduna.stateId) {
       throw StateError(
-        'Only the Kaduna State Coordinator can call members from Assignment Control.',
+        'Only the Kaduna State Coordinator can start operational calls.',
       );
     }
 
@@ -245,6 +429,9 @@ class OperationalCallController extends ChangeNotifier {
     if (recipients.isEmpty) {
       throw StateError('Select at least one member.');
     }
+
+    final gps = <OperationalCallGpsSnapshot>[];
+    final missingGpsNames = <String>[];
     for (final memberId in recipients) {
       final member = _membership.memberById(memberId);
       if (member == null) {
@@ -258,6 +445,23 @@ class OperationalCallController extends ChangeNotifier {
           !GeographyRegistry.scopeContains(authorizedScope, scope)) {
         throw StateError('The selected member is outside Kaduna State scope.');
       }
+
+      final snapshot = gpsSnapshotForMember(
+        memberId,
+        assignmentId: assignmentId,
+        groupAssignmentId: groupAssignmentId,
+      );
+      if (snapshot == null) {
+        missingGpsNames.add(member.fullName);
+      } else {
+        gps.add(snapshot);
+      }
+    }
+
+    if (missingGpsNames.isNotEmpty) {
+      throw StateError(
+        'Active GPS is required for every operational call. No fresh GPS for: ${missingGpsNames.join(', ')}.',
+      );
     }
 
     final now = DateTime.now().toUtc();
@@ -269,6 +473,7 @@ class OperationalCallController extends ChangeNotifier {
           ? 'State Coordinator'
           : callerName.trim(),
       recipientMemberIds: List.unmodifiable(recipients),
+      recipientGps: List.unmodifiable(gps),
       createdAt: now,
       status: OperationalCallStatus.ringing,
       assignmentId: _clean(assignmentId),
@@ -291,12 +496,29 @@ class OperationalCallController extends ChangeNotifier {
       throw StateError('This call is not awaiting this member.');
     }
 
+    final refreshedGps = gpsSnapshotForMember(
+      memberId,
+      assignmentId: current.assignmentId,
+      groupAssignmentId: current.groupAssignmentId,
+    );
+    if (refreshedGps == null) {
+      throw StateError(
+        'A fresh GPS heartbeat is required before this operational call can be answered.',
+      );
+    }
+
+    final gps = [
+      for (final snapshot in current.recipientGps)
+        if (snapshot.memberId != memberId) snapshot,
+      refreshedGps,
+    ];
     final joined = {...current.joinedMemberIds, memberId}.toList();
     final now = DateTime.now().toUtc();
     final updated = current.copyWith(
       status: OperationalCallStatus.active,
       answeredAt: current.answeredAt ?? now,
       joinedMemberIds: List.unmodifiable(joined),
+      recipientGps: List.unmodifiable(gps),
     );
     _calls[index] = updated;
     await _persist(updated);
@@ -371,6 +593,22 @@ class OperationalCallController extends ChangeNotifier {
           'callerId': call.callerId,
           'callerName': call.callerName,
           'recipientMemberIds': call.recipientMemberIds,
+          'recipientGps': call.recipientGps
+              .map(
+                (snapshot) => {
+                  'memberId': snapshot.memberId,
+                  'latitude': snapshot.latitude,
+                  'longitude': snapshot.longitude,
+                  'accuracyMeters': snapshot.accuracyMeters,
+                  'capturedAt': snapshot.capturedAt.toIso8601String(),
+                  'deviceId': snapshot.deviceId,
+                  'assignmentId': snapshot.assignmentId,
+                  'distanceFromTargetMeters':
+                      snapshot.distanceFromTargetMeters,
+                  'source': snapshot.source.name,
+                },
+              )
+              .toList(growable: false),
           'createdAt': call.createdAt.toIso8601String(),
           'status': call.status.name,
           'assignmentId': call.assignmentId,
@@ -382,13 +620,55 @@ class OperationalCallController extends ChangeNotifier {
         },
       );
 
+  static OperationalCallGpsSnapshot? _gpsSnapshot(Object? value) {
+    if (value is! Map) return null;
+    final map = value.map((key, value) => MapEntry(key.toString(), value));
+    final memberId = map['memberId']?.toString();
+    final latitude = _double(map['latitude']);
+    final longitude = _double(map['longitude']);
+    final capturedAt =
+        DateTime.tryParse(map['capturedAt']?.toString() ?? '')?.toUtc();
+    final source = _gpsSource(map['source']);
+    if (memberId == null ||
+        latitude == null ||
+        longitude == null ||
+        capturedAt == null ||
+        source == null) {
+      return null;
+    }
+    return OperationalCallGpsSnapshot(
+      memberId: memberId,
+      latitude: latitude,
+      longitude: longitude,
+      accuracyMeters: _double(map['accuracyMeters']),
+      capturedAt: capturedAt,
+      deviceId: _clean(map['deviceId']?.toString()),
+      assignmentId: _clean(map['assignmentId']?.toString()),
+      distanceFromTargetMeters: _double(map['distanceFromTargetMeters']),
+      source: source,
+    );
+  }
+
   static List<String> _stringList(Object? value) => value is List
       ? value.map((item) => item.toString()).toList(growable: false)
       : const <String>[];
 
+  static double? _double(Object? value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '');
+  }
+
   static String? _clean(String? value) {
     final trimmed = value?.trim();
     return trimmed == null || trimmed.isEmpty ? null : trimmed;
+  }
+
+  static OperationalCallGpsSource? _gpsSource(Object? value) {
+    final name = value?.toString();
+    for (final item in OperationalCallGpsSource.values) {
+      if (item.name == name) return item;
+    }
+    return null;
   }
 
   static OperationalCallKind? _kind(Object? value) {

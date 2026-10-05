@@ -9,6 +9,7 @@ import '../geography/geography_registry.dart';
 import '../membership/membership_store.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
+import 'field_assignment_call_panel.dart';
 import 'field_operations_store.dart';
 
 class FieldMonitoringPage extends StatefulWidget {
@@ -25,6 +26,8 @@ class _FieldMonitoringPageState extends State<FieldMonitoringPage> {
 
   @override
   Widget build(BuildContext context) {
+    final session = TgcgSession.of(context);
+    final isStateCoordinator = session.role == TgcgRole.stateCoordinator;
     final store = FieldOperations.of(context);
     final fieldScopes = <GeographicScope>[
       ...TgcgAccessPolicy.scopesFor(context, TgcgCapability.viewIncidents),
@@ -45,14 +48,16 @@ class _FieldMonitoringPageState extends State<FieldMonitoringPage> {
           ),
         )
         .toList(growable: false);
-    final canCreateIncident = TgcgAccessPolicy.allows(
-      context,
-      TgcgCapability.createIncident,
-    );
-    final canSubmitFieldReport = TgcgAccessPolicy.allows(
-      context,
-      TgcgCapability.submitFieldReport,
-    );
+    final canCreateIncident = !isStateCoordinator &&
+        TgcgAccessPolicy.allows(
+          context,
+          TgcgCapability.createIncident,
+        );
+    final canSubmitFieldReport = !isStateCoordinator &&
+        TgcgAccessPolicy.allows(
+          context,
+          TgcgCapability.submitFieldReport,
+        );
 
     if (statusFilter != null) {
       incidents = incidents
@@ -123,9 +128,12 @@ class _FieldMonitoringPageState extends State<FieldMonitoringPage> {
       children: [
         TgcgPageHeader(
           eyebrow: 'FIELD OPERATIONS',
-          title: 'Field Monitoring & Incident Capture',
-          subtitle:
-              '${fieldScopes.length} authorized scope${fieldScopes.length == 1 ? '' : 's'}: structured field reporting, incident response, evidence context and operational escalation.',
+          title: isStateCoordinator
+              ? 'Field Command Monitoring'
+              : 'Field Monitoring & Incident Capture',
+          subtitle: isStateCoordinator
+              ? GeographicScope.kaduna.label
+              : '${fieldScopes.length} authorized scope${fieldScopes.length == 1 ? '' : 's'}',
           trailing: Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -153,8 +161,14 @@ class _FieldMonitoringPageState extends State<FieldMonitoringPage> {
           evidenceItems: evidence,
           geoTagged: geoTagged,
         ),
-        const SizedBox(height: 16),
-        _CaptureReadinessBanner(),
+        if (isStateCoordinator) ...[
+          const SizedBox(height: 16),
+          const FieldAssignmentCallPanel(),
+        ],
+        if (!isStateCoordinator) ...[
+          const SizedBox(height: 16),
+          _CaptureReadinessBanner(),
+        ],
         const SizedBox(height: 16),
         _Filters(
           status: statusFilter,
