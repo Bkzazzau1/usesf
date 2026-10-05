@@ -4,6 +4,9 @@ import '../access/access_policy.dart';
 import '../access/effective_member_access.dart';
 import '../devices/managed_device_store.dart';
 import '../domain/permissions.dart';
+import '../domain/models.dart';
+import '../edge_ai/assignment_edge_ai_panel.dart';
+import '../edge_ai/assignment_edge_ai_store.dart';
 import '../geography/geography_registry.dart';
 import '../membership/membership_store.dart';
 import '../meeting/operational_call_store.dart';
@@ -30,6 +33,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     final membership = MembershipOperations.of(context);
     final devices = ManagedDevices.of(context);
     final assignments = Assignments.of(context);
+    final edgeAi = AssignmentEdgeAi.of(context);
     final calls = OperationalCalls.of(context);
     final stateCoordinatorScope = stateCoordinatorGroupScope(context, session);
     final assignmentScopes = TgcgAccessPolicy.scopesFor(
@@ -119,6 +123,17 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     final coverage = coverageByUnit.values.toList(growable: false);
     final gaps = coverage.where((item) => item.needsAttention).toList();
     final staffed = coverage.where((item) => !item.isBelowMinimum).length;
+    final edgeSnapshots = visible
+        .where((item) => !item.isTerminal)
+        .map(edgeAi.snapshotFor)
+        .toList(growable: false);
+    final edgeAlerts = edgeSnapshots.fold<int>(
+      0,
+      (total, item) => total + item.alertCount,
+    );
+    final edgeRisks = edgeSnapshots
+        .where((item) => item.health == AssignmentEdgeAiHealth.risk)
+        .length;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 36),
@@ -231,6 +246,16 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                   icon: Icons.phone_android_rounded,
                   tone: TgcgMetricTone.neutral,
                 ),
+                TgcgMetricCard(
+                  width: width,
+                  label: 'Edge AI alerts',
+                  value: '$edgeAlerts',
+                  detail: '$edgeRisks risk assignments',
+                  icon: Icons.psychology_alt_outlined,
+                  tone: edgeRisks > 0
+                      ? TgcgMetricTone.warning
+                      : TgcgMetricTone.ai,
+                ),
               ],
             );
           },
@@ -257,6 +282,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
           _RegisterView.group => GroupAssignmentPanel(
             controller: assignments,
             membership: membership,
+            edgeAi: edgeAi,
             groups: openGroups,
             onCreate: () => _createGroupAssignment(
               context,
@@ -304,6 +330,7 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                 : assignmentScopes.first,
             calls: calls,
             session: session,
+            edgeAi: edgeAi,
             stateCoordinatorScope: stateCoordinatorScope,
           ),
           _RegisterView.submitted => _SubmittedAssignments(
@@ -1430,6 +1457,7 @@ class _AssignmentList extends StatelessWidget {
     required this.authorizedScope,
     required this.calls,
     required this.session,
+    required this.edgeAi,
     required this.stateCoordinatorScope,
     this.title = 'Deployment assignments',
     this.subtitle =
@@ -1452,6 +1480,7 @@ class _AssignmentList extends StatelessWidget {
   final GeographicScope authorizedScope;
   final OperationalCallController calls;
   final TgcgSessionController session;
+  final AssignmentEdgeAiController edgeAi;
   final GeographicScope? stateCoordinatorScope;
 
   @override
@@ -1476,6 +1505,7 @@ class _AssignmentList extends StatelessWidget {
               final coordinateReady =
                   targetUnit?.operationalLatitude != null &&
                   targetUnit?.operationalLongitude != null;
+              final aiSnapshot = edgeAi.snapshotFor(assignment);
               return Container(
                 width: double.infinity,
                 margin: const EdgeInsets.only(bottom: 9),
@@ -1539,6 +1569,7 @@ class _AssignmentList extends StatelessWidget {
                                 color: _presenceColor(presence),
                                 compact: true,
                               ),
+                              AssignmentEdgeAiPill(snapshot: aiSnapshot),
                               if (targetUnit != null)
                                 TgcgStatusPill(
                                   label: coordinateReady
@@ -1569,7 +1600,15 @@ class _AssignmentList extends StatelessWidget {
                       PopupMenuButton<_AssignmentMenuAction>(
                         tooltip: 'Assignment actions',
                         onSelected: (action) async {
-                          if (action == _AssignmentMenuAction.videoCall ||
+                          if (action == _AssignmentMenuAction.edgeAi) {
+                            await showAssignmentEdgeAiDialog(
+                              context,
+                              assignment: assignment,
+                              edgeAi: edgeAi,
+                              actorId: actorId,
+                              authorizedScope: authorizedScope,
+                            );
+                          } else if (action == _AssignmentMenuAction.videoCall ||
                               action == _AssignmentMenuAction.audioCall) {
                             final targetMember = membership.memberById(
                               assignment.memberId,
@@ -1619,6 +1658,19 @@ class _AssignmentList extends StatelessWidget {
                           }
                         },
                         itemBuilder: (context) => [
+                          if (canManage)
+                            const PopupMenuItem(
+                              value: _AssignmentMenuAction.edgeAi,
+                              child: Row(
+                                children: [
+                                  Icon(Icons.psychology_alt_outlined, size: 18),
+                                  SizedBox(width: 8),
+                                  Text('Edge AI'),
+                                ],
+                              ),
+                            ),
+                          if (canManage && stateCoordinatorScope != null)
+                            const PopupMenuDivider(),
                           if (stateCoordinatorScope != null) ...[
                             const PopupMenuItem(
                               value: _AssignmentMenuAction.videoCall,
@@ -1819,6 +1871,7 @@ class _AssignmentList extends StatelessWidget {
 }
 
 enum _AssignmentMenuAction {
+  edgeAi,
   videoCall,
   audioCall,
   coordinate,
