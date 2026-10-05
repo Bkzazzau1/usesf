@@ -1015,7 +1015,7 @@ class _GatewayWorkspace extends StatelessWidget {
                 'Fallback alphanumeric result, incident and acknowledgement transport.',
             protocol: 'SMPP / HTTP integration',
             safeguards: [
-              'Agent ID + PIN validation',
+              'Member ID / VIN + credential validation',
               'Registered SIM / phone binding',
               'Polling-unit validation',
               'Duplicate and arithmetic checks',
@@ -1029,7 +1029,7 @@ class _GatewayWorkspace extends StatelessWidget {
                 'Low-bandwidth fallback workflow for structured field transactions.',
             protocol: 'USSD aggregator integration',
             safeguards: [
-              'Session-bound Agent ID',
+              'Session-bound member identity',
               'Short structured transaction flow',
               'Canonical polling-unit reference',
               'Server validation before acceptance',
