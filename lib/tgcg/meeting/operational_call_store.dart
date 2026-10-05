@@ -372,6 +372,7 @@ class OperationalCallController extends ChangeNotifier {
     required TgcgRole callerRole,
     required GeographicScope authorizedScope,
     String? assignmentId,
+    String? groupAssignmentId,
   }) =>
       _startCall(
         recipientMemberIds: [recipientMemberId],
@@ -381,6 +382,7 @@ class OperationalCallController extends ChangeNotifier {
         callerRole: callerRole,
         authorizedScope: authorizedScope,
         assignmentId: assignmentId,
+        groupAssignmentId: groupAssignmentId,
       );
 
   Future<OperationalCallSession> startConference({
