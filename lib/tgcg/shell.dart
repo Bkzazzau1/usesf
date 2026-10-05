@@ -55,8 +55,18 @@ class _TgcgShellState extends State<TgcgShell> {
   Widget build(BuildContext context) {
     final session = TgcgSession.of(context);
     final capabilities = TgcgAccessPolicy.capabilities(context);
+    final memberLayoutRole = session.role == TgcgRole.member
+        ? TgcgAccessPolicy.roleFor(
+              context,
+              TgcgCapability.viewGeography,
+            ) ??
+            TgcgRole.member
+        : session.role!;
     final allowed = session.role == TgcgRole.member
-        ? modulesForCapabilities(capabilities)
+        ? modulesForCapabilities(
+            capabilities,
+            role: memberLayoutRole,
+          )
         : allowedModules(session.role!);
     if (!allowed.contains(selectedModule)) {
       selectedModule = allowed.contains(TgcgModule.overview)
