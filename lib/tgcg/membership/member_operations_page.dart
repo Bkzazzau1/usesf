@@ -147,7 +147,7 @@ class _MemberOperationsPageState extends State<MemberOperationsPage> {
               if (canEnroll)
                 OutlinedButton.icon(
                   onPressed: () =>
-                      widget.onOpenModule(TgcgModule.accreditation),
+                      widget.onOpenModule(TgcgModule.memberEnrollment),
                   icon: const Icon(Icons.person_add_alt_1_rounded),
                   label: const Text('Enrol member'),
                 ),
