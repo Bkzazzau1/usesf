@@ -856,10 +856,17 @@ class AssignmentController extends ChangeNotifier {
         '${notGrantable.map((item) => item.name).join(', ')}.',
       );
     }
-    final notHeld = grantedCapabilities.difference(assignerCapabilities);
+    final delegableCapabilities = Set<TgcgCapability>.of(
+      assignerCapabilities,
+    );
+    if (assignerCapabilities.contains(TgcgCapability.manageAssignments) &&
+        assignerCapabilities.contains(TgcgCapability.viewEvidence)) {
+      delegableCapabilities.add(TgcgCapability.captureEvidence);
+    }
+    final notHeld = grantedCapabilities.difference(delegableCapabilities);
     if (notHeld.isNotEmpty) {
       throw StateError(
-        'You cannot grant capabilities you do not hold in this area: '
+        'You cannot grant capabilities you do not hold or manage in this area: '
         '${notHeld.map((item) => item.name).join(', ')}.',
       );
     }
@@ -1038,10 +1045,17 @@ class AssignmentController extends ChangeNotifier {
         '${notGrantable.map((item) => item.name).join(', ')}.',
       );
     }
-    final notHeld = grantedCapabilities.difference(assignerCapabilities);
+    final delegableCapabilities = Set<TgcgCapability>.of(
+      assignerCapabilities,
+    );
+    if (assignerCapabilities.contains(TgcgCapability.manageAssignments) &&
+        assignerCapabilities.contains(TgcgCapability.viewEvidence)) {
+      delegableCapabilities.add(TgcgCapability.captureEvidence);
+    }
+    final notHeld = grantedCapabilities.difference(delegableCapabilities);
     if (notHeld.isNotEmpty) {
       throw StateError(
-        'You cannot grant capabilities you do not hold in this area: '
+        'You cannot grant capabilities you do not hold or manage in this area: '
         '${notHeld.map((item) => item.name).join(', ')}.',
       );
     }
