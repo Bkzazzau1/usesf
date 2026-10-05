@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../access/access_policy.dart';
+import '../domain/permissions.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
 
@@ -19,6 +21,15 @@ class _AiVerificationPageState extends State<AiVerificationPage> {
   @override
   Widget build(BuildContext context) {
     final session = TgcgSession.of(context);
+    final scopes = TgcgAccessPolicy.scopesForAny(
+      context,
+      const [
+        TgcgCapability.verifyElectionResult,
+        TgcgCapability.manageMembership,
+        TgcgCapability.manageEvidence,
+      ],
+    );
+    final scope = scopes.isEmpty ? session.scope : scopes.first;
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 36),
       children: [
@@ -26,7 +37,7 @@ class _AiVerificationPageState extends State<AiVerificationPage> {
           eyebrow: 'AI ASSISTED REVIEW',
           title: 'AI Verification Centre',
           subtitle:
-              '${session.scope.label}: assisted PVC extraction, result-form verification and identity checks with human confirmation.',
+              '${scopes.length <= 1 ? scope.label : '${scopes.length} authorized scopes'}: assisted PVC extraction and result-form checks. Member identity review remains a backend human-review process.',
           trailing: const TgcgStatusPill(
             label: 'HUMAN REVIEW',
             color: TgcgColors.accent,
@@ -91,9 +102,9 @@ class _Metrics extends StatelessWidget {
               ),
               TgcgMetricCard(
                 width: width,
-                label: 'Identity checks',
+                label: 'Identity reviews',
                 value: '129',
-                detail: '125 matched',
+                detail: 'Backend human review only',
                 icon: Icons.face_retouching_natural_outlined,
                 tone: TgcgMetricTone.success,
               ),
@@ -142,7 +153,7 @@ class _WorkflowSelector extends StatelessWidget {
               value: _AiWorkflow.identity,
               selected: selected,
               icon: Icons.face_outlined,
-              label: 'Face & Liveness',
+              label: 'Identity Review',
               onChanged: onChanged,
             ),
           ],
@@ -292,27 +303,31 @@ class _IdentityPanel extends StatelessWidget {
   final ValueChanged<String> onConfirm;
 
   @override
-  Widget build(BuildContext context) => _ReviewLayout(
-        preview: const _FacePreview(),
-        details: _ReviewCard(
-          title: 'Agent identity check',
-          status: reviewed.contains('AG-KD-001') ? 'CONFIRMED' : 'MATCH 97.9%',
-          statusColor: TgcgColors.success,
-          rows: const [
-            ('Agent', 'Amina Yusuf'),
-            ('Agent ID', 'AG-KD-001'),
-            ('Liveness', 'Passed'),
-            ('Face match', '97.9%'),
-            ('Assigned PU', 'PU 001'),
-          ],
-          checks: const [
-            'Live face detected',
-            'Anti-spoof check passed',
-            'Enrollment portrait matched',
-            'Agent assignment resolved',
-          ],
-          buttonLabel: reviewed.contains('AG-KD-001') ? 'Identity confirmed' : 'Confirm agent identity',
-          onPressed: reviewed.contains('AG-KD-001') ? null : () => onConfirm('AG-KD-001'),
+  Widget build(BuildContext context) => const _ReviewLayout(
+        preview: _FacePreview(),
+        details: TgcgSectionCard(
+          title: 'Backend identity review',
+          subtitle:
+              'Operational users cannot approve identity from this screen.',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TgcgStatusPill(
+                label: 'HUMAN REVIEW REQUIRED',
+                color: TgcgColors.warning,
+                icon: Icons.person_search_outlined,
+              ),
+              SizedBox(height: 14),
+              Text(
+                'Registration keeps the live selfie for internal review. No automatic face-match score is used to approve the member. The backend System Admin marks the account verified or suspicious after human review.',
+                style: TextStyle(
+                  color: TgcgColors.muted,
+                  fontSize: 11,
+                  height: 1.5,
+                ),
+              ),
+            ],
+          ),
         ),
       );
 }
