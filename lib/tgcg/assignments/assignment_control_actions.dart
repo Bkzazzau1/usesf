@@ -15,6 +15,7 @@ Future<void> startStateCoordinatorMemberCall(
   required TgcgMember member,
   required OperationalCallKind kind,
   String? assignmentId,
+  String? groupAssignmentId,
 }) async {
   final call = await calls.startDirectCall(
     recipientMemberId: member.id,
@@ -26,6 +27,7 @@ Future<void> startStateCoordinatorMemberCall(
     callerRole: TgcgRole.stateCoordinator,
     authorizedScope: stateScope,
     assignmentId: assignmentId,
+    groupAssignmentId: groupAssignmentId,
   );
   if (!context.mounted) return;
   await Navigator.of(context).push(
