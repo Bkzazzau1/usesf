@@ -169,7 +169,7 @@ class _TgcgShellState extends State<TgcgShell> {
         TgcgModule.overview => session.role == TgcgRole.member
             ? const MemberShell()
             : TgcgDashboardPage(onOpenModule: _select),
-        TgcgModule.accreditation => PvcEnrollmentPage(
+        TgcgModule.memberEnrollment => PvcEnrollmentPage(
             onOpenAssignments: () => _select(TgcgModule.assignmentControl),
           ),
         TgcgModule.membershipNetwork => MemberOperationsPage(
@@ -221,7 +221,7 @@ const _destinations = <_Destination>[
   _Destination(TgcgModule.mediaIntelligence, 'Media Intelligence', Icons.insights_outlined, _NavGroup.command),
   _Destination(TgcgModule.geography, 'Geographic Operations', Icons.public_rounded, _NavGroup.command),
   _Destination(TgcgModule.assignmentControl, 'Assignment Control', Icons.assignment_ind_outlined, _NavGroup.fieldOperations),
-  _Destination(TgcgModule.accreditation, 'Member Enrolment', Icons.how_to_reg_outlined, _NavGroup.fieldOperations),
+  _Destination(TgcgModule.memberEnrollment, 'Member Enrolment', Icons.how_to_reg_outlined, _NavGroup.fieldOperations),
   _Destination(TgcgModule.aiVerification, 'AI Verification', Icons.auto_awesome_rounded, _NavGroup.fieldOperations),
   _Destination(TgcgModule.fieldMonitoring, 'Field Monitoring', Icons.sensors_outlined, _NavGroup.fieldOperations),
   _Destination(TgcgModule.evidenceCapture, 'Evidence Capture', Icons.perm_media_outlined, _NavGroup.fieldOperations),
@@ -668,7 +668,7 @@ String _groupLabel(_NavGroup group) => switch (group) {
 
 String _moduleLabel(TgcgModule module) => switch (module) {
       TgcgModule.overview => 'Command Overview',
-      TgcgModule.accreditation => 'Member Enrolment',
+      TgcgModule.memberEnrollment => 'Member Enrolment',
       TgcgModule.membershipNetwork => 'Registered Members',
       TgcgModule.roleAssignment => 'Role Assignment',
       TgcgModule.geography => 'Geographic Operations',
