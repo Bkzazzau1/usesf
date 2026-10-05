@@ -49,16 +49,9 @@ enum AssignmentStatus {
   cancelled,
 }
 
-enum AssignmentPriority {
-  normal,
-  high,
-  critical,
-}
+enum AssignmentPriority { normal, high, critical }
 
-enum AssignmentLocationMode {
-  none,
-  pollingUnit,
-}
+enum AssignmentLocationMode { none, pollingUnit }
 
 enum AssignmentPresence {
   /// No GPS fix has been received.
@@ -72,18 +65,9 @@ enum AssignmentPresence {
   stale,
 }
 
-enum GroupAssignmentDistribution {
-  together,
-  manual,
-  automatic,
-}
+enum GroupAssignmentDistribution { together, manual, automatic }
 
-enum GroupAssignmentStatus {
-  assigned,
-  active,
-  submitted,
-  cancelled,
-}
+enum GroupAssignmentStatus { assigned, active, submitted, cancelled }
 
 class PollingUnitCoverageSnapshot {
   const PollingUnitCoverageSnapshot({
@@ -109,8 +93,7 @@ class PollingUnitCoverageSnapshot {
   bool get hasPresenceGap =>
       activeAssignments > 0 && atLocation < activeAssignments;
   bool get hasGpsAlert => staleGps > 0 || gpsMismatch > 0;
-  bool get needsAttention =>
-      isBelowMinimum || hasPresenceGap || hasGpsAlert;
+  bool get needsAttention => isBelowMinimum || hasPresenceGap || hasGpsAlert;
 }
 
 class AssignmentLocationPing {
@@ -203,26 +186,25 @@ class GroupAssignment {
     String? submittedBy,
     DateTime? cancelledAt,
     String? cancelledBy,
-  }) =>
-      GroupAssignment(
-        id: id,
-        title: title,
-        chairmanMemberId: chairmanMemberId ?? this.chairmanMemberId,
-        memberIds: memberIds,
-        targetScopes: targetScopes,
-        distribution: distribution,
-        assignedBy: assignedBy,
-        assignedAt: assignedAt,
-        status: status ?? this.status,
-        priority: priority,
-        instructions: instructions,
-        dueAt: dueAt,
-        submittedAt: submittedAt ?? this.submittedAt,
-        submittedBy: submittedBy ?? this.submittedBy,
-        cancelledAt: cancelledAt ?? this.cancelledAt,
-        cancelledBy: cancelledBy ?? this.cancelledBy,
-        systemIntelligenceRestricted: systemIntelligenceRestricted,
-      );
+  }) => GroupAssignment(
+    id: id,
+    title: title,
+    chairmanMemberId: chairmanMemberId ?? this.chairmanMemberId,
+    memberIds: memberIds,
+    targetScopes: targetScopes,
+    distribution: distribution,
+    assignedBy: assignedBy,
+    assignedAt: assignedAt,
+    status: status ?? this.status,
+    priority: priority,
+    instructions: instructions,
+    dueAt: dueAt,
+    submittedAt: submittedAt ?? this.submittedAt,
+    submittedBy: submittedBy ?? this.submittedBy,
+    cancelledAt: cancelledAt ?? this.cancelledAt,
+    cancelledBy: cancelledBy ?? this.cancelledBy,
+    systemIntelligenceRestricted: systemIntelligenceRestricted,
+  );
 }
 
 class MemberAssignment {
@@ -322,38 +304,35 @@ class MemberAssignment {
     String? groupAssignmentId,
     bool? isGroupChairman,
     bool? systemIntelligenceRestricted,
-  }) =>
-      MemberAssignment(
-        id: id,
-        title: title,
-        memberId: memberId ?? this.memberId,
-        targetPollingUnitId:
-            targetPollingUnitId ?? this.targetPollingUnitId,
-        targetScope: targetScope ?? this.targetScope,
-        locationMode: locationMode ?? this.locationMode,
-        assignedBy: assignedBy ?? this.assignedBy,
-        assignedAt: assignedAt ?? this.assignedAt,
-        status: status ?? this.status,
-        priority: priority ?? this.priority,
-        instructions: instructions ?? this.instructions,
-        deviceId: clearDeviceId ? null : deviceId ?? this.deviceId,
-        acceptedAt: acceptedAt ?? this.acceptedAt,
-        enRouteAt: enRouteAt ?? this.enRouteAt,
-        checkedInAt: checkedInAt ?? this.checkedInAt,
-        activatedAt: activatedAt ?? this.activatedAt,
-        completedAt: completedAt ?? this.completedAt,
-        cancelledAt: cancelledAt ?? this.cancelledAt,
-        dueAt: clearDueAt ? null : dueAt ?? this.dueAt,
-        lastLocation: lastLocation ?? this.lastLocation,
-        requiredEvidence: requiredEvidence,
-        grantedCapabilities:
-            grantedCapabilities ?? this.grantedCapabilities,
-        evidence: evidence ?? this.evidence,
-        groupAssignmentId: groupAssignmentId ?? this.groupAssignmentId,
-        isGroupChairman: isGroupChairman ?? this.isGroupChairman,
-        systemIntelligenceRestricted:
-            systemIntelligenceRestricted ?? this.systemIntelligenceRestricted,
-      );
+  }) => MemberAssignment(
+    id: id,
+    title: title,
+    memberId: memberId ?? this.memberId,
+    targetPollingUnitId: targetPollingUnitId ?? this.targetPollingUnitId,
+    targetScope: targetScope ?? this.targetScope,
+    locationMode: locationMode ?? this.locationMode,
+    assignedBy: assignedBy ?? this.assignedBy,
+    assignedAt: assignedAt ?? this.assignedAt,
+    status: status ?? this.status,
+    priority: priority ?? this.priority,
+    instructions: instructions ?? this.instructions,
+    deviceId: clearDeviceId ? null : deviceId ?? this.deviceId,
+    acceptedAt: acceptedAt ?? this.acceptedAt,
+    enRouteAt: enRouteAt ?? this.enRouteAt,
+    checkedInAt: checkedInAt ?? this.checkedInAt,
+    activatedAt: activatedAt ?? this.activatedAt,
+    completedAt: completedAt ?? this.completedAt,
+    cancelledAt: cancelledAt ?? this.cancelledAt,
+    dueAt: clearDueAt ? null : dueAt ?? this.dueAt,
+    lastLocation: lastLocation ?? this.lastLocation,
+    requiredEvidence: requiredEvidence,
+    grantedCapabilities: grantedCapabilities ?? this.grantedCapabilities,
+    evidence: evidence ?? this.evidence,
+    groupAssignmentId: groupAssignmentId ?? this.groupAssignmentId,
+    isGroupChairman: isGroupChairman ?? this.isGroupChairman,
+    systemIntelligenceRestricted:
+        systemIntelligenceRestricted ?? this.systemIntelligenceRestricted,
+  );
 }
 
 class AssignmentController extends ChangeNotifier {
@@ -365,25 +344,34 @@ class AssignmentController extends ChangeNotifier {
     List<GroupAssignment> groupAssignments = const [],
     List<AssignmentEvent> events = const [],
     Map<String, int> minimumStaffingByPollingUnit = const {},
-  })  : _membership = membership,
-        _devices = devices,
-        _persistence = persistence,
-        _assignments = List<MemberAssignment>.of(assignments),
-        _groupAssignments = List<GroupAssignment>.of(groupAssignments),
-        _events = List<AssignmentEvent>.of(events),
-        _minimumStaffingByPollingUnit =
-            Map<String, int>.of(minimumStaffingByPollingUnit);
+  }) : _membership = membership,
+       _devices = devices,
+       _persistence = persistence,
+       _assignments = List<MemberAssignment>.of(assignments),
+       _groupAssignments = List<GroupAssignment>.of(groupAssignments),
+       _events = List<AssignmentEvent>.of(events),
+       _minimumStaffingByPollingUnit = Map<String, int>.of(
+         minimumStaffingByPollingUnit,
+       );
 
+  /// Presentation seed: open work starts empty, and a few already-completed
+  /// individual duties plus one chairman-submitted group populate the
+  /// Submitted register. Completed work is terminal, so it grants no access.
   factory AssignmentController.prototypeSeed({
     required MembershipOperationsController membership,
     required ManagedDeviceController devices,
     required OfflinePersistenceController persistence,
-  }) =>
-      AssignmentController(
-        membership: membership,
-        devices: devices,
-        persistence: persistence,
-      );
+  }) {
+    final seed = _SubmittedPrototypeSeed(membership.geography);
+    return AssignmentController(
+      membership: membership,
+      devices: devices,
+      persistence: persistence,
+      assignments: seed.assignments,
+      groupAssignments: seed.groups,
+      events: seed.events,
+    );
+  }
 
   final MembershipOperationsController _membership;
   final ManagedDeviceController _devices;
@@ -393,8 +381,7 @@ class AssignmentController extends ChangeNotifier {
   final List<AssignmentEvent> _events;
   final Map<String, int> _minimumStaffingByPollingUnit;
 
-  List<MemberAssignment> get assignments =>
-      List.unmodifiable(_assignments);
+  List<MemberAssignment> get assignments => List.unmodifiable(_assignments);
   List<GroupAssignment> get groupAssignments =>
       List.unmodifiable(_groupAssignments);
 
@@ -475,13 +462,15 @@ class AssignmentController extends ChangeNotifier {
             accuracyMeters: accuracy,
             capturedAt: capturedAt,
             deviceId: deviceId,
-            distanceFromTargetMeters:
-                _double(location['distanceFromTargetMeters']),
+            distanceFromTargetMeters: _double(
+              location['distanceFromTargetMeters'],
+            ),
           );
         }
       }
 
-      final locationMode = _assignmentLocationMode(row['locationMode']) ??
+      final locationMode =
+          _assignmentLocationMode(row['locationMode']) ??
           (pollingUnitId == null
               ? AssignmentLocationMode.none
               : AssignmentLocationMode.pollingUnit);
@@ -544,9 +533,9 @@ class AssignmentController extends ChangeNotifier {
       final priority = _assignmentPriority(row['priority']);
       final memberIds = row['memberIds'] is List
           ? (row['memberIds'] as List)
-              .map((item) => item.toString())
-              .where((item) => item.isNotEmpty)
-              .toList(growable: false)
+                .map((item) => item.toString())
+                .where((item) => item.isNotEmpty)
+                .toList(growable: false)
           : const <String>[];
       final targetScopes = <GeographicScope>[];
       final targetsRaw = row['targetScopes'];
@@ -632,25 +621,19 @@ class AssignmentController extends ChangeNotifier {
       final pollingUnitId = row['pollingUnitId']?.toString();
       final minimum = _int(row['minimumStaffing']);
       if (pollingUnitId == null || minimum == null) continue;
-      _minimumStaffingByPollingUnit[pollingUnitId] =
-          minimum.clamp(0, 100).toInt();
+      _minimumStaffingByPollingUnit[pollingUnitId] = minimum
+          .clamp(0, 100)
+          .toInt();
       changed = true;
     }
 
     if (changed) {
-      _assignments.sort(
-        (a, b) => b.assignedAt.compareTo(a.assignedAt),
-      );
-      _groupAssignments.sort(
-        (a, b) => b.assignedAt.compareTo(a.assignedAt),
-      );
-      _events.sort(
-        (a, b) => a.createdAt.compareTo(b.createdAt),
-      );
+      _assignments.sort((a, b) => b.assignedAt.compareTo(a.assignedAt));
+      _groupAssignments.sort((a, b) => b.assignedAt.compareTo(a.assignedAt));
+      _events.sort((a, b) => a.createdAt.compareTo(b.createdAt));
       notifyListeners();
     }
   }
-
 
   List<AssignmentEvent> get events => List.unmodifiable(_events);
 
@@ -675,15 +658,13 @@ class AssignmentController extends ChangeNotifier {
   }
 
   List<MemberAssignment> assignmentsForMember(String memberId) =>
-      _assignments
-          .where((item) => item.memberId == memberId)
-          .toList()
+      _assignments.where((item) => item.memberId == memberId).toList()
         ..sort((a, b) => b.assignedAt.compareTo(a.assignedAt));
 
   List<MemberAssignment> activeAssignmentsForMember(String memberId) =>
-      assignmentsForMember(memberId)
-          .where((item) => !item.isTerminal)
-          .toList(growable: false);
+      assignmentsForMember(
+        memberId,
+      ).where((item) => !item.isTerminal).toList(growable: false);
 
   Set<TgcgCapability> activeAssignmentCapabilitiesForMember(String memberId) =>
       activeAssignmentsForMember(memberId)
@@ -694,20 +675,16 @@ class AssignmentController extends ChangeNotifier {
   List<MemberAssignment> assignmentsForScope(GeographicScope scope) =>
       _assignments
           .where(
-            (item) =>
-                GeographyRegistry.scopeContains(scope, item.targetScope),
+            (item) => GeographyRegistry.scopeContains(scope, item.targetScope),
           )
           .toList()
         ..sort((a, b) => b.assignedAt.compareTo(a.assignedAt));
 
   List<AssignmentEvent> eventsForAssignment(String assignmentId) =>
-      _events
-          .where((item) => item.assignmentId == assignmentId)
-          .toList()
+      _events.where((item) => item.assignmentId == assignmentId).toList()
         ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
-  int get activeCount =>
-      _assignments.where((item) => !item.isTerminal).length;
+  int get activeCount => _assignments.where((item) => !item.isTerminal).length;
 
   int get checkedInCount => _assignments
       .where(
@@ -721,10 +698,7 @@ class AssignmentController extends ChangeNotifier {
       .where((item) => item.status == AssignmentStatus.gpsMismatch)
       .length;
 
-  int minimumStaffingFor(
-    String pollingUnitId, {
-    int fallback = 1,
-  }) =>
+  int minimumStaffingFor(String pollingUnitId, {int fallback = 1}) =>
       _minimumStaffingByPollingUnit[pollingUnitId] ?? fallback;
 
   Future<void> setMinimumStaffing({
@@ -734,9 +708,7 @@ class AssignmentController extends ChangeNotifier {
     GeographicScope? authorizedScope,
   }) async {
     if (minimumStaffing < 0 || minimumStaffing > 100) {
-      throw ArgumentError(
-        'Minimum staffing must be between 0 and 100.',
-      );
+      throw ArgumentError('Minimum staffing must be between 0 and 100.');
     }
     final unit = _membership.geography.pollingUnit(pollingUnitId);
     if (unit == null) {
@@ -828,19 +800,18 @@ class AssignmentController extends ChangeNotifier {
   List<PollingUnitCoverageSnapshot> coverageGapsForScope(
     GeographicScope scope, {
     int minimumStaffing = 1,
-  }) =>
-      coverageForScope(
-        scope,
-        minimumStaffing: minimumStaffing,
-      ).where((item) => item.needsAttention).toList(growable: false);
+  }) => coverageForScope(
+    scope,
+    minimumStaffing: minimumStaffing,
+  ).where((item) => item.needsAttention).toList(growable: false);
 
   int staffedPollingUnitCount(
     GeographicScope scope, {
     int minimumStaffing = 1,
-  }) =>
-      coverageForScope(scope, minimumStaffing: minimumStaffing)
-          .where((item) => !item.isBelowMinimum)
-          .length;
+  }) => coverageForScope(
+    scope,
+    minimumStaffing: minimumStaffing,
+  ).where((item) => !item.isBelowMinimum).length;
 
   Future<MemberAssignment> createAssignment({
     required String title,
@@ -867,15 +838,17 @@ class AssignmentController extends ChangeNotifier {
       throw ArgumentError('Unknown USESF member: $memberId');
     }
 
-    final restricted =
-        grantedCapabilities.intersection(groupAssignmentRestrictedCapabilities);
+    final restricted = grantedCapabilities.intersection(
+      groupAssignmentRestrictedCapabilities,
+    );
     if (groupAssignmentId != null && restricted.isNotEmpty) {
       throw StateError(
         'Internal intelligence capabilities cannot be granted to group members.',
       );
     }
-    final notGrantable =
-        grantedCapabilities.difference(assignmentGrantableCapabilities);
+    final notGrantable = grantedCapabilities.difference(
+      assignmentGrantableCapabilities,
+    );
     if (notGrantable.isNotEmpty) {
       throw StateError(
         'These capabilities cannot be granted through an assignment: '
@@ -939,7 +912,8 @@ class AssignmentController extends ChangeNotifier {
       }
     }
 
-    final assignmentScope = unit?.scope ??
+    final assignmentScope =
+        unit?.scope ??
         targetScopeOverride ??
         authorizedScope ??
         memberScope ??
@@ -1046,15 +1020,17 @@ class AssignmentController extends ChangeNotifier {
       }
     }
 
-    final restrictedGroupCapabilities =
-        grantedCapabilities.intersection(groupAssignmentRestrictedCapabilities);
+    final restrictedGroupCapabilities = grantedCapabilities.intersection(
+      groupAssignmentRestrictedCapabilities,
+    );
     if (restrictedGroupCapabilities.isNotEmpty) {
       throw StateError(
         'Internal intelligence capabilities cannot be granted to group members.',
       );
     }
-    final notGrantable =
-        grantedCapabilities.difference(assignmentGrantableCapabilities);
+    final notGrantable = grantedCapabilities.difference(
+      assignmentGrantableCapabilities,
+    );
     if (notGrantable.isNotEmpty) {
       throw StateError(
         'These capabilities cannot be granted through an assignment: '
@@ -1069,8 +1045,8 @@ class AssignmentController extends ChangeNotifier {
       );
     }
 
-    final chairman = _clean(chairmanMemberId) ??
-        _automaticGroupChairman(uniqueMemberIds);
+    final chairman =
+        _clean(chairmanMemberId) ?? _automaticGroupChairman(uniqueMemberIds);
     if (!uniqueMemberIds.contains(chairman)) {
       throw StateError('The group chairman must be a selected member.');
     }
@@ -1138,15 +1114,15 @@ class AssignmentController extends ChangeNotifier {
 
     for (final memberId in uniqueMemberIds) {
       final target = plannedTargets[memberId];
-      final pollingUnitId =
-          target?.level == GeographyLevel.pollingUnit
-              ? target?.pollingUnitId
-              : null;
+      final pollingUnitId = target?.level == GeographyLevel.pollingUnit
+          ? target?.pollingUnitId
+          : null;
       await createAssignment(
         title: group.title,
         memberId: memberId,
         pollingUnitId: pollingUnitId,
-        targetScopeOverride: distribution == GroupAssignmentDistribution.together
+        targetScopeOverride:
+            distribution == GroupAssignmentDistribution.together
             ? authorizedScope
             : target,
         assignedBy: assignedBy,
@@ -1180,8 +1156,9 @@ class AssignmentController extends ChangeNotifier {
       );
     }
 
-    final groupIndex =
-        _groupAssignments.indexWhere((item) => item.id == groupAssignmentId);
+    final groupIndex = _groupAssignments.indexWhere(
+      (item) => item.id == groupAssignmentId,
+    );
     if (groupIndex < 0) {
       throw ArgumentError('Unknown group assignment: $groupAssignmentId');
     }
@@ -1231,8 +1208,9 @@ class AssignmentController extends ChangeNotifier {
     required String groupAssignmentId,
     required String chairmanMemberId,
   }) async {
-    final groupIndex =
-        _groupAssignments.indexWhere((item) => item.id == groupAssignmentId);
+    final groupIndex = _groupAssignments.indexWhere(
+      (item) => item.id == groupAssignmentId,
+    );
     if (groupIndex < 0) {
       throw ArgumentError('Unknown group assignment: $groupAssignmentId');
     }
@@ -1241,9 +1219,7 @@ class AssignmentController extends ChangeNotifier {
       throw StateError('This group assignment is already closed.');
     }
     if (current.chairmanMemberId != chairmanMemberId) {
-      throw StateError(
-        'Only the group chairman can submit this assignment.',
-      );
+      throw StateError('Only the group chairman can submit this assignment.');
     }
 
     final children = assignmentsForGroup(groupAssignmentId);
@@ -1301,8 +1277,7 @@ class AssignmentController extends ChangeNotifier {
     required String actorId,
     GeographicScope? authorizedScope,
   }) async {
-    final index =
-        _assignments.indexWhere((item) => item.id == assignmentId);
+    final index = _assignments.indexWhere((item) => item.id == assignmentId);
     if (index < 0) {
       throw ArgumentError('Unknown assignment: $assignmentId');
     }
@@ -1343,25 +1318,25 @@ class AssignmentController extends ChangeNotifier {
     final now = DateTime.now().toUtc();
     final updated = current.copyWith(
       status: status,
-      acceptedAt:
-          status == AssignmentStatus.accepted ? now : current.acceptedAt,
-      enRouteAt:
-          status == AssignmentStatus.enRoute ? now : current.enRouteAt,
-      checkedInAt:
-          status == AssignmentStatus.checkedIn ? now : current.checkedInAt,
-      activatedAt:
-          status == AssignmentStatus.active ? now : current.activatedAt,
-      completedAt:
-          status == AssignmentStatus.completed ? now : current.completedAt,
-      cancelledAt:
-          status == AssignmentStatus.cancelled ? now : current.cancelledAt,
+      acceptedAt: status == AssignmentStatus.accepted
+          ? now
+          : current.acceptedAt,
+      enRouteAt: status == AssignmentStatus.enRoute ? now : current.enRouteAt,
+      checkedInAt: status == AssignmentStatus.checkedIn
+          ? now
+          : current.checkedInAt,
+      activatedAt: status == AssignmentStatus.active
+          ? now
+          : current.activatedAt,
+      completedAt: status == AssignmentStatus.completed
+          ? now
+          : current.completedAt,
+      cancelledAt: status == AssignmentStatus.cancelled
+          ? now
+          : current.cancelledAt,
     );
     _assignments[index] = updated;
-    await _appendEvent(
-      updated,
-      action: status.name,
-      actorId: actorId,
-    );
+    await _appendEvent(updated, action: status.name, actorId: actorId);
     if (updated.groupAssignmentId != null &&
         status != AssignmentStatus.cancelled &&
         status != AssignmentStatus.declined &&
@@ -1379,8 +1354,7 @@ class AssignmentController extends ChangeNotifier {
     required String actorId,
     GeographicScope? authorizedScope,
   }) async {
-    final index =
-        _assignments.indexWhere((item) => item.id == assignmentId);
+    final index = _assignments.indexWhere((item) => item.id == assignmentId);
     if (index < 0) {
       throw ArgumentError('Unknown assignment: $assignmentId');
     }
@@ -1404,8 +1378,7 @@ class AssignmentController extends ChangeNotifier {
         'This assignment is outside the coordinator authorization scope.',
       );
     }
-    final memberScope =
-        _membership.registrationScopeForMember(newMemberId);
+    final memberScope = _membership.registrationScopeForMember(newMemberId);
     if (authorizedScope != null &&
         memberScope != null &&
         !GeographyRegistry.scopeContains(authorizedScope, memberScope)) {
@@ -1459,8 +1432,7 @@ class AssignmentController extends ChangeNotifier {
     String? appVersion,
     String? syncState,
   }) {
-    final index =
-        _assignments.indexWhere((item) => item.id == assignmentId);
+    final index = _assignments.indexWhere((item) => item.id == assignmentId);
     if (index < 0) return;
     final current = _assignments[index];
     if (current.deviceId != null && current.deviceId != deviceId) {
@@ -1469,8 +1441,8 @@ class AssignmentController extends ChangeNotifier {
     final unit = current.targetPollingUnitId == null
         ? null
         : _membership.geography.pollingUnit(current.targetPollingUnitId!);
-    final distance = unit?.operationalLatitude == null ||
-            unit?.operationalLongitude == null
+    final distance =
+        unit?.operationalLatitude == null || unit?.operationalLongitude == null
         ? null
         : _distanceMeters(
             latitude,
@@ -1511,8 +1483,7 @@ class AssignmentController extends ChangeNotifier {
     required double accuracyMeters,
     required DateTime capturedAt,
   }) async {
-    final index =
-        _assignments.indexWhere((item) => item.id == assignmentId);
+    final index = _assignments.indexWhere((item) => item.id == assignmentId);
     if (index < 0) {
       throw ArgumentError('Unknown assignment: $assignmentId');
     }
@@ -1534,8 +1505,8 @@ class AssignmentController extends ChangeNotifier {
       );
     }
 
-    final distance = unit?.operationalLatitude == null ||
-            unit?.operationalLongitude == null
+    final distance =
+        unit?.operationalLatitude == null || unit?.operationalLongitude == null
         ? null
         : _distanceMeters(
             latitude,
@@ -1551,10 +1522,12 @@ class AssignmentController extends ChangeNotifier {
       deviceId: deviceId,
       distanceFromTargetMeters: distance,
     );
-    final inside = current.locationMode == AssignmentLocationMode.none ||
+    final inside =
+        current.locationMode == AssignmentLocationMode.none ||
         (distance != null && distance <= unit!.geofenceRadiusMeters);
-    final status =
-        inside ? AssignmentStatus.checkedIn : AssignmentStatus.gpsMismatch;
+    final status = inside
+        ? AssignmentStatus.checkedIn
+        : AssignmentStatus.gpsMismatch;
     final updated = current.copyWith(
       status: status,
       checkedInAt: inside ? capturedAt.toUtc() : current.checkedInAt,
@@ -1588,8 +1561,7 @@ class AssignmentController extends ChangeNotifier {
     required String actorId,
     required String deviceId,
   }) async {
-    final index =
-        _assignments.indexWhere((item) => item.id == assignmentId);
+    final index = _assignments.indexWhere((item) => item.id == assignmentId);
     if (index < 0) {
       throw ArgumentError('Unknown assignment: $assignmentId');
     }
@@ -1732,12 +1704,15 @@ class AssignmentController extends ChangeNotifier {
           'completedAt': assignment.completedAt?.toIso8601String(),
           'cancelledAt': assignment.cancelledAt?.toIso8601String(),
           'dueAt': assignment.dueAt?.toIso8601String(),
-          'requiredEvidence':
-              assignment.requiredEvidence.map((item) => item.name).toList(),
-          'grantedCapabilities':
-              assignment.grantedCapabilities.map((item) => item.name).toList(),
-          'evidence':
-              assignment.evidence.map(evidenceToJson).toList(growable: false),
+          'requiredEvidence': assignment.requiredEvidence
+              .map((item) => item.name)
+              .toList(),
+          'grantedCapabilities': assignment.grantedCapabilities
+              .map((item) => item.name)
+              .toList(),
+          'evidence': assignment.evidence
+              .map(evidenceToJson)
+              .toList(growable: false),
           'groupAssignmentId': assignment.groupAssignmentId,
           'isGroupChairman': assignment.isGroupChairman,
           'systemIntelligenceRestricted':
@@ -1747,10 +1722,9 @@ class AssignmentController extends ChangeNotifier {
               : {
                   'latitude': assignment.lastLocation!.latitude,
                   'longitude': assignment.lastLocation!.longitude,
-                  'accuracyMeters':
-                      assignment.lastLocation!.accuracyMeters,
-                  'capturedAt':
-                      assignment.lastLocation!.capturedAt.toIso8601String(),
+                  'accuracyMeters': assignment.lastLocation!.accuracyMeters,
+                  'capturedAt': assignment.lastLocation!.capturedAt
+                      .toIso8601String(),
                   'deviceId': assignment.lastLocation!.deviceId,
                   'distanceFromTargetMeters':
                       assignment.lastLocation!.distanceFromTargetMeters,
@@ -1770,8 +1744,9 @@ class AssignmentController extends ChangeNotifier {
           'title': group.title,
           'chairmanMemberId': group.chairmanMemberId,
           'memberIds': group.memberIds,
-          'targetScopes':
-              group.targetScopes.map(geographicScopeToJson).toList(),
+          'targetScopes': group.targetScopes
+              .map(geographicScopeToJson)
+              .toList(),
           'distribution': group.distribution.name,
           'assignedBy': group.assignedBy,
           'assignedAt': group.assignedAt.toIso8601String(),
@@ -1783,14 +1758,14 @@ class AssignmentController extends ChangeNotifier {
           'submittedBy': group.submittedBy,
           'cancelledAt': group.cancelledAt?.toIso8601String(),
           'cancelledBy': group.cancelledBy,
-          'systemIntelligenceRestricted':
-              group.systemIntelligenceRestricted,
+          'systemIntelligenceRestricted': group.systemIntelligenceRestricted,
         },
       );
 
   Future<void> _markGroupActive(String groupAssignmentId) async {
-    final index =
-        _groupAssignments.indexWhere((item) => item.id == groupAssignmentId);
+    final index = _groupAssignments.indexWhere(
+      (item) => item.id == groupAssignmentId,
+    );
     if (index < 0) return;
     final current = _groupAssignments[index];
     if (current.status != GroupAssignmentStatus.assigned) return;
@@ -1906,10 +1881,7 @@ class AssignmentController extends ChangeNotifier {
     return null;
   }
 
-  static bool _canTransition(
-    AssignmentStatus current,
-    AssignmentStatus next,
-  ) =>
+  static bool _canTransition(AssignmentStatus current, AssignmentStatus next) =>
       switch (current) {
         AssignmentStatus.assigned =>
           next == AssignmentStatus.accepted ||
@@ -1941,8 +1913,7 @@ class AssignmentController extends ChangeNotifier {
           next == AssignmentStatus.enRoute ||
               next == AssignmentStatus.cancelled ||
               next == AssignmentStatus.reassigned,
-        AssignmentStatus.reassigned =>
-          next == AssignmentStatus.assigned,
+        AssignmentStatus.reassigned => next == AssignmentStatus.assigned,
         AssignmentStatus.completed ||
         AssignmentStatus.declined ||
         AssignmentStatus.cancelled => false,
@@ -1958,7 +1929,8 @@ class AssignmentController extends ChangeNotifier {
     double radians(double degrees) => degrees * math.pi / 180;
     final dLat = radians(lat2 - lat1);
     final dLon = radians(lon2 - lon1);
-    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+    final a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
         math.cos(radians(lat1)) *
             math.cos(radians(lat2)) *
             math.sin(dLon / 2) *
@@ -1980,20 +1952,287 @@ class Assignments extends InheritedNotifier<AssignmentController> {
     required super.child,
   }) : super(notifier: controller);
 
-  static AssignmentController of(
-    BuildContext context, {
-    bool listen = true,
-  }) {
+  static AssignmentController of(BuildContext context, {bool listen = true}) {
     if (listen) {
-      final value =
-          context.dependOnInheritedWidgetOfExactType<Assignments>();
+      final value = context.dependOnInheritedWidgetOfExactType<Assignments>();
       assert(value != null, 'Assignments is missing above this context.');
       return value!.notifier!;
     }
-    final element =
-        context.getElementForInheritedWidgetOfExactType<Assignments>();
+    final element = context
+        .getElementForInheritedWidgetOfExactType<Assignments>();
     final value = element?.widget as Assignments?;
     assert(value != null, 'Assignments is missing above this context.');
     return value!.notifier!;
   }
+}
+
+/// Demo data for already-submitted work, dated on the presentation election
+/// day used by the other prototype seeds.
+class _SubmittedPrototypeSeed {
+  _SubmittedPrototypeSeed(GeographyRegistry geography) {
+    final day = DateTime.utc(2026, 9, 27);
+    const coordinator = 'STATE-COORD';
+
+    GeographicScope unitScope(String code) =>
+        geography.pollingUnit(code)!.scope;
+    GeographicScope lgaScope(String id) => geography.lga(id)!.scope;
+
+    EvidenceAttachment evidence(
+      String id,
+      EvidenceType type,
+      String fileName,
+      String uploader,
+      DateTime at, {
+      String? caption,
+      double? latitude,
+      double? longitude,
+    }) => EvidenceAttachment(
+      id: id,
+      type: type,
+      fileName: fileName,
+      createdAt: at,
+      uploaderId: uploader,
+      caption: caption,
+      latitude: latitude,
+      longitude: longitude,
+      origin: RecordOrigin.systemDerived,
+    );
+
+    MemberAssignment completed({
+      required String id,
+      required String title,
+      required String memberId,
+      required String? pollingUnitId,
+      required GeographicScope scope,
+      required DateTime assignedAt,
+      required DateTime completedAt,
+      required List<EvidenceAttachment> evidence,
+      String? deviceId,
+      String? groupId,
+      bool chairman = false,
+      double? latitude,
+      double? longitude,
+    }) {
+      events
+        ..add(
+          AssignmentEvent(
+            id: 'ASE-$id-ASSIGNED',
+            assignmentId: id,
+            action: 'assigned',
+            actorId: coordinator,
+            createdAt: assignedAt,
+            detail: 'Assigned for presentation day.',
+          ),
+        )
+        ..add(
+          AssignmentEvent(
+            id: 'ASE-$id-COMPLETED',
+            assignmentId: id,
+            action: groupId == null ? 'completed' : 'group_submitted',
+            actorId: memberId,
+            createdAt: completedAt,
+            detail: groupId == null
+                ? 'Completed with ${evidence.length} evidence item(s).'
+                : 'Group assignment submitted by chairman.',
+          ),
+        );
+      return MemberAssignment(
+        id: id,
+        title: title,
+        memberId: memberId,
+        targetPollingUnitId: pollingUnitId,
+        targetScope: scope,
+        locationMode: pollingUnitId == null
+            ? AssignmentLocationMode.none
+            : AssignmentLocationMode.pollingUnit,
+        assignedBy: coordinator,
+        assignedAt: assignedAt,
+        status: AssignmentStatus.completed,
+        priority: AssignmentPriority.normal,
+        deviceId: deviceId,
+        acceptedAt: assignedAt.add(const Duration(minutes: 6)),
+        enRouteAt: assignedAt.add(const Duration(minutes: 10)),
+        checkedInAt: assignedAt.add(const Duration(minutes: 35)),
+        activatedAt: assignedAt.add(const Duration(minutes: 36)),
+        completedAt: completedAt,
+        lastLocation: latitude == null || longitude == null
+            ? null
+            : AssignmentLocationPing(
+                latitude: latitude,
+                longitude: longitude,
+                accuracyMeters: 9,
+                capturedAt: completedAt,
+                deviceId: deviceId ?? 'DEV-UNMANAGED',
+                distanceFromTargetMeters: pollingUnitId == null ? null : 18,
+              ),
+        evidence: evidence,
+        groupAssignmentId: groupId,
+        isGroupChairman: chairman,
+      );
+    }
+
+    // Individual: polling-unit opening check, Kaduna North.
+    final openingAt = day.add(const Duration(hours: 7, minutes: 52));
+    assignments.add(
+      completed(
+        id: 'ASN-DEMO-0001',
+        title: 'Polling unit opening verification',
+        memberId: 'MEM-0001',
+        pollingUnitId: 'KD-KN-W01-PU001',
+        scope: unitScope('KD-KN-W01-PU001'),
+        deviceId: 'DEV-KD-001',
+        assignedAt: day.add(const Duration(hours: 6)),
+        completedAt: openingAt,
+        latitude: 10.5245,
+        longitude: 7.4395,
+        evidence: [
+          evidence(
+            'EVD-DEMO-0001',
+            EvidenceType.photo,
+            'pu001_opening_queue.jpg',
+            'MEM-0001',
+            openingAt.subtract(const Duration(minutes: 9)),
+            caption: 'Queue at opening',
+            latitude: 10.5245,
+            longitude: 7.4395,
+          ),
+          evidence(
+            'EVD-DEMO-0002',
+            EvidenceType.photo,
+            'pu001_materials.jpg',
+            'MEM-0001',
+            openingAt.subtract(const Duration(minutes: 4)),
+            caption: 'Election materials received',
+            latitude: 10.5245,
+            longitude: 7.4395,
+          ),
+        ],
+      ),
+    );
+
+    // Individual: result sheet capture, Zaria.
+    final resultAt = day.add(const Duration(hours: 16, minutes: 40));
+    assignments.add(
+      completed(
+        id: 'ASN-DEMO-0002',
+        title: 'Result sheet capture',
+        memberId: 'MEM-0002',
+        pollingUnitId: 'KD-ZA-W01-PU004',
+        scope: unitScope('KD-ZA-W01-PU004'),
+        deviceId: 'DEV-ZA-014',
+        assignedAt: day.add(const Duration(hours: 14)),
+        completedAt: resultAt,
+        latitude: 11.0855,
+        longitude: 7.7199,
+        evidence: [
+          evidence(
+            'EVD-DEMO-0003',
+            EvidenceType.resultForm,
+            'pu004_ec8a.jpg',
+            'MEM-0002',
+            resultAt.subtract(const Duration(minutes: 6)),
+            caption: 'Form EC8A after announcement',
+            latitude: 11.0855,
+            longitude: 7.7199,
+          ),
+          evidence(
+            'EVD-DEMO-0004',
+            EvidenceType.photo,
+            'pu004_posting.jpg',
+            'MEM-0002',
+            resultAt.subtract(const Duration(minutes: 3)),
+            caption: 'Result posted at the polling unit',
+            latitude: 11.0855,
+            longitude: 7.7199,
+          ),
+        ],
+      ),
+    );
+
+    // Individual, location-flexible: ward mobilisation report, Sabon Gari.
+    final reportAt = day.add(const Duration(hours: 12, minutes: 15));
+    assignments.add(
+      completed(
+        id: 'ASN-DEMO-0003',
+        title: 'Ward mobilisation report',
+        memberId: 'MEM-0007',
+        pollingUnitId: null,
+        scope: lgaScope('KD-SABON-GARI'),
+        assignedAt: day.add(const Duration(hours: 8)),
+        completedAt: reportAt,
+        evidence: [
+          evidence(
+            'EVD-DEMO-0005',
+            EvidenceType.document,
+            'sabon_gari_mobilisation.pdf',
+            'MEM-0007',
+            reportAt.subtract(const Duration(minutes: 20)),
+            caption: 'Turnout mobilisation summary',
+          ),
+        ],
+      ),
+    );
+
+    // Group: Kaduna South sensitisation team, submitted by the chairman.
+    const groupId = 'GRP-DEMO-0001';
+    final groupAssignedAt = day
+        .subtract(const Duration(days: 2))
+        .add(const Duration(hours: 9));
+    final groupSubmittedAt = day
+        .subtract(const Duration(days: 1))
+        .add(const Duration(hours: 17, minutes: 30));
+    final team = <(String, String, bool)>[
+      ('MEM-0004', 'KD-JEMAA', true),
+      ('MEM-0009', 'KD-ZANGON-KATAF', false),
+      ('MEM-0008', 'KD-KACHIA', false),
+    ];
+    for (var i = 0; i < team.length; i++) {
+      final (memberId, lgaId, isChair) = team[i];
+      assignments.add(
+        completed(
+          id: 'ASN-DEMO-01${i + 1}',
+          title: 'Kaduna South voter sensitisation team',
+          memberId: memberId,
+          pollingUnitId: null,
+          scope: lgaScope(lgaId),
+          groupId: groupId,
+          chairman: isChair,
+          assignedAt: groupAssignedAt,
+          completedAt: groupSubmittedAt,
+          evidence: [
+            evidence(
+              'EVD-DEMO-01${i + 1}',
+              EvidenceType.photo,
+              'sensitisation_${lgaId.toLowerCase()}.jpg',
+              memberId,
+              groupSubmittedAt.subtract(Duration(hours: 3 - i)),
+              caption: 'Community sensitisation meeting',
+            ),
+          ],
+        ),
+      );
+    }
+    groups.add(
+      GroupAssignment(
+        id: groupId,
+        title: 'Kaduna South voter sensitisation team',
+        chairmanMemberId: 'MEM-0004',
+        memberIds: [for (final member in team) member.$1],
+        targetScopes: [for (final member in team) lgaScope(member.$2)],
+        distribution: GroupAssignmentDistribution.manual,
+        assignedBy: coordinator,
+        assignedAt: groupAssignedAt,
+        status: GroupAssignmentStatus.submitted,
+        priority: AssignmentPriority.normal,
+        instructions:
+            'Hold one community sensitisation meeting in each LGA before election day.',
+        submittedAt: groupSubmittedAt,
+        submittedBy: 'MEM-0004',
+      ),
+    );
+  }
+
+  final assignments = <MemberAssignment>[];
+  final groups = <GroupAssignment>[];
+  final events = <AssignmentEvent>[];
 }

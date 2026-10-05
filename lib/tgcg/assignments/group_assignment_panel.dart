@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../access/access_policy.dart';
 import '../access/effective_member_access.dart';
 import '../domain/permissions.dart';
-import '../domain/models.dart';
 import '../edge_ai/assignment_edge_ai_panel.dart';
 import '../edge_ai/assignment_edge_ai_store.dart';
 import '../geography/geography_registry.dart';

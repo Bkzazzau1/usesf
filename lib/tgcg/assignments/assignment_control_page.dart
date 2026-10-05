@@ -4,7 +4,6 @@ import '../access/access_policy.dart';
 import '../access/effective_member_access.dart';
 import '../devices/managed_device_store.dart';
 import '../domain/permissions.dart';
-import '../domain/models.dart';
 import '../edge_ai/assignment_edge_ai_panel.dart';
 import '../edge_ai/assignment_edge_ai_store.dart';
 import '../geography/geography_registry.dart';
@@ -2236,7 +2235,10 @@ class _SubmittedAssignments extends StatelessWidget {
       title = group.title;
       who =
           'Submitted by ${chairman?.fullName ?? group.submittedBy ?? group.chairmanMemberId} • ${group.memberIds.length} members';
-      where = group.targetScopes.map((scope) => scope.label).join(', ');
+      final lgaNames = group.targetScopes.map((scope) => scope.lgaName);
+      where = lgaNames.every((name) => name != null)
+          ? '${lgaNames.join(', ')} LGAs'
+          : group.targetScopes.map((scope) => scope.label).join(', ');
       evidence = children.fold<int>(
         0,
         (total, item) => total + item.evidence.length,

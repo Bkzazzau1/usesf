@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../domain/models.dart';
 
 import '../geography/geography_registry.dart';
 import '../membership/membership_store.dart';

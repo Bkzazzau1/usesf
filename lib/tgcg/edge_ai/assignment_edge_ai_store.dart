@@ -371,9 +371,7 @@ class AssignmentEdgeAiController extends ChangeNotifier {
       severity: severity,
       createdAt: now,
       source: source.trim().isEmpty ? 'edge-device' : source.trim(),
-      confidence: confidence == null
-          ? null
-          : confidence.clamp(0.0, 1.0).toDouble(),
+      confidence: confidence?.clamp(0.0, 1.0).toDouble(),
       summary: _clean(summary),
       evidenceReference: _clean(evidenceReference),
     );
