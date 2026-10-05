@@ -255,7 +255,7 @@ void main() {
       );
     });
 
-    test('only chairman submits and individual completion is blocked',
+    test('group cancellation closes every open child', () async {\n      final group = await createGroup();\n      final closed = await assignments.cancelGroupAssignment(\n        groupAssignmentId: group.id,\n        cancelledBy: 'STATE-COORD',\n        cancelledByRole: TgcgRole.stateCoordinator,\n        authorizedScope: GeographicScope.kaduna,\n      );\n\n      expect(closed.status, GroupAssignmentStatus.cancelled);\n      expect(closed.cancelledBy, 'STATE-COORD');\n      expect(closed.cancelledAt, isNotNull);\n      expect(\n        assignments.assignmentsForGroup(group.id).every(\n          (item) => item.status == AssignmentStatus.cancelled,\n        ),\n        isTrue,\n      );\n    });\n    test('only chairman submits and individual completion is blocked',
         () async {
       final group = await createGroup(
         distribution: GroupAssignmentDistribution.together,
