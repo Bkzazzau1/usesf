@@ -941,6 +941,58 @@ class MembershipOperationsController extends ChangeNotifier {
     return updated;
   }
 
+  Future<CanonicalPollingUnit> addManualPollingUnitCoordinate({
+    required String pollingUnitId,
+    required double latitude,
+    required double longitude,
+    required String recordedBy,
+  }) async {
+    if (latitude < -90 || latitude > 90) {
+      throw ArgumentError('Latitude must be between -90 and 90.');
+    }
+    if (longitude < -180 || longitude > 180) {
+      throw ArgumentError('Longitude must be between -180 and 180.');
+    }
+
+    final current = _geography.pollingUnit(pollingUnitId);
+    if (current == null) {
+      throw ArgumentError('Unknown polling unit: $pollingUnitId');
+    }
+    if (current.operationalLatitude != null &&
+        current.operationalLongitude != null) {
+      throw StateError(
+        'This polling unit already has an operational coordinate.',
+      );
+    }
+
+    final actor = recordedBy.trim().isEmpty
+        ? 'State Coordinator'
+        : recordedBy.trim();
+    final updated = await setPollingUnitReferenceCoordinate(
+      pollingUnitId: pollingUnitId,
+      latitude: latitude,
+      longitude: longitude,
+      source: 'manual-state-coordinator:$actor',
+    );
+    final now = DateTime.now().toUtc();
+    await _persistence.persistMutation(
+      entityType: 'polling_unit_coordinate_audit',
+      entityId: '${updated.code}-${now.microsecondsSinceEpoch}',
+      mutationType: SyncMutationType.upsert,
+      scopeKey: scopeStorageKey(updated.scope),
+      ownerId: actor,
+      payload: {
+        'pollingUnitId': updated.code,
+        'latitude': latitude,
+        'longitude': longitude,
+        'recordedBy': actor,
+        'recordedAt': now.toIso8601String(),
+        'source': 'manual-state-coordinator',
+      },
+    );
+    return updated;
+  }
+
   Future<void> _persistMemberState(
     TgcgMember member,
     GeographicScope scope,
