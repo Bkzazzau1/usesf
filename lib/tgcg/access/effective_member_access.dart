@@ -77,7 +77,7 @@ class EffectiveMemberAccess {
           grants.add(
             EffectiveAccessGrant(
               source: EffectiveGrantSource.assignment,
-              sourceId: assignment.id + ':group-target-' + index.toString(),
+              sourceId: '${assignment.id}:group-target-$index',
               label: assignment.title,
               scope: group.targetScopes[index],
               capabilities: assignment.grantedCapabilities,

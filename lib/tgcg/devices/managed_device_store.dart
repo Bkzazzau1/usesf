@@ -4,6 +4,7 @@ import '../domain/models.dart';
 import '../geography/geography_registry.dart';
 import '../membership/membership_store.dart';
 import '../offline/offline_persistence.dart';
+import '../domain/local_id.dart';
 
 enum ManagedDeviceStatus {
   available,
@@ -230,7 +231,7 @@ class ManagedDeviceController extends ChangeNotifier {
   }) async {
     final now = DateTime.now().toUtc();
     final device = ManagedDevice(
-      id: 'DEV-${now.microsecondsSinceEpoch}',
+      id: newLocalId('DEV', now),
       label: label.trim().isEmpty ? 'USESF Managed Device' : label.trim(),
       status: ManagedDeviceStatus.available,
       registeredAt: now,

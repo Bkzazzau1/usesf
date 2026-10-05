@@ -255,7 +255,26 @@ void main() {
       );
     });
 
-    test('group cancellation closes every open child', () async {\n      final group = await createGroup();\n      final closed = await assignments.cancelGroupAssignment(\n        groupAssignmentId: group.id,\n        cancelledBy: 'STATE-COORD',\n        cancelledByRole: TgcgRole.stateCoordinator,\n        authorizedScope: GeographicScope.kaduna,\n      );\n\n      expect(closed.status, GroupAssignmentStatus.cancelled);\n      expect(closed.cancelledBy, 'STATE-COORD');\n      expect(closed.cancelledAt, isNotNull);\n      expect(\n        assignments.assignmentsForGroup(group.id).every(\n          (item) => item.status == AssignmentStatus.cancelled,\n        ),\n        isTrue,\n      );\n    });\n    test('only chairman submits and individual completion is blocked',
+    test('group cancellation closes every open child', () async {
+      final group = await createGroup();
+      final closed = await assignments.cancelGroupAssignment(
+        groupAssignmentId: group.id,
+        cancelledBy: 'STATE-COORD',
+        cancelledByRole: TgcgRole.stateCoordinator,
+        authorizedScope: GeographicScope.kaduna,
+      );
+
+      expect(closed.status, GroupAssignmentStatus.cancelled);
+      expect(closed.cancelledBy, 'STATE-COORD');
+      expect(closed.cancelledAt, isNotNull);
+      expect(
+        assignments.assignmentsForGroup(group.id).every(
+          (item) => item.status == AssignmentStatus.cancelled,
+        ),
+        isTrue,
+      );
+    });
+    test('only chairman submits and individual completion is blocked',
         () async {
       final group = await createGroup(
         distribution: GroupAssignmentDistribution.together,
@@ -337,6 +356,43 @@ void main() {
                   item.systemIntelligenceRestricted,
             ),
         isTrue,
+      );
+    });
+
+    test('a group child cannot be reassigned individually', () async {
+      final group = await createGroup();
+      final child = assignments.assignmentsForGroup(group.id).first;
+
+      await expectLater(
+        assignments.reassign(
+          assignmentId: child.id,
+          newMemberId: 'MEM-0003',
+          actorId: 'STATE-COORD',
+        ),
+        throwsStateError,
+      );
+    });
+
+    test('a group child can still progress through its own duty', () async {
+      final group = await createGroup();
+      final child = assignments.assignmentsForGroup(group.id).first;
+
+      for (final status in [
+        AssignmentStatus.accepted,
+        AssignmentStatus.enRoute,
+        AssignmentStatus.checkedIn,
+        AssignmentStatus.active,
+      ]) {
+        await assignments.transition(
+          assignmentId: child.id,
+          status: status,
+          actorId: child.memberId,
+        );
+      }
+
+      expect(
+        assignments.assignmentById(child.id)!.status,
+        AssignmentStatus.active,
       );
     });
   });

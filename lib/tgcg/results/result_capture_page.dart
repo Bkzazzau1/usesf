@@ -8,6 +8,7 @@ import '../offline/offline_persistence.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
 import 'result_operations_store.dart';
+import '../domain/local_id.dart';
 
 class ResultCapturePage extends StatefulWidget {
   const ResultCapturePage({super.key});
@@ -517,7 +518,7 @@ class _CaptureWorkspaceState extends State<_CaptureWorkspace> {
     try {
       final evidence = attachForm
           ? EvidenceAttachment(
-              id: 'FORM-LOCAL-${DateTime.now().microsecondsSinceEpoch}',
+              id: newLocalId('FORM-LOCAL'),
               type: EvidenceType.resultForm,
               fileName: 'result-form.jpg',
               createdAt: DateTime.now().toUtc(),

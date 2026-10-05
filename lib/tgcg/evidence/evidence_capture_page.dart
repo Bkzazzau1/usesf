@@ -9,6 +9,7 @@ import '../offline/offline_persistence.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
 import 'device_evidence_service.dart';
+import '../domain/local_id.dart';
 
 class EvidenceCapturePage extends StatefulWidget {
   const EvidenceCapturePage({super.key});
@@ -150,7 +151,7 @@ class _EvidenceCapturePageState extends State<EvidenceCapturePage> {
           listen: false,
         ) ??
         session.scope;
-    final id = 'EVD-${DateTime.now().microsecondsSinceEpoch}';
+    final id = newLocalId('EVD');
     await offline.persistMutation(
       entityType: 'evidence',
       entityId: id,

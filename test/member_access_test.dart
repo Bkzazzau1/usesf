@@ -172,4 +172,26 @@ void main() {
       );
     });
   });
+  group('Assignment presence', () {
+    test('distinguishes no fix, live without geofence, and stale fixes', () async {
+      final assignment = await grantDiscussion();
+      expect(assignments.presenceFor(assignment), AssignmentPresence.unknown);
+
+      final now = DateTime.now().toUtc();
+      assignments.recordLocationHeartbeat(
+        assignmentId: assignment.id,
+        deviceId: assignment.deviceId ?? 'DEV-TEST',
+        latitude: 10.53,
+        longitude: 7.44,
+        accuracyMeters: 8,
+        capturedAt: now,
+      );
+      final live = assignments.assignmentById(assignment.id)!;
+      expect(assignments.presenceFor(live), AssignmentPresence.liveNoGeofence);
+      expect(
+        assignments.presenceFor(live, now: now.add(const Duration(minutes: 10))),
+        AssignmentPresence.stale,
+      );
+    });
+  });
 }

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../domain/models.dart';
 import '../geography/geography_registry.dart';
 import '../membership/membership_store.dart';
 import '../meeting/operational_call_stage.dart';
@@ -87,14 +86,16 @@ Future<void> showStateCoordinatorCallMemberDialog(
     builder: (dialogContext) => StatefulBuilder(
       builder: (context, setDialogState) {
         final needle = search.text.trim().toLowerCase();
-        final visible = members.where((member) {
-          if (needle.isEmpty) return true;
-          return member.fullName.toLowerCase().contains(needle) ||
-              (member.membershipNumber ?? '')
-                  .toLowerCase()
-                  .contains(needle) ||
-              member.phoneNumber.toLowerCase().contains(needle);
-        }).toList(growable: false);
+        final visible = members
+            .where((member) {
+              if (needle.isEmpty) return true;
+              return member.fullName.toLowerCase().contains(needle) ||
+                  (member.membershipNumber ?? '').toLowerCase().contains(
+                    needle,
+                  ) ||
+                  member.phoneNumber.toLowerCase().contains(needle);
+            })
+            .toList(growable: false);
 
         if (visible.isNotEmpty &&
             !visible.any((member) => member.id == selectedMemberId)) {
@@ -131,30 +132,31 @@ Future<void> showStateCoordinatorCallMemberDialog(
                     ),
                   ],
                   selected: {kind},
-                  onSelectionChanged: (values) => setDialogState(
-                    () => kind = values.first,
-                  ),
+                  onSelectionChanged: (values) =>
+                      setDialogState(() => kind = values.first),
                 ),
                 const SizedBox(height: 12),
                 SizedBox(
                   height: 300,
-                  child: ListView.builder(
-                    itemCount: visible.length,
-                    itemBuilder: (context, index) {
-                      final member = visible[index];
-                      return RadioListTile<String>(
-                        value: member.id,
-                        groupValue: selectedMemberId,
-                        onChanged: (value) => setDialogState(() {
-                          if (value != null) selectedMemberId = value;
-                        }),
-                        title: Text(member.fullName),
-                        secondary: Text(
-                          member.membershipNumber ?? member.id,
-                          style: const TextStyle(fontSize: 10),
-                        ),
-                      );
-                    },
+                  child: RadioGroup<String>(
+                    groupValue: selectedMemberId,
+                    onChanged: (value) => setDialogState(() {
+                      if (value != null) selectedMemberId = value;
+                    }),
+                    child: ListView.builder(
+                      itemCount: visible.length,
+                      itemBuilder: (context, index) {
+                        final member = visible[index];
+                        return RadioListTile<String>(
+                          value: member.id,
+                          title: Text(member.fullName),
+                          secondary: Text(
+                            member.membershipNumber ?? member.id,
+                            style: const TextStyle(fontSize: 10),
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ),
               ],
@@ -168,10 +170,7 @@ Future<void> showStateCoordinatorCallMemberDialog(
             FilledButton.icon(
               onPressed: visible.isEmpty
                   ? null
-                  : () => Navigator.pop(
-                        dialogContext,
-                        selectedMemberId,
-                      ),
+                  : () => Navigator.pop(dialogContext, selectedMemberId),
               icon: Icon(
                 kind == OperationalCallKind.audio
                     ? Icons.call_rounded
@@ -200,9 +199,9 @@ Future<void> showStateCoordinatorCallMemberDialog(
     );
   } on StateError catch (error) {
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(error.message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(error.message)));
   }
 }
 
@@ -214,7 +213,8 @@ Future<bool> showPollingUnitCoordinateDialog(
   required GeographicScope stateScope,
 }) async {
   final current = membership.geography.pollingUnit(unit.code) ?? unit;
-  final ready = current.operationalLatitude != null &&
+  final ready =
+      current.operationalLatitude != null &&
       current.operationalLongitude != null;
   final latitude = TextEditingController(
     text: ready ? current.operationalLatitude!.toStringAsFixed(6) : '',
@@ -301,9 +301,9 @@ Future<bool> showPollingUnitCoordinateDialog(
                 );
               } on StateError catch (error) {
                 if (!dialogContext.mounted) return;
-                ScaffoldMessenger.of(dialogContext).showSnackBar(
-                  SnackBar(content: Text(error.message)),
-                );
+                ScaffoldMessenger.of(
+                  dialogContext,
+                ).showSnackBar(SnackBar(content: Text(error.message)));
               }
             },
             icon: const Icon(Icons.save_outlined),

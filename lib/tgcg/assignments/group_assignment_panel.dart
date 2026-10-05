@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../access/access_policy.dart';
 import '../access/effective_member_access.dart';
-import '../domain/models.dart';
 import '../domain/permissions.dart';
 import '../geography/geography_registry.dart';
 import '../membership/membership_store.dart';
@@ -48,27 +47,44 @@ class GroupAssignmentPanel extends StatelessWidget {
     required this.onCancel,
     required this.onCallChairman,
     required this.onCallGroup,
+    this.groups,
+    this.title = 'Group assignments',
+    this.emptyMessage =
+        'No group assignments yet. The State Coordinator can create one with New group.',
   });
 
   final AssignmentController controller;
   final MembershipOperationsController membership;
-  final VoidCallback onCreate;
+
+  /// Groups to list; defaults to every group in [controller].
+  final List<GroupAssignment>? groups;
+  final String title;
+  final String emptyMessage;
+
+  /// Shows the New group action when non-null (State Coordinator only).
+  final VoidCallback? onCreate;
   final Future<void> Function(GroupAssignment group) onCancel;
   final Future<void> Function(GroupAssignment group) onCallChairman;
   final Future<void> Function(GroupAssignment group) onCallGroup;
 
   @override
   Widget build(BuildContext context) {
-    final groups = controller.groupAssignments;
+    final groups = this.groups ?? controller.groupAssignments;
     return TgcgSectionCard(
-      title: 'Group assignments',
-      trailing: FilledButton.tonalIcon(
-        onPressed: onCreate,
-        icon: const Icon(Icons.group_add_outlined),
-        label: const Text('New group'),
-      ),
+      title: title,
+      trailing: onCreate == null
+          ? null
+          : FilledButton.tonalIcon(
+              onPressed: onCreate,
+              icon: const Icon(Icons.group_add_outlined),
+              label: const Text('New group'),
+            ),
       child: groups.isEmpty
-          ? const SizedBox.shrink()
+          ? TgcgEmptyState(
+              icon: Icons.groups_2_outlined,
+              title: 'No group assignments',
+              message: emptyMessage,
+            )
           : Column(
               children: groups.take(12).map((group) {
                 final children = controller.assignmentsForGroup(group.id);

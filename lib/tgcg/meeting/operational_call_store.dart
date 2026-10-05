@@ -5,6 +5,7 @@ import '../geography/geography_registry.dart';
 import '../membership/membership_store.dart';
 import '../offline/offline_payloads.dart';
 import '../offline/offline_persistence.dart';
+import '../domain/local_id.dart';
 
 enum OperationalCallKind { audio, video, conference }
 
@@ -261,7 +262,7 @@ class OperationalCallController extends ChangeNotifier {
 
     final now = DateTime.now().toUtc();
     final call = OperationalCallSession(
-      id: 'CALL-${now.microsecondsSinceEpoch}',
+      id: newLocalId('CALL', now),
       kind: kind,
       callerId: callerId,
       callerName: callerName.trim().isEmpty

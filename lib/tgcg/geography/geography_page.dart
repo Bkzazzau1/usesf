@@ -1258,6 +1258,7 @@ class _PollingUnitCoordinateCard extends StatelessWidget {
 String _presenceLabelForRoster(AssignmentPresence presence) =>
     switch (presence) {
       AssignmentPresence.unknown => 'GPS UNKNOWN',
+      AssignmentPresence.liveNoGeofence => 'LIVE GPS',
       AssignmentPresence.insideGeofence => 'AT LOCATION',
       AssignmentPresence.outsideGeofence => 'OUTSIDE GEOFENCE',
       AssignmentPresence.stale => 'GPS STALE',
@@ -1266,6 +1267,7 @@ String _presenceLabelForRoster(AssignmentPresence presence) =>
 Color _presenceColorForRoster(AssignmentPresence presence) =>
     switch (presence) {
       AssignmentPresence.unknown => TgcgColors.muted,
+      AssignmentPresence.liveNoGeofence => TgcgColors.info,
       AssignmentPresence.insideGeofence => TgcgColors.success,
       AssignmentPresence.outsideGeofence => TgcgColors.warning,
       AssignmentPresence.stale => TgcgColors.warning,

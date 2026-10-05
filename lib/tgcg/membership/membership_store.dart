@@ -9,6 +9,7 @@ import '../domain/models.dart';
 import '../geography/geography_registry.dart';
 import '../offline/offline_payloads.dart';
 import '../offline/offline_persistence.dart';
+import '../domain/local_id.dart';
 
 enum MemberPollingUnitLinkSource {
   pvc,
@@ -991,7 +992,7 @@ class MembershipOperationsController extends ChangeNotifier {
     final now = DateTime.now().toUtc();
     await _persistence.persistMutation(
       entityType: 'polling_unit_coordinate_audit',
-      entityId: '${updated.code}-${now.microsecondsSinceEpoch}',
+      entityId: newLocalId(updated.code, now),
       mutationType: SyncMutationType.upsert,
       scopeKey: scopeStorageKey(updated.scope),
       ownerId: actor,

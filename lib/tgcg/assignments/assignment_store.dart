@@ -9,6 +9,7 @@ import '../geography/geography_registry.dart';
 import '../membership/membership_store.dart';
 import '../offline/offline_payloads.dart';
 import '../offline/offline_persistence.dart';
+import '../domain/local_id.dart';
 
 /// Capabilities that an assignment may temporarily grant. Anything else
 /// (verification, broadcasts, membership or system administration) can only
@@ -60,7 +61,12 @@ enum AssignmentLocationMode {
 }
 
 enum AssignmentPresence {
+  /// No GPS fix has been received.
   unknown,
+
+  /// A fresh fix exists but no geofence can be checked: the duty is
+  /// location-flexible or its polling unit has no coordinates yet.
+  liveNoGeofence,
   insideGeofence,
   outsideGeofence,
   stale,
@@ -945,7 +951,7 @@ class AssignmentController extends ChangeNotifier {
     final now = DateTime.now().toUtc();
     final device = _devices.deviceForMember(memberId);
     final assignment = MemberAssignment(
-      id: 'ASN-${now.microsecondsSinceEpoch}',
+      id: newLocalId('ASN', now),
       title: title.trim().isEmpty ? 'Operational Assignment' : title.trim(),
       memberId: memberId,
       targetPollingUnitId: unit?.code,
@@ -1113,7 +1119,7 @@ class AssignmentController extends ChangeNotifier {
 
     final now = DateTime.now().toUtc();
     final group = GroupAssignment(
-      id: 'GRP-${now.microsecondsSinceEpoch}',
+      id: newLocalId('GRP', now),
       title: title.trim().isEmpty ? 'Group Assignment' : title.trim(),
       chairmanMemberId: chairman,
       memberIds: List.unmodifiable(uniqueMemberIds),
@@ -1301,7 +1307,8 @@ class AssignmentController extends ChangeNotifier {
       throw ArgumentError('Unknown assignment: $assignmentId');
     }
     final current = _assignments[index];
-    if (current.groupAssignmentId != null) {
+    if (current.groupAssignmentId != null &&
+        status == AssignmentStatus.reassigned) {
       throw StateError(
         'Group assignment membership cannot be changed through individual reassignment.',
       );
@@ -1383,6 +1390,11 @@ class AssignmentController extends ChangeNotifier {
     }
 
     final current = _assignments[index];
+    if (current.groupAssignmentId != null) {
+      throw StateError(
+        'Group assignment membership cannot be changed through individual reassignment.',
+      );
+    }
     if (authorizedScope != null &&
         !GeographyRegistry.scopeContains(
           authorizedScope,
@@ -1645,7 +1657,7 @@ class AssignmentController extends ChangeNotifier {
       return AssignmentPresence.stale;
     }
     if (assignment.locationMode == AssignmentLocationMode.none) {
-      return AssignmentPresence.unknown;
+      return AssignmentPresence.liveNoGeofence;
     }
     final pollingUnitId = assignment.targetPollingUnitId;
     final unit = pollingUnitId == null
@@ -1653,7 +1665,7 @@ class AssignmentController extends ChangeNotifier {
         : _membership.geography.pollingUnit(pollingUnitId);
     final distance = ping.distanceFromTargetMeters;
     if (unit == null || distance == null) {
-      return AssignmentPresence.unknown;
+      return AssignmentPresence.liveNoGeofence;
     }
     return distance <= unit.geofenceRadiusMeters
         ? AssignmentPresence.insideGeofence
@@ -1668,7 +1680,7 @@ class AssignmentController extends ChangeNotifier {
   }) async {
     final now = DateTime.now().toUtc();
     final event = AssignmentEvent(
-      id: 'ASE-${now.microsecondsSinceEpoch}',
+      id: newLocalId('ASE', now),
       assignmentId: assignment.id,
       action: action,
       actorId: actorId,

@@ -337,3 +337,8 @@ class KadunaMapBackdrop extends StatelessWidget {
     ),
   );
 }
+
+/// Where a GPS position falls on a [KadunaMap] of [size], for live overlays
+/// such as member locations.
+Offset kadunaMapProject(double longitude, double latitude, Size size) =>
+    _KadunaProjection.instance.project(longitude, latitude, size);

@@ -10,6 +10,7 @@ import '../governance/governance_store.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
 import 'membership_store.dart';
+import '../domain/local_id.dart';
 
 class MemberShell extends StatelessWidget {
   const MemberShell({super.key});
@@ -1050,7 +1051,7 @@ class _MemberAssignmentCardState extends State<_MemberAssignmentCard> {
               assignment;
       final ping = latest.lastLocation;
       final evidence = EvidenceAttachment(
-        id: 'AEV-${DateTime.now().microsecondsSinceEpoch}',
+        id: newLocalId('AEV'),
         type: captured.type,
         fileName: captured.fileName,
         createdAt: captured.createdAt,
@@ -1481,6 +1482,7 @@ Color _assignmentStatusColor(AssignmentStatus status) => switch (status) {
 
 String _presenceLabel(AssignmentPresence presence) => switch (presence) {
       AssignmentPresence.unknown => 'GPS UNKNOWN',
+      AssignmentPresence.liveNoGeofence => 'LIVE GPS',
       AssignmentPresence.insideGeofence => 'AT LOCATION',
       AssignmentPresence.outsideGeofence => 'OUTSIDE GEOFENCE',
       AssignmentPresence.stale => 'GPS STALE',
@@ -1488,6 +1490,7 @@ String _presenceLabel(AssignmentPresence presence) => switch (presence) {
 
 Color _presenceColor(AssignmentPresence presence) => switch (presence) {
       AssignmentPresence.unknown => TgcgColors.muted,
+      AssignmentPresence.liveNoGeofence => TgcgColors.info,
       AssignmentPresence.insideGeofence => TgcgColors.success,
       AssignmentPresence.outsideGeofence => TgcgColors.warning,
       AssignmentPresence.stale => TgcgColors.warning,

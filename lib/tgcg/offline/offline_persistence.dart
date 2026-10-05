@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import '../sync/sync_models.dart';
 import 'offline_crypto.dart';
 import 'offline_database.dart';
+import '../domain/local_id.dart';
 
 export '../sync/sync_models.dart';
 
@@ -119,7 +120,7 @@ class OfflinePersistenceController extends ChangeNotifier {
       aad: aad,
     );
     final outbox = SyncOutboxItem(
-      id: 'OUT-L-${now.microsecondsSinceEpoch}',
+      id: newLocalId('OUT-L', now),
       entityType: entityType,
       entityId: entityId,
       mutationType: mutationType,

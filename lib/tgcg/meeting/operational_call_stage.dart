@@ -187,9 +187,9 @@ class _OperationalCallStageState extends State<OperationalCallStage> {
                                     ? session.operatorName
                                     : session.accessId,
                               );
-                              if (mounted) Navigator.pop(context);
+                              if (context.mounted) Navigator.pop(context);
                             } on StateError catch (error) {
-                              if (!mounted) return;
+                              if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(content: Text(error.message)),
                               );
