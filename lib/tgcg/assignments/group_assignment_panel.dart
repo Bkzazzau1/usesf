@@ -4,6 +4,8 @@ import '../access/access_policy.dart';
 import '../access/effective_member_access.dart';
 import '../domain/permissions.dart';
 import '../domain/models.dart';
+import '../edge_ai/assignment_edge_ai_panel.dart';
+import '../edge_ai/assignment_edge_ai_store.dart';
 import '../geography/geography_registry.dart';
 import '../membership/membership_store.dart';
 import '../session.dart';
@@ -44,6 +46,7 @@ class GroupAssignmentPanel extends StatelessWidget {
     super.key,
     required this.controller,
     required this.membership,
+    required this.edgeAi,
     required this.onCreate,
     required this.onCancel,
     required this.onCallChairman,
@@ -56,6 +59,7 @@ class GroupAssignmentPanel extends StatelessWidget {
 
   final AssignmentController controller;
   final MembershipOperationsController membership;
+  final AssignmentEdgeAiController edgeAi;
 
   /// Groups to list; defaults to every group in [controller].
   final List<GroupAssignment>? groups;
@@ -181,6 +185,10 @@ class GroupAssignmentPanel extends StatelessWidget {
                                           .toUpperCase(),
                                   color: TgcgColors.muted,
                                   compact: true,
+                                ),
+                                GroupAssignmentEdgeAiPill(
+                                  assignments: children,
+                                  edgeAi: edgeAi,
                                 ),
                               ],
                             ),
