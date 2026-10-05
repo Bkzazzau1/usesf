@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../access/access_policy.dart';
+import '../assignments/assignment_store.dart';
 import '../communications/communications_store.dart';
+import '../domain/permissions.dart';
 import '../field/field_operations_store.dart';
 import '../membership/membership_store.dart';
 import '../offline/offline_persistence.dart';
@@ -18,7 +21,23 @@ class SystemMonitoringPage extends StatelessWidget {
     final field = FieldOperations.of(context);
     final results = ResultOperations.of(context);
     final membership = MembershipOperations.of(context);
+    final assignments = Assignments.of(context);
     final communications = Communications.of(context);
+    final monitoringScopes = TgcgAccessPolicy.scopesForAny(
+      context,
+      const [
+        TgcgCapability.viewAudit,
+        TgcgCapability.manageSystemSettings,
+        TgcgCapability.viewSituationRoom,
+      ],
+    );
+    final scope = monitoringScopes.isEmpty
+        ? session.scope
+        : monitoringScopes.first;
+    final scopedAssignments = assignments
+        .assignmentsForScope(scope)
+        .where((item) => !item.isTerminal)
+        .toList(growable: false);
 
     final queued = offline.outbox.where((item) => item.state == SyncState.queued).length;
     final syncing = offline.outbox.where((item) => item.state == SyncState.syncing).length;
@@ -32,7 +51,7 @@ class SystemMonitoringPage extends StatelessWidget {
         TgcgPageHeader(
           eyebrow: 'OPERATIONS HEALTH',
           title: 'System Monitoring',
-          subtitle: '${session.scope.label}: application health, synchronization, field activity and communications status.',
+          subtitle: '${monitoringScopes.length <= 1 ? scope.label : '${monitoringScopes.length} authorized scopes'}: application health, synchronization, field activity and communications status.',
           trailing: TgcgStatusPill(
             label: failed == 0 && conflicts == 0 ? 'HEALTHY' : 'ATTENTION',
             color: failed == 0 && conflicts == 0 ? TgcgColors.success : TgcgColors.warning,
@@ -66,11 +85,11 @@ class SystemMonitoringPage extends StatelessWidget {
             deliveredMessages: delivered,
           );
           final activity = _ActivityPanel(
-            members: membership.members.length,
-            agents: membership.agents.length,
-            incidents: field.incidents.length,
-            reports: field.reports.length,
-            results: results.submissions.length,
+            members: membership.membersForScope(scope).length,
+            assignments: scopedAssignments.length,
+            incidents: field.incidentsForScope(scope).length,
+            reports: field.reportsForScope(scope).length,
+            results: results.submissionsForScope(scope).length,
             messages: communications.messages.length,
           );
           if (constraints.maxWidth < 980) {
@@ -158,9 +177,9 @@ class _HealthRow extends StatelessWidget {
 }
 
 class _ActivityPanel extends StatelessWidget {
-  const _ActivityPanel({required this.members, required this.agents, required this.incidents, required this.reports, required this.results, required this.messages});
+  const _ActivityPanel({required this.members, required this.assignments, required this.incidents, required this.reports, required this.results, required this.messages});
   final int members;
-  final int agents;
+  final int assignments;
   final int incidents;
   final int reports;
   final int results;
@@ -170,7 +189,7 @@ class _ActivityPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final values = [
       ('Members', members, Icons.groups_outlined),
-      ('Agents', agents, Icons.badge_outlined),
+      ('Active assignments', assignments, Icons.assignment_outlined),
       ('Incidents', incidents, Icons.warning_amber_outlined),
       ('Field reports', reports, Icons.assignment_outlined),
       ('Results', results, Icons.ballot_outlined),
