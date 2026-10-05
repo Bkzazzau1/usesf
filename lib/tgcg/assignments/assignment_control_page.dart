@@ -1270,8 +1270,18 @@ Set<TgcgCapability> _delegableCapabilities(
       .toSet();
 }
 
-List<TgcgCapability> _assignmentGrantOptions(Set<TgcgCapability> own) =>
-    assignmentGrantableCapabilities.where(own.contains).toList(growable: false);
+List<TgcgCapability> _assignmentGrantOptions(
+  Set<TgcgCapability> own,
+) =>
+    assignmentGrantableCapabilities
+        .where(
+          (capability) =>
+              own.contains(capability) ||
+              (capability == TgcgCapability.captureEvidence &&
+                  own.contains(TgcgCapability.manageAssignments) &&
+                  own.contains(TgcgCapability.viewEvidence)),
+        )
+        .toList(growable: false);
 
 String _assignmentCapabilityLabel(TgcgCapability capability) =>
     switch (capability) {
