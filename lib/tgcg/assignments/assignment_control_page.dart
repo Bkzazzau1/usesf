@@ -7,8 +7,10 @@ import '../domain/permissions.dart';
 import '../geography/geography_registry.dart';
 import '../geography/kaduna_map.dart';
 import '../membership/membership_store.dart';
+import '../meeting/operational_call_store.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
+import 'assignment_control_actions.dart';
 import 'assignment_store.dart';
 import 'group_assignment_panel.dart';
 
@@ -26,6 +28,9 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     final membership = MembershipOperations.of(context);
     final devices = ManagedDevices.of(context);
     final assignments = Assignments.of(context);
+    final calls = OperationalCalls.of(context);
+    final stateCoordinatorScope =
+        stateCoordinatorGroupScope(context, session);
     final assignmentScopes = TgcgAccessPolicy.scopesFor(
       context,
       TgcgCapability.manageAssignments,
@@ -96,6 +101,19 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
+                    if (stateCoordinatorScope != null)
+                      OutlinedButton.icon(
+                        onPressed: () =>
+                            showStateCoordinatorCallMemberDialog(
+                          context,
+                          calls: calls,
+                          membership: membership,
+                          session: session,
+                          stateScope: stateCoordinatorScope,
+                        ),
+                        icon: const Icon(Icons.video_call_outlined),
+                        label: const Text('Call member'),
+                      ),
                     OutlinedButton.icon(
                       onPressed: () => _setStaffingRequirement(
                         context,
@@ -142,6 +160,22 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
               assignments,
               session,
               group,
+            ),
+            onCallChairman: (group) => _callGroupChairman(
+              context,
+              calls,
+              membership,
+              session,
+              stateCoordinatorScope!,
+              group,
+            ),
+            onCallGroup: (group) => startStateCoordinatorGroupCall(
+              context,
+              calls: calls,
+              session: session,
+              stateScope: stateCoordinatorScope!,
+              memberIds: group.memberIds,
+              groupAssignmentId: group.id,
             ),
           ),
           const SizedBox(height: 16),
@@ -230,6 +264,9 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
           authorizedScope: assignmentScopes.isEmpty
               ? session.scope
               : assignmentScopes.first,
+          calls: calls,
+          session: session,
+          stateCoordinatorScope: stateCoordinatorScope,
         ),
         const SizedBox(height: 16),
         _DeviceRegistry(
@@ -249,6 +286,33 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
         ),
       ],
     );
+  }
+
+  Future<void> _callGroupChairman(
+    BuildContext context,
+    OperationalCallController calls,
+    MembershipOperationsController membership,
+    TgcgSessionController session,
+    GeographicScope stateScope,
+    GroupAssignment group,
+  ) async {
+    final chairman = membership.memberById(group.chairmanMemberId);
+    if (chairman == null) return;
+    try {
+      await startStateCoordinatorMemberCall(
+        context,
+        calls: calls,
+        session: session,
+        stateScope: stateScope,
+        member: chairman,
+        kind: OperationalCallKind.video,
+      );
+    } on StateError catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    }
   }
 
   Future<void> _createGroupAssignment(
