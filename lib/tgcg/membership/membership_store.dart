@@ -744,8 +744,8 @@ class MembershipOperationsController extends ChangeNotifier {
     return updated;
   }
 
-  /// Backend identity-review operation. A suspicious finding blocks the
-  /// account immediately; a later verified finding reactivates the same member.
+  /// Backend identity-review operation. A suspicious finding blocks access
+  /// immediately without changing whether first-password activation is complete.
   Future<TgcgMember> setIdentityReview({
     required String memberId,
     required MemberIdentityReview review,
@@ -756,11 +756,6 @@ class MembershipOperationsController extends ChangeNotifier {
     final updated = _copyMember(
       current,
       identityReview: review,
-      accountStatus: review == MemberIdentityReview.suspicious
-          ? MemberAccountStatus.blocked
-          : current.accountStatus == MemberAccountStatus.pendingActivation
-              ? MemberAccountStatus.pendingActivation
-              : MemberAccountStatus.active,
     );
     final scope = _memberScopes[memberId] ?? GeographicScope.kaduna;
     await _persistMemberState(
