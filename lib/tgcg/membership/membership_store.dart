@@ -48,13 +48,11 @@ class MembershipOperationsController extends ChangeNotifier {
   MembershipOperationsController._({
     required GeographyRegistry geography,
     required List<TgcgMember> members,
-    required List<AccreditedAgent> agents,
     required Map<String, GeographicScope> memberScopes,
     required Map<String, MemberPollingUnitLink> memberPollingUnits,
     required OfflinePersistenceController persistence,
   })  : _geography = geography,
         _members = members,
-        _agents = agents,
         _memberScopes = memberScopes,
         _memberPollingUnits = memberPollingUnits,
         _persistence = persistence;
@@ -221,134 +219,11 @@ class MembershipOperationsController extends ChangeNotifier {
         'MEM-0012': lgaScope('Kagarko'),
       },
       persistence: persistence ?? OfflinePersistenceController(),
-      agents: [
-        AccreditedAgent(
-          id: 'ACC-0001',
-          memberId: 'MEM-0001',
-          agentId: 'AG-KD-001',
-          role: TgcgRole.pollingUnitAgent,
-          scope: kdPu,
-          status: AccreditationStatus.approved,
-          createdAt: now.subtract(const Duration(days: 20)),
-          registeredPhoneNumber: '+2348000000001',
-          deviceId: 'DEV-KD-001',
-          simFingerprint: 'SIM-KD-001',
-          biometricEnrolled: true,
-          trainingCompleted: true,
-          origin: RecordOrigin.systemDerived,
-        ),
-        AccreditedAgent(
-          id: 'ACC-0002',
-          memberId: 'MEM-0002',
-          agentId: 'AG-ZA-014',
-          role: TgcgRole.pollingUnitAgent,
-          scope: zaPu,
-          status: AccreditationStatus.approved,
-          createdAt: now.subtract(const Duration(days: 18)),
-          registeredPhoneNumber: '+2348000000002',
-          deviceId: 'DEV-ZA-014',
-          biometricEnrolled: true,
-          trainingCompleted: true,
-          origin: RecordOrigin.systemDerived,
-        ),
-        AccreditedAgent(
-          id: 'ACC-0003',
-          memberId: 'MEM-0004',
-          agentId: 'AG-JM-032',
-          role: TgcgRole.pollingUnitAgent,
-          scope: jmPu,
-          status: AccreditationStatus.pending,
-          createdAt: now.subtract(const Duration(days: 9)),
-          registeredPhoneNumber: '+2348000000004',
-          biometricEnrolled: false,
-          trainingCompleted: true,
-          origin: RecordOrigin.systemDerived,
-        ),
-        AccreditedAgent(
-          id: 'ACC-0004',
-          memberId: 'MEM-0005',
-          agentId: 'AG-IG-021',
-          role: TgcgRole.lgaCoordinator,
-          scope: lgaScope('Igabi'),
-          status: AccreditationStatus.approved,
-          createdAt: now.subtract(const Duration(days: 8)),
-          registeredPhoneNumber: '+2348000000005',
-          biometricEnrolled: true,
-          trainingCompleted: true,
-          origin: RecordOrigin.systemDerived,
-        ),
-        AccreditedAgent(
-          id: 'ACC-0005',
-          memberId: 'MEM-0006',
-          agentId: 'AG-KS-015',
-          role: TgcgRole.lgaCoordinator,
-          scope: lgaScope('Kaduna South'),
-          status: AccreditationStatus.approved,
-          createdAt: now.subtract(const Duration(days: 8)),
-          registeredPhoneNumber: '+2348000000006',
-          biometricEnrolled: true,
-          trainingCompleted: true,
-          origin: RecordOrigin.systemDerived,
-        ),
-        AccreditedAgent(
-          id: 'ACC-0006',
-          memberId: 'MEM-0007',
-          agentId: 'AG-SG-018',
-          role: TgcgRole.lgaCoordinator,
-          scope: lgaScope('Sabon Gari'),
-          status: AccreditationStatus.approved,
-          createdAt: now.subtract(const Duration(days: 7)),
-          registeredPhoneNumber: '+2348000000007',
-          biometricEnrolled: true,
-          trainingCompleted: true,
-          origin: RecordOrigin.systemDerived,
-        ),
-        AccreditedAgent(
-          id: 'ACC-0007',
-          memberId: 'MEM-0008',
-          agentId: 'AG-KC-011',
-          role: TgcgRole.lgaCoordinator,
-          scope: lgaScope('Kachia'),
-          status: AccreditationStatus.approved,
-          createdAt: now.subtract(const Duration(days: 6)),
-          registeredPhoneNumber: '+2348000000008',
-          biometricEnrolled: true,
-          trainingCompleted: true,
-          origin: RecordOrigin.systemDerived,
-        ),
-        AccreditedAgent(
-          id: 'ACC-0008',
-          memberId: 'MEM-0009',
-          agentId: 'AG-ZK-008',
-          role: TgcgRole.lgaCoordinator,
-          scope: lgaScope('Zangon Kataf'),
-          status: AccreditationStatus.pending,
-          createdAt: now.subtract(const Duration(days: 5)),
-          registeredPhoneNumber: '+2348000000009',
-          biometricEnrolled: true,
-          trainingCompleted: true,
-          origin: RecordOrigin.systemDerived,
-        ),
-        AccreditedAgent(
-          id: 'ACC-0009',
-          memberId: 'MEM-0010',
-          agentId: 'AG-GW-006',
-          role: TgcgRole.lgaCoordinator,
-          scope: lgaScope('Giwa'),
-          status: AccreditationStatus.approved,
-          createdAt: now.subtract(const Duration(days: 4)),
-          registeredPhoneNumber: '+2348000000010',
-          biometricEnrolled: true,
-          trainingCompleted: true,
-          origin: RecordOrigin.systemDerived,
-        ),
-      ],
     );
   }
 
   final GeographyRegistry _geography;
   final List<TgcgMember> _members;
-  final List<AccreditedAgent> _agents;
   final Map<String, GeographicScope> _memberScopes;
   final Map<String, MemberPollingUnitLink> _memberPollingUnits;
   final OfflinePersistenceController _persistence;
@@ -360,7 +235,6 @@ class MembershipOperationsController extends ChangeNotifier {
 
   GeographyRegistry get geography => _geography;
   List<TgcgMember> get members => List.unmodifiable(_members);
-  List<AccreditedAgent> get agents => List.unmodifiable(_agents);
 
   Future<void> hydrateFromOffline() async {
     final memberRows = await _persistence.readEntities(
@@ -368,9 +242,6 @@ class MembershipOperationsController extends ChangeNotifier {
     );
     final coordinateRows = await _persistence.readEntities(
       entityType: 'polling_unit_coordinate',
-    );
-    final agentRows = await _persistence.readEntities(
-      entityType: 'accredited_agent',
     );
 
     var changed = false;
@@ -442,51 +313,6 @@ class MembershipOperationsController extends ChangeNotifier {
             linkedBy: _nullableText(home['linkedBy']),
           );
         }
-      }
-      changed = true;
-    }
-
-    for (final row in agentRows) {
-      final id = row['id']?.toString();
-      final memberId = row['memberId']?.toString();
-      final agentId = row['agentId']?.toString();
-      final role = _role(row['role']);
-      final scope = geographicScopeFromJson(row['scope']);
-      final status = _accreditationStatus(row['status']);
-      final createdAt =
-          DateTime.tryParse(row['createdAt']?.toString() ?? '')?.toUtc();
-      if (id == null ||
-          memberId == null ||
-          agentId == null ||
-          role == null ||
-          scope == null ||
-          status == null ||
-          createdAt == null) {
-        continue;
-      }
-      if (memberById(memberId) == null) continue;
-
-      final restored = AccreditedAgent(
-        id: id,
-        memberId: memberId,
-        agentId: agentId,
-        role: role,
-        scope: scope,
-        status: status,
-        createdAt: createdAt,
-        registeredPhoneNumber:
-            _nullableText(row['registeredPhoneNumber']),
-        deviceId: _nullableText(row['deviceId']),
-        simFingerprint: _nullableText(row['simFingerprint']),
-        biometricEnrolled: row['biometricEnrolled'] == true,
-        trainingCompleted: row['trainingCompleted'] == true,
-        origin: _recordOrigin(row['origin']) ?? RecordOrigin.localEntry,
-      );
-      final index = _agents.indexWhere((item) => item.id == id);
-      if (index < 0) {
-        _agents.add(restored);
-      } else {
-        _agents[index] = restored;
       }
       changed = true;
     }
@@ -577,16 +403,6 @@ class MembershipOperationsController extends ChangeNotifier {
       }
     }
     return memberByPvcCredential(pvcVin);
-  }
-
-  AccreditedAgent? approvedAccreditationForMember(String memberId) {
-    for (final agent in _agents) {
-      if (agent.memberId == memberId &&
-          agent.status == AccreditationStatus.approved) {
-        return agent;
-      }
-    }
-    return null;
   }
 
   bool hasMemberPin(String memberId) =>
@@ -976,23 +792,6 @@ class MembershipOperationsController extends ChangeNotifier {
   int memberCountForScope(GeographicScope scope) =>
       membersForScope(scope).length;
 
-  List<AccreditedAgent> agentsForScope(GeographicScope scope) =>
-      _agents
-          .where((agent) => GeographyRegistry.scopeContains(scope, agent.scope))
-          .toList(growable: false);
-
-  int agentCountForScope(GeographicScope scope) =>
-      agentsForScope(scope).length;
-
-  int assignedPollingUnitsWithin(GeographicScope scope) => agentsForScope(scope)
-      .where((agent) =>
-          agent.status == AccreditationStatus.approved &&
-          agent.role == TgcgRole.pollingUnitAgent &&
-          agent.scope.pollingUnitId != null)
-      .map((agent) => agent.scope.pollingUnitId!)
-      .toSet()
-      .length;
-
   Future<TgcgMember> createMember({
     required String fullName,
     String phoneNumber = '',
@@ -1142,107 +941,6 @@ class MembershipOperationsController extends ChangeNotifier {
     return updated;
   }
 
-  Future<AccreditedAgent> accredit({
-    required String memberId,
-    required TgcgRole role,
-    required GeographicScope scope,
-    String? phoneNumber,
-    String? deviceId,
-    String? simFingerprint,
-  }) async {
-    if (scope.level == GeographyLevel.pollingUnit &&
-        _geography.pollingUnit(scope.pollingUnitId ?? '') == null) {
-      throw ArgumentError(
-        'Polling-unit assignment must use canonical geography.',
-      );
-    }
-
-    final agent = AccreditedAgent(
-      id: 'ACC-${(_agents.length + 1).toString().padLeft(4, '0')}',
-      memberId: memberId,
-      agentId: 'AG-${(_agents.length + 1).toString().padLeft(5, '0')}',
-      role: role,
-      scope: scope,
-      status: AccreditationStatus.pending,
-      createdAt: DateTime.now().toUtc(),
-      registeredPhoneNumber: phoneNumber?.trim(),
-      deviceId: deviceId?.trim().isEmpty == true ? null : deviceId?.trim(),
-      simFingerprint:
-          simFingerprint?.trim().isEmpty == true ? null : simFingerprint?.trim(),
-      origin: RecordOrigin.localEntry,
-    );
-    await _persistAgent(agent);
-    _agents.insert(0, agent);
-    notifyListeners();
-    return agent;
-  }
-
-  Future<void> updateAccreditationStatus(
-    String id,
-    AccreditationStatus status,
-  ) async {
-    final index = _agents.indexWhere((agent) => agent.id == id);
-    if (index < 0) return;
-    final updated = _copyAgent(_agents[index], status: status);
-    await _persistAgent(updated);
-    _agents[index] = updated;
-    notifyListeners();
-  }
-
-  Future<void> updateReadiness(
-    String id, {
-    bool? trainingCompleted,
-    bool? biometricEnrolled,
-    String? deviceId,
-    String? simFingerprint,
-  }) async {
-    final index = _agents.indexWhere((agent) => agent.id == id);
-    if (index < 0) return;
-    final current = _agents[index];
-    final updated = AccreditedAgent(
-      id: current.id,
-      memberId: current.memberId,
-      agentId: current.agentId,
-      role: current.role,
-      scope: current.scope,
-      status: current.status,
-      createdAt: current.createdAt,
-      registeredPhoneNumber: current.registeredPhoneNumber,
-      deviceId: deviceId ?? current.deviceId,
-      simFingerprint: simFingerprint ?? current.simFingerprint,
-      biometricEnrolled: biometricEnrolled ?? current.biometricEnrolled,
-      trainingCompleted: trainingCompleted ?? current.trainingCompleted,
-      origin: current.origin,
-    );
-    await _persistAgent(updated);
-    _agents[index] = updated;
-    notifyListeners();
-  }
-
-  Future<void> _persistAgent(AccreditedAgent agent) =>
-      _persistence.persistMutation(
-        entityType: 'accredited_agent',
-        entityId: agent.id,
-        mutationType: SyncMutationType.upsert,
-        scopeKey: scopeStorageKey(agent.scope),
-        ownerId: agent.memberId,
-        payload: {
-          'id': agent.id,
-          'memberId': agent.memberId,
-          'agentId': agent.agentId,
-          'role': agent.role.name,
-          'scope': geographicScopeToJson(agent.scope),
-          'status': agent.status.name,
-          'createdAt': agent.createdAt.toIso8601String(),
-          'registeredPhoneNumber': agent.registeredPhoneNumber,
-          'deviceId': agent.deviceId,
-          'simFingerprint': agent.simFingerprint,
-          'biometricEnrolled': agent.biometricEnrolled,
-          'trainingCompleted': agent.trainingCompleted,
-          'origin': agent.origin.name,
-        },
-      );
-
   Future<void> _persistMemberState(
     TgcgMember member,
     GeographicScope scope,
@@ -1332,21 +1030,6 @@ class MembershipOperationsController extends ChangeNotifier {
         origin: current.origin,
       );
 
-  static TgcgRole? _role(Object? value) {
-    final name = value?.toString();
-    for (final item in TgcgRole.values) {
-      if (item.name == name) return item;
-    }
-    return null;
-  }
-
-  static AccreditationStatus? _accreditationStatus(Object? value) {
-    final name = value?.toString();
-    for (final item in AccreditationStatus.values) {
-      if (item.name == name) return item;
-    }
-    return null;
-  }
 
   static RecordStatus? _recordStatus(Object? value) {
     final name = value?.toString();
@@ -1453,24 +1136,6 @@ class MembershipOperationsController extends ChangeNotifier {
     return difference == 0;
   }
 
-  static AccreditedAgent _copyAgent(
-    AccreditedAgent current, {
-    AccreditationStatus? status,
-  }) => AccreditedAgent(
-        id: current.id,
-        memberId: current.memberId,
-        agentId: current.agentId,
-        role: current.role,
-        scope: current.scope,
-        status: status ?? current.status,
-        createdAt: current.createdAt,
-        registeredPhoneNumber: current.registeredPhoneNumber,
-        deviceId: current.deviceId,
-        simFingerprint: current.simFingerprint,
-        biometricEnrolled: current.biometricEnrolled,
-        trainingCompleted: current.trainingCompleted,
-        origin: current.origin,
-      );
 }
 
 class MembershipOperations extends InheritedNotifier<MembershipOperationsController> {
