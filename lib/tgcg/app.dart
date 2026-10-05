@@ -13,6 +13,8 @@ import 'geography/geography_registry.dart';
 import 'governance/governance_store.dart';
 import 'membership/member_shell.dart';
 import 'membership/membership_store.dart';
+import 'meeting/operational_call_stage.dart';
+import 'meeting/operational_call_store.dart';
 import 'media/device_media.dart';
 import 'offline/offline_persistence.dart';
 import 'presentation_access_login.dart';
@@ -43,6 +45,7 @@ class _TgcgAppState extends State<TgcgApp> {
   late ManagedDeviceController managedDeviceController;
   late AssignmentController assignmentController;
   late AssignmentTrackingController assignmentTrackingController;
+  late OperationalCallController operationalCallController;
   late GovernanceOperationsController governanceOperationsController;
   late FieldOperationsController fieldOperationsController;
   late ResultOperationsController resultOperationsController;
@@ -66,6 +69,7 @@ class _TgcgAppState extends State<TgcgApp> {
       await membershipOperationsController.hydrateFromOffline();
       await managedDeviceController.hydrateFromOffline();
       await assignmentController.hydrateFromOffline();
+      await operationalCallController.hydrateFromOffline();
     } catch (_) {
       // Keep the prototype-seeded in-memory state available if a persisted
       // record is corrupt or from an incompatible development build.
@@ -90,6 +94,10 @@ class _TgcgAppState extends State<TgcgApp> {
     );
     assignmentTrackingController = AssignmentTrackingController(
       assignments: assignmentController,
+    );
+    operationalCallController = OperationalCallController(
+      membership: membershipOperationsController,
+      persistence: offlinePersistenceController,
     );
     governanceOperationsController = GovernanceOperationsController.prototypeSeed();
     fieldOperationsController = FieldOperationsController.prototypeSeed(
@@ -120,6 +128,7 @@ class _TgcgAppState extends State<TgcgApp> {
     final oldDevices = managedDeviceController;
     final oldAssignments = assignmentController;
     final oldAssignmentTracking = assignmentTrackingController;
+    final oldCalls = operationalCallController;
     final oldGovernance = governanceOperationsController;
     final oldField = fieldOperationsController;
     final oldResults = resultOperationsController;
@@ -146,6 +155,7 @@ class _TgcgAppState extends State<TgcgApp> {
       oldField.dispose();
       oldResults.dispose();
       oldAssignmentTracking.dispose();
+      oldCalls.dispose();
       oldAssignments.dispose();
       oldDevices.dispose();
       oldMembership.dispose();
@@ -164,6 +174,7 @@ class _TgcgAppState extends State<TgcgApp> {
     fieldOperationsController.dispose();
     resultOperationsController.dispose();
     assignmentTrackingController.dispose();
+    operationalCallController.dispose();
     assignmentController.dispose();
     managedDeviceController.dispose();
     membershipOperationsController.dispose();
@@ -198,19 +209,25 @@ class _TgcgAppState extends State<TgcgApp> {
                         controller: managedDeviceController,
                         child: Assignments(
                           controller: assignmentController,
-                          child: AssignmentTracking(
-                            controller: assignmentTrackingController,
-                            child: FieldOperations(
-                              controller: fieldOperationsController,
-                              child: ResultOperations(
-                                controller: resultOperationsController,
-                                child: MaterialApp(
-                                  navigatorKey: tgcgNavigatorKey,
-                                  debugShowCheckedModeBanner: false,
-                                  title: 'USESF',
-                                  theme: _theme(),
-                                  home: _AuthenticationGate(
-                                    onResetPresentation: _resetPresentation,
+                          child: OperationalCalls(
+                            controller: operationalCallController,
+                            child: AssignmentTracking(
+                              controller: assignmentTrackingController,
+                              child: FieldOperations(
+                                controller: fieldOperationsController,
+                                child: ResultOperations(
+                                  controller: resultOperationsController,
+                                  child: MaterialApp(
+                                    navigatorKey: tgcgNavigatorKey,
+                                    debugShowCheckedModeBanner: false,
+                                    title: 'USESF',
+                                    theme: _theme(),
+                                    home: OperationalCallOverlay(
+                                      child: _AuthenticationGate(
+                                        onResetPresentation:
+                                            _resetPresentation,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),

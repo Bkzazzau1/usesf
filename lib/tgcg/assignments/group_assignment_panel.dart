@@ -8,6 +8,7 @@ import '../geography/geography_registry.dart';
 import '../membership/membership_store.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
+import 'assignment_control_actions.dart';
 import 'assignment_store.dart';
 
 GeographicScope? stateCoordinatorGroupScope(
@@ -45,12 +46,16 @@ class GroupAssignmentPanel extends StatelessWidget {
     required this.membership,
     required this.onCreate,
     required this.onCancel,
+    required this.onCallChairman,
+    required this.onCallGroup,
   });
 
   final AssignmentController controller;
   final MembershipOperationsController membership;
   final VoidCallback onCreate;
   final Future<void> Function(GroupAssignment group) onCancel;
+  final Future<void> Function(GroupAssignment group) onCallChairman;
+  final Future<void> Function(GroupAssignment group) onCallGroup;
 
   @override
   Widget build(BuildContext context) {
@@ -169,11 +174,36 @@ class GroupAssignmentPanel extends StatelessWidget {
                         PopupMenuButton<String>(
                           tooltip: 'Group actions',
                           onSelected: (value) async {
-                            if (value == 'cancel') {
+                            if (value == 'chairman') {
+                              await onCallChairman(group);
+                            } else if (value == 'conference') {
+                              await onCallGroup(group);
+                            } else if (value == 'cancel') {
                               await onCancel(group);
                             }
                           },
                           itemBuilder: (context) => const [
+                            PopupMenuItem(
+                              value: 'chairman',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.videocam_outlined, size: 18),
+                                  SizedBox(width: 8),
+                                  Text('Call chairman'),
+                                ],
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: 'conference',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.groups_rounded, size: 18),
+                                  SizedBox(width: 8),
+                                  Text('Conference group'),
+                                ],
+                              ),
+                            ),
+                            PopupMenuDivider(),
                             PopupMenuItem(
                               value: 'cancel',
                               child: Row(
@@ -421,11 +451,50 @@ Future<bool> showGroupAssignmentDialog({
                       itemCount: visibleTargets.length,
                       itemBuilder: (context, index) {
                         final option = visibleTargets[index];
+                        final pollingUnit =
+                            areaLevel == _GroupAreaLevel.pollingUnit &&
+                                    option.scope.pollingUnitId != null
+                                ? membership.geography.pollingUnit(
+                                    option.scope.pollingUnitId!,
+                                  )
+                                : null;
+                        final gpsReady =
+                            pollingUnit?.operationalLatitude != null &&
+                                pollingUnit?.operationalLongitude != null;
                         return CheckboxListTile(
                           dense: true,
                           contentPadding: EdgeInsets.zero,
                           value: selectedTargetKeys.contains(option.key),
                           title: Text(option.label),
+                          secondary: pollingUnit == null
+                              ? null
+                              : IconButton(
+                                  tooltip:
+                                      gpsReady ? 'Polling-unit GPS' : 'Add GPS',
+                                  onPressed: () async {
+                                    final changed =
+                                        await showPollingUnitCoordinateDialog(
+                                      context,
+                                      membership: membership,
+                                      unit: pollingUnit,
+                                      actorId: session.accessId.isEmpty
+                                          ? session.operatorName
+                                          : session.accessId,
+                                      stateScope: authorizedScope,
+                                    );
+                                    if (changed && dialogContext.mounted) {
+                                      setDialogState(() {});
+                                    }
+                                  },
+                                  icon: Icon(
+                                    gpsReady
+                                        ? Icons.gps_fixed_rounded
+                                        : Icons.add_location_alt_outlined,
+                                    color: gpsReady
+                                        ? TgcgColors.success
+                                        : TgcgColors.warning,
+                                  ),
+                                ),
                           onChanged: (value) => setDialogState(() {
                             if (value == true) {
                               selectedTargetKeys.add(option.key);

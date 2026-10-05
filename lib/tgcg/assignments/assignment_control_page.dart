@@ -7,8 +7,10 @@ import '../domain/permissions.dart';
 import '../geography/geography_registry.dart';
 import '../geography/kaduna_map.dart';
 import '../membership/membership_store.dart';
+import '../meeting/operational_call_store.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
+import 'assignment_control_actions.dart';
 import 'assignment_store.dart';
 import 'group_assignment_panel.dart';
 
@@ -26,6 +28,9 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     final membership = MembershipOperations.of(context);
     final devices = ManagedDevices.of(context);
     final assignments = Assignments.of(context);
+    final calls = OperationalCalls.of(context);
+    final stateCoordinatorScope =
+        stateCoordinatorGroupScope(context, session);
     final assignmentScopes = TgcgAccessPolicy.scopesFor(
       context,
       TgcgCapability.manageAssignments,
@@ -96,6 +101,19 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
+                    if (stateCoordinatorScope != null)
+                      OutlinedButton.icon(
+                        onPressed: () =>
+                            showStateCoordinatorCallMemberDialog(
+                          context,
+                          calls: calls,
+                          membership: membership,
+                          session: session,
+                          stateScope: stateCoordinatorScope,
+                        ),
+                        icon: const Icon(Icons.video_call_outlined),
+                        label: const Text('Call member'),
+                      ),
                     OutlinedButton.icon(
                       onPressed: () => _setStaffingRequirement(
                         context,
@@ -141,6 +159,21 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
               context,
               assignments,
               session,
+              group,
+            ),
+            onCallChairman: (group) => _callGroupChairman(
+              context,
+              calls,
+              membership,
+              session,
+              stateCoordinatorScope!,
+              group,
+            ),
+            onCallGroup: (group) => _callGroupConference(
+              context,
+              calls,
+              session,
+              stateCoordinatorScope!,
               group,
             ),
           ),
@@ -230,6 +263,9 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
           authorizedScope: assignmentScopes.isEmpty
               ? session.scope
               : assignmentScopes.first,
+          calls: calls,
+          session: session,
+          stateCoordinatorScope: stateCoordinatorScope,
         ),
         const SizedBox(height: 16),
         _DeviceRegistry(
@@ -249,6 +285,57 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
         ),
       ],
     );
+  }
+
+  Future<void> _callGroupChairman(
+    BuildContext context,
+    OperationalCallController calls,
+    MembershipOperationsController membership,
+    TgcgSessionController session,
+    GeographicScope stateScope,
+    GroupAssignment group,
+  ) async {
+    final chairman = membership.memberById(group.chairmanMemberId);
+    if (chairman == null) return;
+    try {
+      await startStateCoordinatorMemberCall(
+        context,
+        calls: calls,
+        session: session,
+        stateScope: stateScope,
+        member: chairman,
+        kind: OperationalCallKind.video,
+      );
+    } on StateError catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    }
+  }
+
+  Future<void> _callGroupConference(
+    BuildContext context,
+    OperationalCallController calls,
+    TgcgSessionController session,
+    GeographicScope stateScope,
+    GroupAssignment group,
+  ) async {
+    try {
+      await startStateCoordinatorGroupCall(
+        context,
+        calls: calls,
+        session: session,
+        stateScope: stateScope,
+        memberIds: group.memberIds,
+        groupAssignmentId: group.id,
+      );
+    } on StateError catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    }
   }
 
   Future<void> _createGroupAssignment(
@@ -559,6 +646,8 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     final availableCapabilities = _assignmentGrantOptions(
       _delegableCapabilities(context, session),
     );
+    final coordinateStateScope =
+        stateCoordinatorGroupScope(context, session, listen: false);
     final title = TextEditingController(text: 'Field Duty Assignment');
     final instructions = TextEditingController();
 
@@ -664,6 +753,47 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
                     onChanged: (value) =>
                         setDialogState(() => pollingUnitId = value),
                   ),
+                  if (coordinateStateScope != null &&
+                      pollingUnitId != null) ...[
+                    const SizedBox(height: 10),
+                    Builder(
+                      builder: (context) {
+                        final unit = membership.geography
+                            .pollingUnit(pollingUnitId!);
+                        if (unit == null) return const SizedBox.shrink();
+                        final ready = unit.operationalLatitude != null &&
+                            unit.operationalLongitude != null;
+                        return Align(
+                          alignment: Alignment.centerLeft,
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              final changed =
+                                  await showPollingUnitCoordinateDialog(
+                                context,
+                                membership: membership,
+                                unit: unit,
+                                actorId: session.accessId.isEmpty
+                                    ? session.operatorName
+                                    : session.accessId,
+                                stateScope: coordinateStateScope,
+                              );
+                              if (changed && dialogContext.mounted) {
+                                setDialogState(() {});
+                              }
+                            },
+                            icon: Icon(
+                              ready
+                                  ? Icons.gps_fixed_rounded
+                                  : Icons.add_location_alt_outlined,
+                            ),
+                            label: Text(
+                              ready ? 'Polling-unit GPS' : 'Add GPS',
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                   ],
                   const SizedBox(height: 12),
                   DropdownButtonFormField<AssignmentPriority>(
@@ -1325,6 +1455,9 @@ class _AssignmentList extends StatelessWidget {
     required this.authorizedMembers,
     required this.actorId,
     required this.authorizedScope,
+    required this.calls,
+    required this.session,
+    required this.stateCoordinatorScope,
   });
 
   final List<MemberAssignment> assignments;
@@ -1334,6 +1467,9 @@ class _AssignmentList extends StatelessWidget {
   final List<TgcgMember> authorizedMembers;
   final String actorId;
   final GeographicScope authorizedScope;
+  final OperationalCallController calls;
+  final TgcgSessionController session;
+  final GeographicScope? stateCoordinatorScope;
 
   @override
   Widget build(BuildContext context) => TgcgSectionCard(
@@ -1351,6 +1487,13 @@ class _AssignmentList extends StatelessWidget {
                 children: assignments.map((assignment) {
                   final member = membership.memberById(assignment.memberId);
                   final presence = controller.presenceFor(assignment);
+                  final targetUnit = assignment.targetPollingUnitId == null
+                      ? null
+                      : membership.geography
+                          .pollingUnit(assignment.targetPollingUnitId!);
+                  final coordinateReady =
+                      targetUnit?.operationalLatitude != null &&
+                          targetUnit?.operationalLongitude != null;
                   return Container(
                     width: double.infinity,
                     margin: const EdgeInsets.only(bottom: 9),
@@ -1415,6 +1558,19 @@ class _AssignmentList extends StatelessWidget {
                                     color: _presenceColor(presence),
                                     compact: true,
                                   ),
+                                  if (targetUnit != null)
+                                    TgcgStatusPill(
+                                      label: coordinateReady
+                                          ? 'GPS READY'
+                                          : 'GPS MISSING',
+                                      color: coordinateReady
+                                          ? TgcgColors.success
+                                          : TgcgColors.warning,
+                                      icon: coordinateReady
+                                          ? Icons.gps_fixed_rounded
+                                          : Icons.location_off_outlined,
+                                      compact: true,
+                                    ),
                                   if (assignment.deviceId != null)
                                     TgcgStatusPill(
                                       label: assignment.deviceId!,
@@ -1427,13 +1583,57 @@ class _AssignmentList extends StatelessWidget {
                             ],
                           ),
                         ),
-                        if (canManage &&
-                            !assignment.isTerminal &&
-                            !assignment.belongsToGroup)
+                        if (!assignment.isTerminal &&
+                            (canManage || stateCoordinatorScope != null))
                           PopupMenuButton<_AssignmentMenuAction>(
                             tooltip: 'Assignment actions',
                             onSelected: (action) async {
-                              if (action == _AssignmentMenuAction.reassign) {
+                              if (action == _AssignmentMenuAction.videoCall ||
+                                  action == _AssignmentMenuAction.audioCall) {
+                                final targetMember =
+                                    membership.memberById(assignment.memberId);
+                                final scope = stateCoordinatorScope;
+                                if (targetMember == null || scope == null) {
+                                  return;
+                                }
+                                try {
+                                  await startStateCoordinatorMemberCall(
+                                    context,
+                                    calls: calls,
+                                    session: session,
+                                    stateScope: scope,
+                                    member: targetMember,
+                                    kind: action ==
+                                            _AssignmentMenuAction.audioCall
+                                        ? OperationalCallKind.audio
+                                        : OperationalCallKind.video,
+                                    assignmentId: assignment.id,
+                                  );
+                                } on StateError catch (error) {
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text(error.message)),
+                                  );
+                                }
+                              } else if (action ==
+                                  _AssignmentMenuAction.coordinate) {
+                                final pollingUnitId =
+                                    assignment.targetPollingUnitId;
+                                if (pollingUnitId == null) return;
+                                final unit =
+                                    membership.geography.pollingUnit(
+                                  pollingUnitId,
+                                );
+                                if (unit == null) return;
+                                await showPollingUnitCoordinateDialog(
+                                  context,
+                                  membership: membership,
+                                  unit: unit,
+                                  actorId: actorId,
+                                  stateScope: stateCoordinatorScope!,
+                                );
+                              } else if (action ==
+                                  _AssignmentMenuAction.reassign) {
                                 await _reassign(context, assignment);
                               } else if (action ==
                                   _AssignmentMenuAction.cancel) {
@@ -1441,7 +1641,42 @@ class _AssignmentList extends StatelessWidget {
                               }
                             },
                             itemBuilder: (context) => [
-                              if (!assignment.belongsToGroup)
+                              if (stateCoordinatorScope != null) ...[
+                                const PopupMenuItem(
+                                  value: _AssignmentMenuAction.videoCall,
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.videocam_outlined, size: 18),
+                                      SizedBox(width: 8),
+                                      Text('Video call'),
+                                    ],
+                                  ),
+                                ),
+                                const PopupMenuItem(
+                                  value: _AssignmentMenuAction.audioCall,
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.call_outlined, size: 18),
+                                      SizedBox(width: 8),
+                                      Text('Audio call'),
+                                    ],
+                                  ),
+                                ),
+                                if (assignment.targetPollingUnitId != null)
+                                  const PopupMenuItem(
+                                    value: _AssignmentMenuAction.coordinate,
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.gps_fixed_rounded, size: 18),
+                                        SizedBox(width: 8),
+                                        Text('Polling-unit GPS'),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                              if (canManage && !assignment.belongsToGroup) ...[
+                                if (stateCoordinatorScope != null)
+                                  const PopupMenuDivider(),
                                 const PopupMenuItem(
                                   value: _AssignmentMenuAction.reassign,
                                   child: Row(
@@ -1452,16 +1687,17 @@ class _AssignmentList extends StatelessWidget {
                                     ],
                                   ),
                                 ),
-                              const PopupMenuItem(
-                                value: _AssignmentMenuAction.cancel,
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.cancel_outlined, size: 18),
-                                    SizedBox(width: 8),
-                                    Text('Cancel assignment'),
-                                  ],
+                                const PopupMenuItem(
+                                  value: _AssignmentMenuAction.cancel,
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.cancel_outlined, size: 18),
+                                      SizedBox(width: 8),
+                                      Text('Cancel assignment'),
+                                    ],
+                                  ),
                                 ),
-                              ),
+                              ],
                             ],
                           ),
                       ],
@@ -1605,6 +1841,9 @@ class _AssignmentList extends StatelessWidget {
 }
 
 enum _AssignmentMenuAction {
+  videoCall,
+  audioCall,
+  coordinate,
   reassign,
   cancel,
 }
