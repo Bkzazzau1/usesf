@@ -10,6 +10,34 @@ import '../session.dart';
 import '../ui/tgcg_design.dart';
 import 'assignment_store.dart';
 
+GeographicScope? stateCoordinatorGroupScope(
+  BuildContext context,
+  TgcgSessionController session, {
+  bool listen = false,
+}) {
+  if (session.role == TgcgRole.stateCoordinator &&
+      TgcgPermissionPolicy.scopeAllows(
+        session.scope,
+        GeographicScope.kaduna,
+      )) {
+    return session.scope;
+  }
+
+  final member = TgcgAccessPolicy.memberAccess(context, listen: listen);
+  if (member == null) return null;
+  for (final grant in member.grants) {
+    if (grant.source == EffectiveGrantSource.role &&
+        grant.role == TgcgRole.stateCoordinator &&
+        grant.allows(
+          TgcgCapability.manageAssignments,
+          targetScope: GeographicScope.kaduna,
+        )) {
+      return grant.scope;
+    }
+  }
+  return null;
+}
+
 class GroupAssignmentPanel extends StatelessWidget {
   const GroupAssignmentPanel({
     super.key,
@@ -155,21 +183,11 @@ Future<bool> showGroupAssignmentDialog({
 }) async {
   if (authorizedMembers.isEmpty || authorizedUnits.isEmpty) return false;
 
-  final role = TgcgAccessPolicy.roleFor(
-    context,
-    TgcgCapability.manageAssignments,
-    targetScope: GeographicScope.kaduna,
-    listen: false,
-  );
-  if (role != TgcgRole.stateCoordinator) {
+  final authorizedScope =
+      stateCoordinatorGroupScope(context, session, listen: false);
+  if (authorizedScope == null) {
     throw StateError('Only the State Coordinator can create group assignments.');
   }
-
-  final authorizedScope = assignmentScopes.firstWhere(
-    (scope) =>
-        scope.level == GeographyLevel.state && scope.stateId == 'KD',
-    orElse: () => GeographicScope.kaduna,
-  );
 
   final title = TextEditingController(text: 'Group Field Assignment');
   final instructions = TextEditingController();
@@ -604,7 +622,7 @@ Future<bool> showGroupAssignmentDialog({
                           assignedBy: session.accessId.isEmpty
                               ? session.operatorName
                               : session.accessId,
-                          assignedByRole: role,
+                          assignedByRole: TgcgRole.stateCoordinator,
                           authorizedScope: authorizedScope,
                           chairmanMemberId:
                               automaticChairman ? null : chairmanMemberId,
