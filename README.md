@@ -76,6 +76,11 @@ Assignments are separate from roles.
 - If a polling unit has no operational coordinate, the State Coordinator may enter latitude/longitude from Assignment Control. The coordinate becomes a persistent reusable reference coordinate with an audit mutation.
 - Manual Assignment Control coordinate entry never silently overwrites an existing reference or field-verified operational coordinate.
 - Group GPS telemetry, AI-derived records and operational intelligence are internal system data and are not exposed on member-facing group assignment screens.
+- Assignment Control includes a private Assignment Edge AI monitor for assignment managers; members do not receive the AI score, findings or event ledger.
+- The current Edge AI foundation actively evaluates GPS integrity and managed-device integrity from fresh local telemetry, producing an assignment health score and internal findings.
+- Assignment Edge AI profiles support Normal, Verification, Event and Emergency monitoring modes and persist through encrypted offline storage/outbox sync.
+- AI events retain type, severity, source, confidence, optional evidence reference, resolution state and assignment scope. The event schema is ready for image-quality, video-verification, audio-event, identity, crowd, OCR/location-corroboration and evidence-integrity detectors as those on-device models are implemented.
+- Image/video/audio detectors are not treated as active merely because their event types exist; they must be backed by real on-device capture/inference before being enabled as working detectors.
 - Temporary capabilities on a group assignment remain constrained to the group's selected geographic targets, including when the group moves together.
 - The coordinator can grant only the temporary app capabilities needed for the assignment and only from authority they already possess.
 - Assignment-only access disappears automatically when the assignment is completed, cancelled or removed.
