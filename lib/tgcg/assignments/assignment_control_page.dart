@@ -137,6 +137,12 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
               authorizedMembers,
               authorizedUnits,
             ),
+            onCancel: (group) => _cancelGroupAssignment(
+              context,
+              assignments,
+              session,
+              group,
+            ),
           ),
           const SizedBox(height: 16),
         ],
@@ -264,6 +270,56 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     if (created && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Group assignment created.')),
+      );
+    }
+  }
+
+  Future<void> _cancelGroupAssignment(
+    BuildContext context,
+    AssignmentController assignments,
+    TgcgSessionController session,
+    GroupAssignment group,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Cancel group assignment'),
+        content: Text(group.title),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Cancel group'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final authorizedScope =
+        stateCoordinatorGroupScope(context, session, listen: false);
+    if (authorizedScope == null) return;
+
+    try {
+      await assignments.cancelGroupAssignment(
+        groupAssignmentId: group.id,
+        cancelledBy: session.accessId.isEmpty
+            ? session.operatorName
+            : session.accessId,
+        cancelledByRole: TgcgRole.stateCoordinator,
+        authorizedScope: authorizedScope,
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Group assignment cancelled.')),
+      );
+    } on StateError catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
       );
     }
   }
@@ -1371,7 +1427,9 @@ class _AssignmentList extends StatelessWidget {
                             ],
                           ),
                         ),
-                        if (canManage && !assignment.isTerminal)
+                        if (canManage &&
+                            !assignment.isTerminal &&
+                            !assignment.belongsToGroup)
                           PopupMenuButton<_AssignmentMenuAction>(
                             tooltip: 'Assignment actions',
                             onSelected: (action) async {
