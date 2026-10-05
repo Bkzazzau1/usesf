@@ -79,7 +79,10 @@ Future<void> showStateCoordinatorCallMemberDialog(
 
   final search = TextEditingController();
   var kind = OperationalCallKind.video;
-  var selectedMemberId = members.first.id;
+  String? selectedMemberId = members
+      .where((member) => calls.gpsActiveForMember(member.id))
+      .map((member) => member.id)
+      .firstOrNull;
 
   final selected = await showDialog<String>(
     context: context,
@@ -97,9 +100,19 @@ Future<void> showStateCoordinatorCallMemberDialog(
             })
             .toList(growable: false);
 
-        if (visible.isNotEmpty &&
-            !visible.any((member) => member.id == selectedMemberId)) {
-          selectedMemberId = visible.first.id;
+        if (selectedMemberId != null &&
+            !visible.any(
+              (member) =>
+                  member.id == selectedMemberId &&
+                  calls.gpsActiveForMember(member.id),
+            )) {
+          selectedMemberId = null;
+        }
+        if (selectedMemberId == null) {
+          selectedMemberId = visible
+              .where((member) => calls.gpsActiveForMember(member.id))
+              .map((member) => member.id)
+              .firstOrNull;
         }
 
         return AlertDialog(
@@ -147,12 +160,24 @@ Future<void> showStateCoordinatorCallMemberDialog(
                       itemCount: visible.length,
                       itemBuilder: (context, index) {
                         final member = visible[index];
+                        final gps =
+                            calls.gpsSnapshotForMember(member.id);
                         return RadioListTile<String>(
                           value: member.id,
+                          enabled: gps != null,
                           title: Text(member.fullName),
-                          secondary: Text(
-                            member.membershipNumber ?? member.id,
-                            style: const TextStyle(fontSize: 10),
+                          subtitle: Text(
+                            gps == null
+                                ? 'GPS inactive'
+                                : 'GPS active • ${_callGpsAge(gps.capturedAt)}',
+                          ),
+                          secondary: Icon(
+                            gps == null
+                                ? Icons.gps_off_rounded
+                                : Icons.gps_fixed_rounded,
+                            color: gps == null
+                                ? TgcgColors.warning
+                                : TgcgColors.success,
                           ),
                         );
                       },
@@ -168,7 +193,7 @@ Future<void> showStateCoordinatorCallMemberDialog(
               child: const Text('Cancel'),
             ),
             FilledButton.icon(
-              onPressed: visible.isEmpty
+              onPressed: selectedMemberId == null
                   ? null
                   : () => Navigator.pop(dialogContext, selectedMemberId),
               icon: Icon(
@@ -316,6 +341,16 @@ Future<bool> showPollingUnitCoordinateDialog(
   latitude.dispose();
   longitude.dispose();
   return saved == true;
+}
+
+String _callGpsAge(DateTime capturedAt) {
+  final age = DateTime.now().toUtc().difference(capturedAt.toUtc()).abs();
+  if (age.inSeconds < 60) return '${age.inSeconds}s ago';
+  return '${age.inMinutes}m ago';
+}
+
+extension _FirstOrNull<T> on Iterable<T> {
+  T? get firstOrNull => isEmpty ? null : first;
 }
 
 String _coordinateStatusLabel(PollingUnitCoordinateStatus status) =>
