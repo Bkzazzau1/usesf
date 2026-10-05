@@ -985,9 +985,11 @@ class AssignmentController extends ChangeNotifier {
     Set<TgcgCapability> grantedCapabilities = const {},
     required Set<TgcgCapability> assignerCapabilities,
   }) async {
-    if (assignedByRole != TgcgRole.stateCoordinator) {
+    if (assignedByRole != TgcgRole.stateCoordinator ||
+        authorizedScope.level != GeographyLevel.state ||
+        authorizedScope.stateId != GeographicScope.kaduna.stateId) {
       throw StateError(
-        'Only the State Coordinator can create group assignments.',
+        'Only the Kaduna State Coordinator can create group assignments.',
       );
     }
 
@@ -1178,9 +1180,11 @@ class AssignmentController extends ChangeNotifier {
     if (chairmanAssignment == null) {
       throw StateError('The chairman assignment record is missing.');
     }
-    if (chairmanAssignment.status != AssignmentStatus.active) {
+    if (chairmanAssignment.status == AssignmentStatus.assigned ||
+        chairmanAssignment.status == AssignmentStatus.reassigned ||
+        chairmanAssignment.isTerminal) {
       throw StateError(
-        'The chairman must start the assignment before submitting the group.',
+        'The chairman must accept the assignment before submitting the group.',
       );
     }
 
