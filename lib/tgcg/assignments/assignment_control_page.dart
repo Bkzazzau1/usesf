@@ -169,13 +169,12 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
               stateCoordinatorScope!,
               group,
             ),
-            onCallGroup: (group) => startStateCoordinatorGroupCall(
+            onCallGroup: (group) => _callGroupConference(
               context,
-              calls: calls,
-              session: session,
-              stateScope: stateCoordinatorScope!,
-              memberIds: group.memberIds,
-              groupAssignmentId: group.id,
+              calls,
+              session,
+              stateCoordinatorScope!,
+              group,
             ),
           ),
           const SizedBox(height: 16),
@@ -306,6 +305,30 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
         stateScope: stateScope,
         member: chairman,
         kind: OperationalCallKind.video,
+      );
+    } on StateError catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    }
+  }
+
+  Future<void> _callGroupConference(
+    BuildContext context,
+    OperationalCallController calls,
+    TgcgSessionController session,
+    GeographicScope stateScope,
+    GroupAssignment group,
+  ) async {
+    try {
+      await startStateCoordinatorGroupCall(
+        context,
+        calls: calls,
+        session: session,
+        stateScope: stateScope,
+        memberIds: group.memberIds,
+        groupAssignmentId: group.id,
       );
     } on StateError catch (error) {
       if (!context.mounted) return;
