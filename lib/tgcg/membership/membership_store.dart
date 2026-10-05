@@ -570,7 +570,7 @@ class MembershipOperationsController extends ChangeNotifier {
       final index = _members.indexWhere((item) => item.id == memberId);
       final activated = _copyMember(
         member,
-        accountStatus: accountStatus,
+        accountStatus: MemberAccountStatus.active,
       );
       final scope = _memberScopes[memberId] ?? GeographicScope.kaduna;
       await _persistMemberState(
@@ -870,7 +870,7 @@ class MembershipOperationsController extends ChangeNotifier {
       pvcVin: normalizedVin.isEmpty ? null : normalizedVin,
       selfieReference:
           selfieReference?.trim().isEmpty == true ? null : selfieReference?.trim(),
-      accountStatus: MemberAccountStatus.active,
+      accountStatus: accountStatus,
       identityReview: MemberIdentityReview.pending,
       createdAt: DateTime.now().toUtc(),
       status: RecordStatus.submitted,
