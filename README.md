@@ -81,6 +81,9 @@ Assignments are separate from roles.
 - Assignment Edge AI profiles support Normal, Verification, Event and Emergency monitoring modes and persist through encrypted offline storage/outbox sync.
 - AI events retain type, severity, source, confidence, optional evidence reference, resolution state and assignment scope. The event schema is ready for image-quality, video-verification, audio-event, identity, crowd, OCR/location-corroboration and evidence-integrity detectors as those on-device models are implemented.
 - Image/video/audio detectors are not treated as active merely because their event types exist; they must be backed by real on-device capture/inference before being enabled as working detectors.
+- Submitted individual and group assignments open a historical AI report from the Submitted register. The report assesses stored completion GPS, evidence, assignment timeline and recorded AI events as they existed at submission rather than re-scoring old work from current live telemetry.
+- Submitted group AI reports aggregate all child assignments and their evidence under the chairman's submitted group record.
+- Evidence entries in a submitted AI report are individually clickable for capture metadata, GPS, integrity/reference fields and uploader details when available.
 - Temporary capabilities on a group assignment remain constrained to the group's selected geographic targets, including when the group moves together.
 - The coordinator can grant only the temporary app capabilities needed for the assignment and only from authority they already possess.
 - Assignment-only access disappears automatically when the assignment is completed, cancelled or removed.
