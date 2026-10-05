@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../access/access_policy.dart';
-import '../domain/models.dart';
 import '../domain/permissions.dart';
 import '../media/device_media.dart';
 import '../offline/offline_persistence.dart';
@@ -36,7 +35,6 @@ class _EvidenceCapturePageState extends State<EvidenceCapturePage> {
 
   @override
   Widget build(BuildContext context) {
-    final session = TgcgSession.of(context);
     final offline = OfflinePersistence.of(context);
     final scope = TgcgAccessPolicy.authorizingScope(
       context,

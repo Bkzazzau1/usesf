@@ -2,7 +2,6 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:usesf/tgcg/assignments/assignment_store.dart';
 import 'package:usesf/tgcg/devices/managed_device_store.dart';
-import 'package:usesf/tgcg/domain/models.dart';
 import 'package:usesf/tgcg/domain/permissions.dart';
 import 'package:usesf/tgcg/edge_ai/assignment_edge_ai_store.dart';
 import 'package:usesf/tgcg/evidence/evidence_intelligence_page.dart';

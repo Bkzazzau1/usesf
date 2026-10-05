@@ -327,7 +327,7 @@ SubmittedAiReport buildSubmittedAiReport({
         observations.add(
           SubmittedAiObservation(
             label: 'Required evidence incomplete',
-            detail: '${missingCount} required evidence type(s) are missing.',
+            detail: '$missingCount required evidence type(s) are missing.',
             severity: AssignmentEdgeAiSeverity.warning,
           ),
         );

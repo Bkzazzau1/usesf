@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../access/access_policy.dart';
 import '../assignments/assignment_store.dart';
-import '../domain/models.dart';
 import '../domain/permissions.dart';
 import '../edge_ai/assignment_edge_ai_store.dart';
 import '../edge_ai/submitted_assignment_ai_report.dart';
@@ -303,7 +302,7 @@ class _EvidenceIntelligencePageState extends State<EvidenceIntelligencePage> {
                 TgcgMetricCard(
                   width: width,
                   label: 'Photos',
-                  value: '${photos}',
+                  value: '$photos',
                   detail: 'Images',
                   icon: Icons.photo_outlined,
                   tone: TgcgMetricTone.info,
@@ -311,7 +310,7 @@ class _EvidenceIntelligencePageState extends State<EvidenceIntelligencePage> {
                 TgcgMetricCard(
                   width: width,
                   label: 'Video / Audio',
-                  value: '${videoAudio}',
+                  value: '$videoAudio',
                   detail: 'Recorded media',
                   icon: Icons.video_camera_back_outlined,
                   tone: TgcgMetricTone.ai,
@@ -319,7 +318,7 @@ class _EvidenceIntelligencePageState extends State<EvidenceIntelligencePage> {
                 TgcgMetricCard(
                   width: width,
                   label: 'AI review',
-                  value: '${review}',
+                  value: '$review',
                   detail: 'Needs attention',
                   icon: Icons.psychology_alt_outlined,
                   tone: review == 0
@@ -329,7 +328,7 @@ class _EvidenceIntelligencePageState extends State<EvidenceIntelligencePage> {
                 TgcgMetricCard(
                   width: width,
                   label: 'GPS tagged',
-                  value: '${gps}',
+                  value: '$gps',
                   detail: 'Location evidence',
                   icon: Icons.gps_fixed_rounded,
                   tone: TgcgMetricTone.success,
@@ -337,7 +336,7 @@ class _EvidenceIntelligencePageState extends State<EvidenceIntelligencePage> {
                 TgcgMetricCard(
                   width: width,
                   label: 'Integrity',
-                  value: '${hashed}',
+                  value: '$hashed',
                   detail: 'Hashed records',
                   icon: Icons.verified_user_outlined,
                   tone: TgcgMetricTone.success,
@@ -611,7 +610,7 @@ class _EvidenceRegisterRow extends StatelessWidget {
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          '${uploaderName} • ${record.referenceTitle}',
+                          '$uploaderName • ${record.referenceTitle}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
