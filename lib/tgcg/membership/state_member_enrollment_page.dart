@@ -68,10 +68,18 @@ class _StateMemberEnrollmentPageState
 
     final members = membership.membersForScope(scope);
     final pending = members
-        .where((item) => item.accountStatus == MemberAccountStatus.pendingActivation)
+        .where(
+          (item) =>
+              item.accountStatus == MemberAccountStatus.pendingActivation &&
+              !item.isBlocked,
+        )
         .length;
     final active = members
-        .where((item) => item.accountStatus == MemberAccountStatus.active)
+        .where(
+          (item) =>
+              item.accountStatus == MemberAccountStatus.active &&
+              !item.isBlocked,
+        )
         .length;
     final withoutRole = members
         .where((item) => governance.activeRolesForMember(item.id).isEmpty)
