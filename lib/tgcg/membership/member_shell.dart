@@ -711,7 +711,9 @@ class _MemberAssignmentCardState extends State<_MemberAssignmentCard> {
         current.groupAssignmentId != null &&
         group != null &&
         !group.isTerminal &&
-        current.status == AssignmentStatus.active;
+        !current.isTerminal &&
+        current.status != AssignmentStatus.assigned &&
+        current.status != AssignmentStatus.reassigned;
 
     return Container(
       width: double.infinity,
