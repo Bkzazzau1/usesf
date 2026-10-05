@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../access/access_policy.dart';
 import '../access/effective_member_access.dart';
 import '../domain/permissions.dart';
+import '../domain/models.dart';
 import '../geography/geography_registry.dart';
 import '../membership/membership_store.dart';
 import '../session.dart';
