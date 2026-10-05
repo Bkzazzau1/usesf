@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../access/access_policy.dart';
+import '../domain/models.dart';
 import '../domain/permissions.dart';
 import '../media/device_media.dart';
 import '../offline/offline_persistence.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
 import 'device_evidence_service.dart';
+import 'evidence_store.dart';
 import '../domain/local_id.dart';
 
 class EvidenceCapturePage extends StatefulWidget {
@@ -37,10 +39,18 @@ class _EvidenceCapturePageState extends State<EvidenceCapturePage> {
     final session = TgcgSession.of(context);
     final offline = OfflinePersistence.of(context);
     final scope = TgcgAccessPolicy.authorizingScope(
-          context,
-          TgcgCapability.viewEvidence,
-        ) ??
-        session.scope;
+      context,
+      TgcgCapability.captureEvidence,
+    );
+    if (scope == null) {
+      return const Center(
+        child: TgcgEmptyState(
+          icon: Icons.lock_outline_rounded,
+          title: 'Capture unavailable',
+          message: 'This workspace is available for evidence review only.',
+        ),
+      );
+    }
     final photos = _captured.where((item) => item.type == EvidenceType.photo).length;
     final videos = _captured.where((item) => item.type == EvidenceType.video).length;
     final audio = _captured.where((item) => item.type == EvidenceType.audio).length;
@@ -144,34 +154,31 @@ class _EvidenceCapturePageState extends State<EvidenceCapturePage> {
 
   Future<void> _save(CapturedEvidence evidence) async {
     final session = TgcgSession.of(context, listen: false);
-    final offline = OfflinePersistence.of(context, listen: false);
     final scope = TgcgAccessPolicy.authorizingScope(
-          context,
-          TgcgCapability.viewEvidence,
-          listen: false,
-        ) ??
-        session.scope;
+      context,
+      TgcgCapability.captureEvidence,
+      listen: false,
+    );
+    if (scope == null) {
+      throw StateError('Evidence capture is not authorized for this user.');
+    }
     final id = newLocalId('EVD');
-    await offline.persistMutation(
-      entityType: 'evidence',
-      entityId: id,
-      mutationType: SyncMutationType.create,
-      ownerId: session.accessId,
-      scopeKey: scope.label,
-      payload: {
-        'id': id,
-        'type': evidence.type.name,
-        'fileName': evidence.fileName,
-        'mimeType': evidence.mimeType,
-        'contentHash': evidence.contentHash,
-        'sourceReference': evidence.path,
-        'latitude': evidence.latitude,
-        'longitude': evidence.longitude,
-        'reference': _reference.text.trim().isEmpty ? null : _reference.text.trim(),
-        'uploaderId': session.accessId,
-        'createdAt': evidence.createdAt.toIso8601String(),
-        'scope': scope.label,
-      },
+    final attachment = EvidenceAttachment(
+      id: id,
+      type: evidence.type,
+      fileName: evidence.fileName,
+      createdAt: evidence.createdAt,
+      uploaderId: session.accessId,
+      contentHash: evidence.contentHash,
+      mimeType: evidence.mimeType,
+      sourceReference: evidence.path,
+      latitude: evidence.latitude,
+      longitude: evidence.longitude,
+    );
+    await EvidenceOperations.of(context, listen: false).addCapture(
+      evidence: attachment,
+      scope: scope,
+      reference: _reference.text,
     );
     if (!mounted) return;
     setState(() => _captured.insert(0, evidence));

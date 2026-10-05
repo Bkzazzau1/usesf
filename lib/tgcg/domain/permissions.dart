@@ -33,6 +33,7 @@ enum TgcgCapability {
   startMeeting,
   joinMeeting,
   viewEvidence,
+  captureEvidence,
   manageEvidence,
   viewAudit,
   exportReports,
@@ -125,6 +126,7 @@ class TgcgPermissionPolicy {
       TgcgCapability.startMeeting,
       TgcgCapability.joinMeeting,
       TgcgCapability.viewEvidence,
+      TgcgCapability.captureEvidence,
       TgcgCapability.exportReports,
     },
     TgcgRole.stateCoordinator: {
@@ -184,6 +186,7 @@ class TgcgPermissionPolicy {
       TgcgCapability.startMeeting,
       TgcgCapability.joinMeeting,
       TgcgCapability.viewEvidence,
+      TgcgCapability.captureEvidence,
     },
     TgcgRole.wardCoordinator: {
       TgcgCapability.createCustomRoles,
@@ -207,6 +210,7 @@ class TgcgPermissionPolicy {
       TgcgCapability.startMeeting,
       TgcgCapability.joinMeeting,
       TgcgCapability.viewEvidence,
+      TgcgCapability.captureEvidence,
     },
     TgcgRole.member: {},
     TgcgRole.pollingUnitCoordinator: {
@@ -228,6 +232,7 @@ class TgcgPermissionPolicy {
       TgcgCapability.startMeeting,
       TgcgCapability.joinMeeting,
       TgcgCapability.viewEvidence,
+      TgcgCapability.captureEvidence,
     },
     TgcgRole.mediaOfficer: {
       TgcgCapability.viewMediaIntelligence,
@@ -239,6 +244,7 @@ class TgcgPermissionPolicy {
       TgcgCapability.viewMeetingRoom,
       TgcgCapability.joinMeeting,
       TgcgCapability.viewEvidence,
+      TgcgCapability.captureEvidence,
     },
     TgcgRole.womenMobilizationCoordinator: {
       TgcgCapability.viewCommunications,
@@ -280,6 +286,7 @@ class TgcgPermissionPolicy {
       TgcgCapability.viewIncidents,
       TgcgCapability.submitFieldReport,
       TgcgCapability.viewEvidence,
+      TgcgCapability.captureEvidence,
       TgcgCapability.exportReports,
     },
     TgcgRole.dataEvidenceOfficer: {
@@ -325,6 +332,7 @@ class TgcgPermissionPolicy {
       TgcgCapability.viewMeetingRoom,
       TgcgCapability.joinMeeting,
       TgcgCapability.viewEvidence,
+      TgcgCapability.captureEvidence,
     },
     TgcgRole.observer: {
       TgcgCapability.viewGeography,
@@ -337,6 +345,7 @@ class TgcgPermissionPolicy {
       TgcgCapability.viewMeetingRoom,
       TgcgCapability.joinMeeting,
       TgcgCapability.viewEvidence,
+      TgcgCapability.captureEvidence,
     },
     TgcgRole.legalOfficer: {
       TgcgCapability.viewSituationRoom,

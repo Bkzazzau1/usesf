@@ -247,6 +247,127 @@ class FieldOperationsController extends ChangeNotifier {
   List<FieldIncident> get incidents => List.unmodifiable(_incidents);
   List<FieldReport> get reports => List.unmodifiable(_reports);
 
+  Future<void> hydrateFromOffline() async {
+    final persistence = _persistence;
+    if (persistence == null) return;
+
+    final incidentRows = await persistence.readEntities(
+      entityType: 'field_incident',
+    );
+    final reportRows = await persistence.readEntities(
+      entityType: 'field_report',
+    );
+    var changed = false;
+
+    for (final row in incidentRows) {
+      final id = row['id']?.toString();
+      final title = row['title']?.toString();
+      final category = row['category']?.toString();
+      final severity = _incidentSeverity(row['severity']);
+      final status = _incidentStatus(row['status']);
+      final scope = geographicScopeFromJson(row['scope']);
+      final reportedAt =
+          DateTime.tryParse(row['reportedAt']?.toString() ?? '')?.toUtc();
+      final reporterId = row['reporterId']?.toString();
+      if (id == null ||
+          title == null ||
+          category == null ||
+          severity == null ||
+          status == null ||
+          scope == null ||
+          reportedAt == null ||
+          reporterId == null) {
+        continue;
+      }
+      final evidence = <EvidenceAttachment>[];
+      final rawEvidence = row['evidence'];
+      if (rawEvidence is List) {
+        for (final value in rawEvidence) {
+          final item = evidenceFromJson(value);
+          if (item != null) evidence.add(item);
+        }
+      }
+      final restored = FieldIncident(
+        id: id,
+        title: title,
+        category: category,
+        severity: severity,
+        status: status,
+        scope: scope,
+        reportedAt: reportedAt,
+        reporterId: reporterId,
+        summary: row['summary']?.toString(),
+        assignedTeam: row['assignedTeam']?.toString(),
+        assignmentId: row['assignmentId']?.toString(),
+        deviceId: row['deviceId']?.toString(),
+        latitude: _double(row['latitude']),
+        longitude: _double(row['longitude']),
+        evidence: List.unmodifiable(evidence),
+        origin: _recordOrigin(row['origin']) ?? RecordOrigin.localEntry,
+      );
+      final index = _incidents.indexWhere((item) => item.id == id);
+      if (index < 0) {
+        _incidents.add(restored);
+      } else {
+        _incidents[index] = restored;
+      }
+      changed = true;
+    }
+
+    for (final row in reportRows) {
+      final id = row['id']?.toString();
+      final category = row['category']?.toString();
+      final summary = row['summary']?.toString();
+      final scope = geographicScopeFromJson(row['scope']);
+      final reporterId = row['reporterId']?.toString();
+      final reportedAt =
+          DateTime.tryParse(row['reportedAt']?.toString() ?? '')?.toUtc();
+      final status = _recordStatus(row['status']);
+      if (id == null ||
+          category == null ||
+          summary == null ||
+          scope == null ||
+          reporterId == null ||
+          reportedAt == null ||
+          status == null) {
+        continue;
+      }
+      final evidence = <EvidenceAttachment>[];
+      final rawEvidence = row['evidence'];
+      if (rawEvidence is List) {
+        for (final value in rawEvidence) {
+          final item = evidenceFromJson(value);
+          if (item != null) evidence.add(item);
+        }
+      }
+      final restored = FieldReport(
+        id: id,
+        category: category,
+        summary: summary,
+        scope: scope,
+        reporterId: reporterId,
+        reportedAt: reportedAt,
+        status: status,
+        incidentId: row['incidentId']?.toString(),
+        evidence: List.unmodifiable(evidence),
+        origin: _recordOrigin(row['origin']) ?? RecordOrigin.localEntry,
+      );
+      final index = _reports.indexWhere((item) => item.id == id);
+      if (index < 0) {
+        _reports.add(restored);
+      } else {
+        _reports[index] = restored;
+      }
+      changed = true;
+    }
+
+    if (changed) {
+      _incidents.sort((a, b) => b.reportedAt.compareTo(a.reportedAt));
+      _reports.sort((a, b) => b.reportedAt.compareTo(a.reportedAt));
+      notifyListeners();
+    }
+  }
+
   List<FieldIncident> incidentsForScope(GeographicScope scope) =>
       _incidents.where((item) => _within(scope, item.scope)).toList(growable: false);
 
@@ -367,6 +488,43 @@ class FieldOperationsController extends ChangeNotifier {
       origin: incident.origin,
     );
     notifyListeners();
+  }
+
+  static double? _double(Object? value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '');
+  }
+
+  static IncidentSeverity? _incidentSeverity(Object? value) {
+    final name = value?.toString();
+    for (final item in IncidentSeverity.values) {
+      if (item.name == name) return item;
+    }
+    return null;
+  }
+
+  static IncidentStatus? _incidentStatus(Object? value) {
+    final name = value?.toString();
+    for (final item in IncidentStatus.values) {
+      if (item.name == name) return item;
+    }
+    return null;
+  }
+
+  static RecordStatus? _recordStatus(Object? value) {
+    final name = value?.toString();
+    for (final item in RecordStatus.values) {
+      if (item.name == name) return item;
+    }
+    return null;
+  }
+
+  static RecordOrigin? _recordOrigin(Object? value) {
+    final name = value?.toString();
+    for (final item in RecordOrigin.values) {
+      if (item.name == name) return item;
+    }
+    return null;
   }
 
   bool _within(GeographicScope parent, GeographicScope child) {

@@ -210,6 +210,107 @@ class ResultOperationsController extends ChangeNotifier {
 
   List<ElectionResultSubmission> get submissions => List.unmodifiable(_submissions);
 
+  Future<void> hydrateFromOffline() async {
+    final persistence = _persistence;
+    if (persistence == null) return;
+
+    final rows = await persistence.readEntities(
+      entityType: 'election_result',
+    );
+    var changed = false;
+
+    for (final row in rows) {
+      final id = row['id']?.toString();
+      final scope = geographicScopeFromJson(row['pollingUnitScope']);
+      final submittedBy = row['submittedBy']?.toString();
+      final submittedAt =
+          DateTime.tryParse(row['submittedAt']?.toString() ?? '')?.toUtc();
+      final status = _recordStatus(row['status']);
+      final source = _submissionSource(row['source']);
+      final total = _int(row['totalVotesRecorded']);
+      final accredited = _int(row['accreditedVoters']);
+      if (id == null ||
+          scope == null ||
+          submittedBy == null ||
+          submittedAt == null ||
+          status == null ||
+          source == null ||
+          total == null ||
+          accredited == null) {
+        continue;
+      }
+
+      final votes = <String, int>{};
+      final rawVotes = row['partyVotes'];
+      if (rawVotes is Map) {
+        for (final entry in rawVotes.entries) {
+          final value = _int(entry.value);
+          if (value != null) votes[entry.key.toString()] = value;
+        }
+      }
+
+      ResultValidationSummary? validation;
+      final rawValidation = row['validation'];
+      if (rawValidation is Map) {
+        final map = rawValidation.map(
+          (key, value) => MapEntry(key.toString(), value),
+        );
+        validation = ResultValidationSummary(
+          arithmeticValid: map['arithmeticValid'] == true,
+          duplicateSuspected: map['duplicateSuspected'] == true,
+          pollingUnitMatched: map['pollingUnitMatched'] != false,
+          agentScopeMatched: map['agentScopeMatched'] != false,
+          ocrConfidence: _double(map['ocrConfidence']),
+          ocrMatchedManualEntry: map['ocrMatchedManualEntry'] is bool
+              ? map['ocrMatchedManualEntry'] as bool
+              : null,
+          notes: map['notes'] is List
+              ? (map['notes'] as List)
+                  .map((item) => item.toString())
+                  .toList(growable: false)
+              : const [],
+        );
+      }
+
+      final restored = ElectionResultSubmission(
+        id: id,
+        pollingUnitScope: scope,
+        submittedBy: submittedBy,
+        submittedAt: submittedAt,
+        status: status,
+        source: source,
+        partyVotes: Map.unmodifiable(votes),
+        totalVotesRecorded: total,
+        accreditedVoters: accredited,
+        rejectedVotes: _int(row['rejectedVotes']),
+        registeredVoters: _int(row['registeredVoters']),
+        resultForm: evidenceFromJson(row['resultForm']),
+        validation: validation,
+        verifiedBy: row['verifiedBy']?.toString(),
+        verifiedAt:
+            DateTime.tryParse(row['verifiedAt']?.toString() ?? '')?.toUtc(),
+        disputeReason: row['disputeReason']?.toString(),
+        sourceReference: row['sourceReference']?.toString(),
+        origin: _recordOrigin(row['origin']) ?? RecordOrigin.localEntry,
+      );
+
+      final index = _submissions.indexWhere((item) => item.id == id);
+      if (index < 0) {
+        _submissions.add(restored);
+      } else {
+        _submissions[index] = restored;
+      }
+      changed = true;
+    }
+
+    if (changed) {
+      _submissions.sort(
+        (a, b) => b.submittedAt.compareTo(a.submittedAt),
+      );
+      notifyListeners();
+    }
+  }
+
   List<ElectionResultSubmission> submissionsForScope(GeographicScope scope) =>
       _submissions.where((item) => _within(scope, item.pollingUnitScope)).toList(growable: false);
 
@@ -353,6 +454,40 @@ class ResultOperationsController extends ChangeNotifier {
     _submissions[index] = updated;
     notifyListeners();
     return true;
+  }
+
+  static int? _int(Object? value) {
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '');
+  }
+
+  static double? _double(Object? value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '');
+  }
+
+  static RecordStatus? _recordStatus(Object? value) {
+    final name = value?.toString();
+    for (final item in RecordStatus.values) {
+      if (item.name == name) return item;
+    }
+    return null;
+  }
+
+  static SubmissionSource? _submissionSource(Object? value) {
+    final name = value?.toString();
+    for (final item in SubmissionSource.values) {
+      if (item.name == name) return item;
+    }
+    return null;
+  }
+
+  static RecordOrigin? _recordOrigin(Object? value) {
+    final name = value?.toString();
+    for (final item in RecordOrigin.values) {
+      if (item.name == name) return item;
+    }
+    return null;
   }
 
   static bool _needsReview(ElectionResultSubmission item) {

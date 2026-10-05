@@ -12,6 +12,7 @@ import 'dashboard_page.dart';
 import 'domain/permissions.dart';
 import 'discussion/discussion_room_page.dart';
 import 'evidence/evidence_capture_page.dart';
+import 'evidence/evidence_intelligence_page.dart';
 import 'field/field_monitoring_page.dart';
 import 'field/situation_room_page.dart';
 import 'geography/geography_page.dart';
@@ -75,8 +76,26 @@ class _TgcgShellState extends State<TgcgShell> {
           : allowed.first;
     }
 
+    final evidenceRole = TgcgAccessPolicy.roleFor(
+      context,
+      TgcgCapability.viewEvidence,
+    );
+    final evidenceIntelligence =
+        allowed.contains(TgcgModule.evidenceCapture) &&
+        evidenceRole == TgcgRole.stateCoordinator;
     final destinations = _destinations
         .where((item) => allowed.contains(item.module))
+        .map(
+          (item) => item.module == TgcgModule.evidenceCapture &&
+                  evidenceIntelligence
+              ? _Destination(
+                  item.module,
+                  'Evidence Intelligence',
+                  Icons.fact_check_outlined,
+                  item.group,
+                )
+              : item,
+        )
         .toList(growable: false);
 
     return LayoutBuilder(
@@ -148,6 +167,7 @@ class _TgcgShellState extends State<TgcgShell> {
                         children: [
                           _CommandBar(
                             selectedModule: selectedModule,
+                            evidenceIntelligence: evidenceIntelligence,
                             showAlerts: allowed.contains(TgcgModule.alertCenter),
                             onAlerts: () => _select(TgcgModule.alertCenter),
                             onTour: () => _openTour(allowed),
@@ -184,7 +204,15 @@ class _TgcgShellState extends State<TgcgShell> {
         TgcgModule.aiAnalytics => const AiDataAnalyticsPage(),
         TgcgModule.alertCenter => const AlertCenterPage(),
         TgcgModule.fieldMonitoring => const FieldMonitoringPage(),
-        TgcgModule.evidenceCapture => const EvidenceCapturePage(),
+        TgcgModule.evidenceCapture =>
+          TgcgAccessPolicy.roleFor(
+            context,
+            TgcgCapability.viewEvidence,
+            listen: false,
+          ) ==
+              TgcgRole.stateCoordinator
+          ? const EvidenceIntelligencePage()
+          : const EvidenceCapturePage(),
         TgcgModule.situationRoom => const SituationRoomPage(),
         TgcgModule.securityResponse => const SecurityResponsePortalPage(),
         TgcgModule.resultCapture => const ResultCapturePage(),
@@ -488,12 +516,14 @@ class _OperatorCard extends StatelessWidget {
 class _CommandBar extends StatelessWidget {
   const _CommandBar({
     required this.selectedModule,
+    required this.evidenceIntelligence,
     required this.showAlerts,
     required this.onAlerts,
     required this.onTour,
   });
 
   final TgcgModule selectedModule;
+  final bool evidenceIntelligence;
   final bool showAlerts;
   final VoidCallback onAlerts;
   final VoidCallback onTour;
@@ -529,7 +559,10 @@ class _CommandBar extends StatelessWidget {
       child: Row(
         children: [
           Text(
-            _moduleLabel(selectedModule),
+            _moduleLabel(
+              selectedModule,
+              evidenceIntelligence: evidenceIntelligence,
+            ),
             style: const TextStyle(color: TgcgColors.ink, fontSize: 14, fontWeight: FontWeight.w900),
           ),
           const SizedBox(width: 20),
@@ -667,7 +700,10 @@ String _groupLabel(_NavGroup group) => switch (group) {
       _NavGroup.control => 'CONTROL',
     };
 
-String _moduleLabel(TgcgModule module) => switch (module) {
+String _moduleLabel(
+  TgcgModule module, {
+  bool evidenceIntelligence = false,
+}) => switch (module) {
       TgcgModule.overview => 'Command Overview',
       TgcgModule.memberEnrollment => 'Member Enrolment',
       TgcgModule.membershipNetwork => 'Registered Members',
@@ -679,7 +715,8 @@ String _moduleLabel(TgcgModule module) => switch (module) {
       TgcgModule.aiAnalytics => 'AI Data Analytics Centre',
       TgcgModule.alertCenter => 'Alert Centre',
       TgcgModule.fieldMonitoring => 'Field Monitoring',
-      TgcgModule.evidenceCapture => 'Evidence Capture',
+      TgcgModule.evidenceCapture =>
+        evidenceIntelligence ? 'Evidence Intelligence' : 'Evidence Capture',
       TgcgModule.situationRoom => 'Situation Room',
       TgcgModule.securityResponse => 'Security & Emergency Response',
       TgcgModule.resultCapture => 'Result Capture',
