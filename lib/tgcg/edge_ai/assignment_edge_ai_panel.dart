@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../assignments/assignment_store.dart';
+import '../domain/models.dart';
 import '../ui/tgcg_design.dart';
 import 'assignment_edge_ai_store.dart';
 
@@ -88,6 +89,7 @@ Future<bool> showAssignmentEdgeAiDialog(
   required MemberAssignment assignment,
   required AssignmentEdgeAiController edgeAi,
   required String actorId,
+  required GeographicScope authorizedScope,
 }) async {
   final profile = edgeAi.profileFor(assignment.id);
   var enabled = profile.enabled;
@@ -250,6 +252,7 @@ Future<bool> showAssignmentEdgeAiDialog(
                                     await edgeAi.resolveEvent(
                                       eventId: event.id,
                                       resolvedBy: actorId,
+                                      authorizedScope: authorizedScope,
                                     );
                                     if (dialogContext.mounted) {
                                       setDialogState(() {});
@@ -271,6 +274,7 @@ Future<bool> showAssignmentEdgeAiDialog(
                 await edgeAi.updateProfile(
                   assignmentId: assignment.id,
                   updatedBy: actorId,
+                  authorizedScope: authorizedScope,
                   enabled: enabled,
                   mode: mode,
                   capabilities: capabilities,
