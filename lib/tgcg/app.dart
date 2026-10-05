@@ -103,6 +103,7 @@ class _TgcgAppState extends State<TgcgApp> {
     bulkCommunicationsController =
         BulkCommunicationsController.productionFoundation(
       membership: membershipOperationsController,
+      devices: managedDeviceController,
       governance: governanceOperationsController,
       persistence: offlinePersistenceController,
     );
