@@ -10,6 +10,7 @@ import '../membership/membership_store.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
 import 'assignment_store.dart';
+import 'group_assignment_panel.dart';
 
 class AssignmentControlPage extends StatefulWidget {
   const AssignmentControlPage({super.key});
@@ -35,6 +36,13 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     );
     final canManageAssignments = assignmentScopes.isNotEmpty;
     final canManageDevices = deviceScopes.isNotEmpty;
+    final groupAssignmentRole = TgcgAccessPolicy.roleFor(
+      context,
+      TgcgCapability.manageAssignments,
+      targetScope: GeographicScope.kaduna,
+    );
+    final canCreateGroupAssignment =
+        groupAssignmentRole == TgcgRole.stateCoordinator;
     final authorizedUnits = membership.geography.pollingUnits
         .where(
           (unit) => assignmentScopes.any(
@@ -122,6 +130,22 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
               : null,
         ),
         const SizedBox(height: 18),
+        if (canCreateGroupAssignment) ...[
+          GroupAssignmentPanel(
+            controller: assignments,
+            membership: membership,
+            onCreate: () => _createGroupAssignment(
+              context,
+              membership,
+              assignments,
+              session,
+              authorizedMembers,
+              authorizedUnits,
+              assignmentScopes,
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
         LayoutBuilder(
           builder: (context, constraints) {
             final columns = constraints.maxWidth >= 980
@@ -225,6 +249,31 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
         ),
       ],
     );
+  }
+
+  Future<void> _createGroupAssignment(
+    BuildContext context,
+    MembershipOperationsController membership,
+    AssignmentController assignments,
+    TgcgSessionController session,
+    List<TgcgMember> authorizedMembers,
+    List<CanonicalPollingUnit> authorizedUnits,
+    List<GeographicScope> assignmentScopes,
+  ) async {
+    final created = await showGroupAssignmentDialog(
+      context: context,
+      membership: membership,
+      assignments: assignments,
+      session: session,
+      authorizedMembers: authorizedMembers,
+      authorizedUnits: authorizedUnits,
+      assignmentScopes: assignmentScopes,
+    );
+    if (created && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Group assignment created.')),
+      );
+    }
   }
 
   Future<void> _setStaffingRequirement(
