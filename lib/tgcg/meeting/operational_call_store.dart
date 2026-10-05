@@ -1,7 +1,8 @@
 import 'package:flutter/widgets.dart';
 
 import '../domain/models.dart';
-import '../geography/geography_registry.dart';\nimport '../membership/membership_store.dart';
+import '../geography/geography_registry.dart';
+import '../membership/membership_store.dart';
 import '../offline/offline_payloads.dart';
 import '../offline/offline_persistence.dart';
 
