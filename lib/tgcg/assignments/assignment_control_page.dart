@@ -136,7 +136,6 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
               session,
               authorizedMembers,
               authorizedUnits,
-              assignmentScopes,
             ),
           ),
           const SizedBox(height: 16),
@@ -253,7 +252,6 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
     TgcgSessionController session,
     List<TgcgMember> authorizedMembers,
     List<CanonicalPollingUnit> authorizedUnits,
-    List<GeographicScope> assignmentScopes,
   ) async {
     final created = await showGroupAssignmentDialog(
       context: context,
@@ -262,7 +260,6 @@ class _AssignmentControlPageState extends State<AssignmentControlPage> {
       session: session,
       authorizedMembers: authorizedMembers,
       authorizedUnits: authorizedUnits,
-      assignmentScopes: assignmentScopes,
     );
     if (created && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1385,18 +1382,19 @@ class _AssignmentList extends StatelessWidget {
                                 await _cancel(context, assignment);
                               }
                             },
-                            itemBuilder: (context) => const [
-                              PopupMenuItem(
-                                value: _AssignmentMenuAction.reassign,
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.swap_horiz_rounded, size: 18),
-                                    SizedBox(width: 8),
-                                    Text('Reassign'),
-                                  ],
+                            itemBuilder: (context) => [
+                              if (!assignment.belongsToGroup)
+                                const PopupMenuItem(
+                                  value: _AssignmentMenuAction.reassign,
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.swap_horiz_rounded, size: 18),
+                                      SizedBox(width: 8),
+                                      Text('Reassign'),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              PopupMenuItem(
+                              const PopupMenuItem(
                                 value: _AssignmentMenuAction.cancel,
                                 child: Row(
                                   children: [
