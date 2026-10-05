@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../access/access_policy.dart';
+import '../domain/permissions.dart';
 import '../media/device_media.dart';
 import '../offline/offline_persistence.dart';
 import '../session.dart';
@@ -33,6 +35,11 @@ class _EvidenceCapturePageState extends State<EvidenceCapturePage> {
   Widget build(BuildContext context) {
     final session = TgcgSession.of(context);
     final offline = OfflinePersistence.of(context);
+    final scope = TgcgAccessPolicy.authorizingScope(
+          context,
+          TgcgCapability.viewEvidence,
+        ) ??
+        session.scope;
     final photos = _captured.where((item) => item.type == EvidenceType.photo).length;
     final videos = _captured.where((item) => item.type == EvidenceType.video).length;
     final audio = _captured.where((item) => item.type == EvidenceType.audio).length;
@@ -44,7 +51,7 @@ class _EvidenceCapturePageState extends State<EvidenceCapturePage> {
         TgcgPageHeader(
           eyebrow: 'FIELD EVIDENCE',
           title: 'Evidence Capture',
-          subtitle: '${session.scope.label}: capture and preserve field media with location and integrity metadata.',
+          subtitle: '${scope.label}: capture and preserve field media with location and integrity metadata.',
           trailing: TgcgStatusPill(
             label: offline.pendingOutbox.isEmpty ? 'SYNCED' : '${offline.pendingOutbox.length} QUEUED',
             color: offline.pendingOutbox.isEmpty ? TgcgColors.success : TgcgColors.warning,
@@ -137,13 +144,19 @@ class _EvidenceCapturePageState extends State<EvidenceCapturePage> {
   Future<void> _save(CapturedEvidence evidence) async {
     final session = TgcgSession.of(context, listen: false);
     final offline = OfflinePersistence.of(context, listen: false);
+    final scope = TgcgAccessPolicy.authorizingScope(
+          context,
+          TgcgCapability.viewEvidence,
+          listen: false,
+        ) ??
+        session.scope;
     final id = 'EVD-${DateTime.now().microsecondsSinceEpoch}';
     await offline.persistMutation(
       entityType: 'evidence',
       entityId: id,
       mutationType: SyncMutationType.create,
       ownerId: session.accessId,
-      scopeKey: session.scope.label,
+      scopeKey: scope.label,
       payload: {
         'id': id,
         'type': evidence.type.name,
@@ -156,7 +169,7 @@ class _EvidenceCapturePageState extends State<EvidenceCapturePage> {
         'reference': _reference.text.trim().isEmpty ? null : _reference.text.trim(),
         'uploaderId': session.accessId,
         'createdAt': evidence.createdAt.toIso8601String(),
-        'scope': session.scope.label,
+        'scope': scope.label,
       },
     );
     if (!mounted) return;
