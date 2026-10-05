@@ -45,12 +45,16 @@ class GroupAssignmentPanel extends StatelessWidget {
     required this.membership,
     required this.onCreate,
     required this.onCancel,
+    required this.onCallChairman,
+    required this.onCallGroup,
   });
 
   final AssignmentController controller;
   final MembershipOperationsController membership;
   final VoidCallback onCreate;
   final Future<void> Function(GroupAssignment group) onCancel;
+  final Future<void> Function(GroupAssignment group) onCallChairman;
+  final Future<void> Function(GroupAssignment group) onCallGroup;
 
   @override
   Widget build(BuildContext context) {
@@ -169,11 +173,36 @@ class GroupAssignmentPanel extends StatelessWidget {
                         PopupMenuButton<String>(
                           tooltip: 'Group actions',
                           onSelected: (value) async {
-                            if (value == 'cancel') {
+                            if (value == 'chairman') {
+                              await onCallChairman(group);
+                            } else if (value == 'conference') {
+                              await onCallGroup(group);
+                            } else if (value == 'cancel') {
                               await onCancel(group);
                             }
                           },
                           itemBuilder: (context) => const [
+                            PopupMenuItem(
+                              value: 'chairman',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.videocam_outlined, size: 18),
+                                  SizedBox(width: 8),
+                                  Text('Call chairman'),
+                                ],
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: 'conference',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.groups_rounded, size: 18),
+                                  SizedBox(width: 8),
+                                  Text('Conference group'),
+                                ],
+                              ),
+                            ),
+                            PopupMenuDivider(),
                             PopupMenuItem(
                               value: 'cancel',
                               child: Row(
