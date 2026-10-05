@@ -226,19 +226,16 @@ class _FieldMonitoringPageState extends State<FieldMonitoringPage> {
     var category = _incidentCategories.first;
     var severity = IncidentSeverity.medium;
 
-    final agent = session.role == TgcgRole.pollingUnitAgent
-        ? _fieldAgentByAccessId(membership, session.accessId)
-        : null;
-    final memberId = session.role == TgcgRole.member
-        ? session.accessId
-        : agent?.memberId;
-    final activeAssignments = memberId == null
+    final memberId =
+        session.role == TgcgRole.member ? session.accessId : null;
+    final activeAssignments = memberId == null || memberId.isEmpty
         ? const <MemberAssignment>[]
         : assignments.activeAssignmentsForMember(memberId);
     MemberAssignment? selectedAssignment =
         activeAssignments.isEmpty ? null : activeAssignments.first;
-    final managedDevice =
-        memberId == null ? null : devices.deviceForMember(memberId);
+    final managedDevice = memberId == null || memberId.isEmpty
+        ? null
+        : devices.deviceForMember(memberId);
 
     final scopedUnits = membership.geography.pollingUnits
         .where(
@@ -579,7 +576,7 @@ class _FieldMonitoringPageState extends State<FieldMonitoringPage> {
                     decoration: const InputDecoration(labelText: 'Field location'),
                     isExpanded: true,
                     items: (units.isEmpty
-                            ? <GeographicScope>[session.scope]
+                            ? <GeographicScope>[scope]
                             : units.map((unit) => unit.scope).toList())
                         .map(
                           (value) => DropdownMenuItem(
@@ -1641,23 +1638,6 @@ class _Detail extends StatelessWidget {
           ],
         ),
       );
-}
-
-AccreditedAgent? _fieldAgentByAccessId(
-  MembershipOperationsController membership,
-  String accessId,
-) {
-  final normalized = accessId.trim().toLowerCase();
-  if (normalized.isEmpty) return null;
-  for (final agent in membership.agents) {
-    if (agent.role != TgcgRole.pollingUnitAgent) continue;
-    if (agent.agentId.toLowerCase() == normalized ||
-        (agent.registeredPhoneNumber ?? '').trim().toLowerCase() ==
-            normalized) {
-      return agent;
-    }
-  }
-  return null;
 }
 
 const _incidentCategories = <String>[
