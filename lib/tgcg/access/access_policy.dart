@@ -99,6 +99,76 @@ class TgcgAccessPolicy {
         listen: listen,
       );
 
+  static List<GeographicScope> scopesForAny(
+    BuildContext context,
+    Iterable<TgcgCapability> capabilities, {
+    bool listen = true,
+  }) {
+    final result = <GeographicScope>[];
+    final seen = <String>{};
+    for (final capability in capabilities) {
+      for (final scope in scopesFor(
+        context,
+        capability,
+        listen: listen,
+      )) {
+        final key = _scopeKey(scope);
+        if (seen.add(key)) result.add(scope);
+      }
+    }
+    return List.unmodifiable(result);
+  }
+
+  static String accessSummary(
+    BuildContext context, {
+    bool listen = true,
+  }) {
+    final session = TgcgSession.of(context, listen: listen);
+    final member = memberAccess(context, listen: listen);
+    if (member == null) {
+      final role = session.role;
+      return role == null ? 'No access' : roleLabel(role);
+    }
+
+    final roleCount = member.grants
+        .where((grant) => grant.source == EffectiveGrantSource.role)
+        .length;
+    final assignmentCount = member.grants
+        .where((grant) => grant.source == EffectiveGrantSource.assignment)
+        .length;
+    if (roleCount == 0 && assignmentCount == 0) return 'Member';
+    if (roleCount == 0) {
+      return '\$assignmentCount active assignment\${assignmentCount == 1 ? '' : 's'}';
+    }
+    if (assignmentCount == 0) {
+      return '\$roleCount active role\${roleCount == 1 ? '' : 's'}';
+    }
+    return '\$roleCount role\${roleCount == 1 ? '' : 's'} • '
+        '\$assignmentCount assignment\${assignmentCount == 1 ? '' : 's'}';
+  }
+
+  static String actorLabelFor(
+    BuildContext context,
+    TgcgCapability capability, {
+    GeographicScope? targetScope,
+    bool listen = false,
+  }) {
+    final role = roleFor(
+      context,
+      capability,
+      targetScope: targetScope,
+      listen: listen,
+    );
+    if (role != null) return roleLabel(role);
+
+    final member = memberAccess(context, listen: listen);
+    if (member != null) {
+      final grants = member.grantsFor(capability);
+      if (grants.isNotEmpty) return grants.first.label;
+    }
+    return 'Member';
+  }
+
   /// Chooses a concrete scope that authorizes an operation. For member
   /// sessions, the narrowest matching grant is preferred when a target is
   /// supplied; otherwise the broadest available grant is used.
@@ -162,6 +232,12 @@ class TgcgAccessPolicy {
     );
     return scopes.first;
   }
+
+  static String _scopeKey(GeographicScope scope) =>
+      '\${scope.level.name}:\${scope.country}:\${scope.zoneId ?? ''}:'
+      '\${scope.stateId ?? ''}:\${scope.senatorialDistrictId ?? ''}:'
+      '\${scope.lgaId ?? ''}:\${scope.wardId ?? ''}:'
+      '\${scope.pollingUnitId ?? ''}';
 
   static int _roleRank(TgcgRole role) => switch (role) {
         TgcgRole.stateAdministrator => 100,
