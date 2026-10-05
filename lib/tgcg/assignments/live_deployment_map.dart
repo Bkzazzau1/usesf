@@ -42,6 +42,10 @@ class _LiveDeploymentMapState extends State<LiveDeploymentMap>
     duration: const Duration(milliseconds: 1600),
   )..repeat();
   Timer? _clock;
+  String? _selectedLgaId;
+
+  void _toggleLga(String lgaId) =>
+      setState(() => _selectedLgaId = _selectedLgaId == lgaId ? null : lgaId);
 
   @override
   void initState() {
@@ -79,6 +83,7 @@ class _LiveDeploymentMapState extends State<LiveDeploymentMap>
           _DeploymentMarker(
             longitude: ping.longitude,
             latitude: ping.latitude,
+            lgaId: assignment.targetScope.lgaId,
             kind: switch (presence) {
               AssignmentPresence.insideGeofence => _MarkerKind.inside,
               AssignmentPresence.outsideGeofence => _MarkerKind.outside,
@@ -107,9 +112,10 @@ class _LiveDeploymentMapState extends State<LiveDeploymentMap>
           _DeploymentMarker(
             longitude: lon,
             latitude: lat,
+            lgaId: unit!.scope.lgaId,
             kind: _MarkerKind.target,
             tooltip:
-                '$name • ${assignment.title}\nAwaiting first GPS • target ${unit!.displayCode}',
+                '$name • ${assignment.title}\nAwaiting first GPS • target ${unit.displayCode}',
           ),
         );
       }
@@ -154,30 +160,70 @@ class _LiveDeploymentMapState extends State<LiveDeploymentMap>
             ],
           ),
           const SizedBox(height: 12),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 600),
-            child: Center(
-              child: AspectRatio(
-                aspectRatio: kadunaMapAspectRatio,
-                child: LayoutBuilder(
-                  builder: (context, box) {
-                    final size = box.biggest;
-                    return Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        Positioned.fill(
-                          child: KadunaMap(
-                            fillColor: _readinessFill,
-                            badge: _readinessBadge,
-                          ),
-                        ),
-                        for (final marker in markers) _positioned(marker, size),
-                      ],
-                    );
-                  },
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final map = ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 600),
+                child: Center(
+                  child: AspectRatio(
+                    aspectRatio: kadunaMapAspectRatio,
+                    child: LayoutBuilder(
+                      builder: (context, box) {
+                        final size = box.biggest;
+                        return Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Positioned.fill(
+                              child: KadunaMap(
+                                fillColor: _readinessFill,
+                                badge: _readinessBadge,
+                                selectedLgaId: _selectedLgaId,
+                                onLgaTap: _toggleLga,
+                              ),
+                            ),
+                            for (final marker in markers)
+                              _positioned(marker, size),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
                 ),
-              ),
-            ),
+              );
+              final panel = _LgaDetailPanel(
+                lgaId: _selectedLgaId,
+                membership: widget.membership,
+                controller: widget.controller,
+                snapshots: _selectedLgaId == null
+                    ? const []
+                    : _byLga[_selectedLgaId] ?? const [],
+                assignments: _selectedLgaId == null
+                    ? const []
+                    : open
+                          .where(
+                            (item) => item.targetScope.lgaId == _selectedLgaId,
+                          )
+                          .toList(growable: false),
+                authorized:
+                    _selectedLgaId != null &&
+                    _authorizedLgas.contains(_selectedLgaId),
+                onClose: () => setState(() => _selectedLgaId = null),
+              );
+              if (constraints.maxWidth < 1000) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [map, const SizedBox(height: 14), panel],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(flex: 3, child: map),
+                  const SizedBox(width: 16),
+                  Expanded(flex: 2, child: panel),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 14),
           const Wrap(
@@ -215,7 +261,15 @@ class _LiveDeploymentMapState extends State<LiveDeploymentMap>
       height: extent,
       child: Tooltip(
         message: marker.tooltip,
-        child: _MarkerDot(kind: marker.kind, pulse: _pulse),
+        child: GestureDetector(
+          onTap: marker.lgaId == null ? null : () => _toggleLga(marker.lgaId!),
+          child: MouseRegion(
+            cursor: marker.lgaId == null
+                ? MouseCursor.defer
+                : SystemMouseCursors.click,
+            child: _MarkerDot(kind: marker.kind, pulse: _pulse),
+          ),
+        ),
       ),
     );
   }
@@ -268,12 +322,14 @@ class _DeploymentMarker {
   const _DeploymentMarker({
     required this.longitude,
     required this.latitude,
+    required this.lgaId,
     required this.kind,
     required this.tooltip,
   });
 
   final double longitude;
   final double latitude;
+  final String? lgaId;
   final _MarkerKind kind;
   final String tooltip;
 }
@@ -471,11 +527,350 @@ String _presenceLabel(AssignmentPresence presence) => switch (presence) {
   AssignmentPresence.outsideGeofence => 'Outside geofence',
   AssignmentPresence.stale => 'GPS stale',
   AssignmentPresence.liveNoGeofence => 'Live, no geofence',
-  AssignmentPresence.unknown => 'Location unknown',
+  AssignmentPresence.unknown => 'Awaiting GPS',
 };
-
 
 String _time(DateTime value) {
   final local = value.toLocal();
   return '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+}
+
+/// Details for the LGA selected on the map: readiness, polling-unit staffing
+/// and the open assignments targeting it.
+class _LgaDetailPanel extends StatelessWidget {
+  const _LgaDetailPanel({
+    required this.lgaId,
+    required this.membership,
+    required this.controller,
+    required this.snapshots,
+    required this.assignments,
+    required this.authorized,
+    required this.onClose,
+  });
+
+  final String? lgaId;
+  final MembershipOperationsController membership;
+  final AssignmentController controller;
+  final List<PollingUnitCoverageSnapshot> snapshots;
+  final List<MemberAssignment> assignments;
+  final bool authorized;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final id = lgaId;
+    final lga = id == null ? null : membership.geography.lga(id);
+    if (lga == null) {
+      return _frame(
+        child: const TgcgEmptyState(
+          icon: Icons.touch_app_outlined,
+          title: 'Select an LGA',
+          message:
+              'Click any LGA on the map to see its polling units, staffing and live assignments.',
+        ),
+      );
+    }
+
+    final required = snapshots.fold<int>(
+      0,
+      (total, item) => total + item.minimumStaffing,
+    );
+    final assigned = snapshots.fold<int>(
+      0,
+      (total, item) => total + item.activeAssignments,
+    );
+    final present = snapshots.fold<int>(
+      0,
+      (total, item) => total + item.atLocation,
+    );
+    final gaps = snapshots.where((item) => item.needsAttention).length;
+    final (statusLabel, statusColor) = !authorized
+        ? ('OUTSIDE YOUR SCOPE', TgcgColors.muted)
+        : snapshots.isEmpty
+        ? ('NO PUs LOADED', TgcgColors.navy700)
+        : snapshots.any((item) => item.isUnstaffed || item.hasGpsAlert)
+        ? ('CRITICAL', TgcgColors.danger)
+        : gaps > 0
+        ? ('STAFFING GAP', TgcgColors.warning)
+        : ('READY', TgcgColors.success);
+
+    return _frame(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${lga.name} LGA',
+                      style: const TextStyle(
+                        color: TgcgColors.ink,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${lga.senatorialDistrictName} Senatorial Zone',
+                      style: const TextStyle(
+                        color: TgcgColors.muted,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Clear selection',
+                onPressed: onClose,
+                icon: const Icon(Icons.close_rounded, size: 20),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          TgcgStatusPill(label: statusLabel, color: statusColor, compact: true),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _Stat('${snapshots.length}', 'Polling units'),
+              _Stat('$assigned/$required', 'Assigned / required'),
+              _Stat('$present', 'At location'),
+              _Stat('$gaps', 'Need attention'),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const _Heading('Polling units'),
+          if (snapshots.isEmpty)
+            const _Note(
+              'No polling units with staffing requirements are loaded for this LGA.',
+            )
+          else
+            for (final item in snapshots.take(8))
+              _PollingUnitRow(snapshot: item),
+          if (snapshots.length > 8)
+            _Note('+ ${snapshots.length - 8} more polling units'),
+          const SizedBox(height: 14),
+          const _Heading('Open assignments'),
+          if (assignments.isEmpty)
+            const _Note('No open assignments target this LGA.')
+          else
+            for (final item in assignments.take(8))
+              _AssignmentRow(
+                title: item.title,
+                member:
+                    membership.memberById(item.memberId)?.fullName ??
+                    item.memberId,
+                presence: controller.presenceFor(item),
+              ),
+        ],
+      ),
+    );
+  }
+
+  Widget _frame({required Widget child}) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: TgcgColors.surfaceSoft,
+      borderRadius: BorderRadius.circular(TgcgRadius.md),
+      border: Border.all(color: TgcgColors.border),
+    ),
+    child: child,
+  );
+}
+
+class _Stat extends StatelessWidget {
+  const _Stat(this.value, this.label);
+
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+    decoration: BoxDecoration(
+      color: TgcgColors.surface,
+      borderRadius: BorderRadius.circular(TgcgRadius.sm),
+      border: Border.all(color: TgcgColors.border),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+            color: TgcgColors.ink,
+            fontSize: 16,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        Text(
+          label,
+          style: const TextStyle(color: TgcgColors.muted, fontSize: 10),
+        ),
+      ],
+    ),
+  );
+}
+
+class _Heading extends StatelessWidget {
+  const _Heading(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Text(
+      text.toUpperCase(),
+      style: const TextStyle(
+        color: TgcgColors.muted,
+        fontSize: 10,
+        fontWeight: FontWeight.w900,
+        letterSpacing: .8,
+      ),
+    ),
+  );
+}
+
+class _Note extends StatelessWidget {
+  const _Note(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) =>
+      Text(text, style: const TextStyle(color: TgcgColors.muted, fontSize: 11));
+}
+
+class _PollingUnitRow extends StatelessWidget {
+  const _PollingUnitRow({required this.snapshot});
+
+  final PollingUnitCoverageSnapshot snapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = snapshot.isUnstaffed || snapshot.hasGpsAlert
+        ? TgcgColors.danger
+        : snapshot.needsAttention
+        ? TgcgColors.warning
+        : TgcgColors.success;
+    final unit = snapshot.unit;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+      decoration: BoxDecoration(
+        color: TgcgColors.surface,
+        borderRadius: BorderRadius.circular(TgcgRadius.sm),
+        border: Border.all(color: TgcgColors.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              '${unit.displayCode} • ${unit.scope.pollingUnitName ?? ''} • ${unit.scope.wardName ?? ''}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: TgcgColors.ink,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Text(
+            '${snapshot.atLocation}/${snapshot.minimumStaffing} present',
+            style: TextStyle(
+              color: color,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AssignmentRow extends StatelessWidget {
+  const _AssignmentRow({
+    required this.title,
+    required this.member,
+    required this.presence,
+  });
+
+  final String title;
+  final String member;
+  final AssignmentPresence presence;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (presence) {
+      AssignmentPresence.insideGeofence => TgcgColors.success,
+      AssignmentPresence.outsideGeofence => TgcgColors.warning,
+      AssignmentPresence.liveNoGeofence => TgcgColors.info,
+      AssignmentPresence.stale ||
+      AssignmentPresence.unknown => TgcgColors.muted,
+    };
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+      decoration: BoxDecoration(
+        color: TgcgColors.surface,
+        borderRadius: BorderRadius.circular(TgcgRadius.sm),
+        border: Border.all(color: TgcgColors.border),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.person_pin_circle_outlined,
+            size: 17,
+            color: TgcgColors.primary,
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  member,
+                  style: const TextStyle(
+                    color: TgcgColors.ink,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: TgcgColors.muted,
+                    fontSize: 10.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TgcgStatusPill(
+            label: _presenceLabel(presence).toUpperCase(),
+            color: color,
+            compact: true,
+          ),
+        ],
+      ),
+    );
+  }
 }
