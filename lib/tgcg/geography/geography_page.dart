@@ -234,6 +234,29 @@ class _GeographyPageState extends State<GeographyPage> {
     CanonicalPollingUnit unit,
   ) async {
     if (verifyingPollingUnitId != null) return;
+    final authorized =
+        TgcgAccessPolicy.allows(
+          context,
+          TgcgCapability.manageMembership,
+          targetScope: unit.scope,
+          listen: false,
+        ) ||
+        TgcgAccessPolicy.allows(
+          context,
+          TgcgCapability.manageAssignments,
+          targetScope: unit.scope,
+          listen: false,
+        );
+    if (!authorized) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'This polling unit is outside your coordinate-verification authority.',
+          ),
+        ),
+      );
+      return;
+    }
     setState(() => verifyingPollingUnitId = unit.code);
     try {
       final fix = await verificationService.captureCurrentFix();
