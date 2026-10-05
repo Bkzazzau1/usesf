@@ -7,6 +7,7 @@ import '../devices/managed_device_store.dart';
 import '../evidence/device_evidence_service.dart';
 import '../geography/geography_registry.dart';
 import '../governance/governance_store.dart';
+import '../meeting/operational_call_stage.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
 import 'membership_store.dart';
@@ -92,6 +93,7 @@ class MemberShell extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 36),
         children: [
+          IncomingOperationalCallCard(memberId: member.id),
           TgcgPageHeader(
             eyebrow: 'MEMBER PROFILE',
             title: member.fullName,
@@ -406,6 +408,7 @@ class _WaitingForAccessScaffoldState extends State<_WaitingForAccessScaffold> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 36),
         children: [
+          IncomingOperationalCallCard(memberId: member.id),
           TgcgPageHeader(
             eyebrow: 'MEMBERSHIP ACTIVE',
             title: member.fullName,
