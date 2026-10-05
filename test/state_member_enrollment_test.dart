@@ -187,6 +187,38 @@ void main() {
       );
     });
 
+    test('suspicious review blocks pending member without activating it',
+        () async {
+      final member = await quickCreate(
+        name: 'Review Lifecycle',
+        phone: '+2348033333333',
+      );
+
+      final suspicious = await membership.setIdentityReview(
+        memberId: member.id,
+        review: MemberIdentityReview.suspicious,
+      );
+      expect(suspicious.isBlocked, isTrue);
+      expect(
+        suspicious.accountStatus,
+        MemberAccountStatus.pendingActivation,
+      );
+
+      final cleared = await membership.setIdentityReview(
+        memberId: member.id,
+        review: MemberIdentityReview.verified,
+      );
+      expect(cleared.isBlocked, isFalse);
+      expect(
+        cleared.accountStatus,
+        MemberAccountStatus.pendingActivation,
+      );
+      expect(
+        await membership.hasMemberPasswordCredential(member.id),
+        isFalse,
+      );
+    });
+
     test('pending activation survives offline hydration', () async {
       final member = await quickCreate(
         name: 'Persisted Pending',
