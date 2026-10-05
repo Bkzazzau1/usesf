@@ -335,7 +335,10 @@ SubmittedAiReport buildSubmittedAiReport({
       }
     }
 
-    final events = edgeAi.eventsForAssignment(assignment.id);
+    final events = edgeAi
+        .eventsForAssignment(assignment.id)
+        .where((item) => !item.createdAt.isAfter(completion))
+        .toList(growable: false);
     for (final event in events) {
       score -= switch (event.severity) {
         AssignmentEdgeAiSeverity.info => 0,
@@ -358,7 +361,10 @@ SubmittedAiReport buildSubmittedAiReport({
         assessment: _assessmentFor(normalized),
         observations: List.unmodifiable(observations),
         aiEvents: events,
-        timeline: assignments.eventsForAssignment(assignment.id),
+        timeline: assignments
+            .eventsForAssignment(assignment.id)
+            .where((item) => !item.createdAt.isAfter(completion))
+            .toList(growable: false),
       ),
     );
   }
@@ -491,6 +497,11 @@ class _ReportSummary extends StatelessWidget {
             label: '${report.evidence.length} EVIDENCE',
             color: TgcgColors.primary,
             icon: Icons.perm_media_outlined,
+          ),
+          TgcgStatusPill(
+            label: _fullTime(report.generatedAt),
+            color: TgcgColors.muted,
+            icon: Icons.schedule_rounded,
           ),
         ],
       ),
