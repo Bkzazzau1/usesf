@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../access/access_policy.dart';
 import '../assignments/assignment_control_actions.dart';
 import '../assignments/assignment_store.dart';
+import '../devices/managed_device_store.dart';
 import '../domain/models.dart';
 import '../domain/permissions.dart';
 import '../membership/membership_store.dart';
@@ -21,6 +22,9 @@ class FieldAssignmentCallPanel extends StatelessWidget {
     }
 
     final assignments = Assignments.of(context);
+    // Managed-device GPS can satisfy the active-GPS call requirement even
+    // when an assignment heartbeat is not the freshest source.
+    ManagedDevices.of(context);
     final membership = MembershipOperations.of(context);
     final calls = OperationalCalls.of(context);
     final stateScope = TgcgAccessPolicy.authorizingScope(
