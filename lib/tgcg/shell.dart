@@ -23,6 +23,7 @@ import 'meeting/meeting_room_page.dart';
 import 'membership/member_operations_page.dart';
 import 'membership/member_shell.dart';
 import 'membership/pvc_enrollment_page.dart';
+import 'membership/state_member_enrollment_page.dart';
 import 'monitoring/system_monitoring_page.dart';
 import 'offline/offline_persistence.dart';
 import 'operations/live_operations_page.dart';
@@ -42,8 +43,16 @@ class TgcgShell extends StatefulWidget {
 
 class _TgcgShellState extends State<TgcgShell> {
   TgcgModule selectedModule = TgcgModule.overview;
+  String? _preferredRoleMemberId;
 
   void _select(TgcgModule module) => setState(() => selectedModule = module);
+
+  void _openRoleAssignmentFor(String memberId) {
+    setState(() {
+      _preferredRoleMemberId = memberId;
+      selectedModule = TgcgModule.roleAssignment;
+    });
+  }
 
   void _openTour(Set<TgcgModule> allowed) {
     showPresentationTour(
@@ -190,13 +199,25 @@ class _TgcgShellState extends State<TgcgShell> {
         TgcgModule.overview => session.role == TgcgRole.member
             ? const MemberShell()
             : TgcgDashboardPage(onOpenModule: _select),
-        TgcgModule.memberEnrollment => PvcEnrollmentPage(
-            onOpenAssignments: () => _select(TgcgModule.assignmentControl),
-          ),
+        TgcgModule.memberEnrollment =>
+          TgcgAccessPolicy.roleFor(
+            context,
+            TgcgCapability.manageMembership,
+            listen: false,
+          ) ==
+              TgcgRole.stateCoordinator
+          ? StateMemberEnrollmentPage(
+              onAssignRole: _openRoleAssignmentFor,
+            )
+          : PvcEnrollmentPage(
+              onOpenAssignments: () => _select(TgcgModule.assignmentControl),
+            ),
         TgcgModule.membershipNetwork => MemberOperationsPage(
             onOpenModule: _select,
           ),
-        TgcgModule.roleAssignment => const RoleAssignmentPage(),
+        TgcgModule.roleAssignment => RoleAssignmentPage(
+            initialMemberId: _preferredRoleMemberId,
+          ),
         TgcgModule.geography => const GeographyPage(),
         TgcgModule.assignmentControl => const AssignmentControlPage(),
         TgcgModule.liveOperations => const LiveOperationsPage(),
