@@ -257,6 +257,7 @@ class _GroupFieldCallCard extends StatelessWidget {
         member: member,
         kind: kind,
         assignmentId: assignmentId,
+        groupAssignmentId: group.id,
       );
     } on StateError catch (error) {
       if (!context.mounted) return;
