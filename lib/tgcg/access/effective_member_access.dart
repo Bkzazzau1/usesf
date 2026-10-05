@@ -70,7 +70,9 @@ class EffectiveMemberAccess {
       final group = assignment.groupAssignmentId == null
           ? null
           : assignments.groupAssignmentById(assignment.groupAssignmentId!);
-      if (group != null && group.targetScopes.isNotEmpty) {
+      if (group != null &&
+          group.distribution == GroupAssignmentDistribution.together &&
+          group.targetScopes.isNotEmpty) {
         for (var index = 0; index < group.targetScopes.length; index++) {
           grants.add(
             EffectiveAccessGrant(
