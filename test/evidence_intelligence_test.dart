@@ -120,6 +120,56 @@ void main() {
     });
   });
 
+  group('Evidence capture delegation', () {
+    test('State Coordinator can delegate capture without personal capture permission',
+        () async {
+      final assignment = await assignments.createAssignment(
+        title: 'Evidence capture duty',
+        memberId: 'MEM-0001',
+        assignedBy: 'STATE-COORD',
+        authorizedScope: GeographicScope.kaduna,
+        grantedCapabilities: const {
+          TgcgCapability.viewEvidence,
+          TgcgCapability.captureEvidence,
+        },
+        assignerCapabilities: TgcgPermissionPolicy.capabilitiesFor(
+          TgcgRole.stateCoordinator,
+        ),
+      );
+
+      expect(
+        assignment.grantedCapabilities,
+        contains(TgcgCapability.captureEvidence),
+      );
+      expect(
+        TgcgPermissionPolicy.allows(
+          TgcgRole.stateCoordinator,
+          TgcgCapability.captureEvidence,
+        ),
+        isFalse,
+      );
+    });
+
+    test('capture delegation still requires assignment-management authority',
+        () async {
+      await expectLater(
+        assignments.createAssignment(
+          title: 'Unauthorized evidence duty',
+          memberId: 'MEM-0001',
+          assignedBy: 'VIEWER',
+          authorizedScope: GeographicScope.kaduna,
+          grantedCapabilities: const {
+            TgcgCapability.captureEvidence,
+          },
+          assignerCapabilities: const {
+            TgcgCapability.viewEvidence,
+          },
+        ),
+        throwsStateError,
+      );
+    });
+  });
+
   group('State Evidence Intelligence aggregation', () {
     test('combines all authoritative evidence streams', () async {
       final pu = membership.geography.pollingUnit('KD-KN-W01-PU001')!;
