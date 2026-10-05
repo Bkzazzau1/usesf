@@ -540,6 +540,9 @@ class MembershipOperationsController extends ChangeNotifier {
     if (member == null) {
       throw ArgumentError('Unknown member: $memberId');
     }
+    if (member.isBlocked) {
+      throw StateError('Blocked member accounts cannot set a password.');
+    }
     if (password.length < 8) {
       throw ArgumentError('Password must contain at least 8 characters.');
     }
@@ -755,7 +758,9 @@ class MembershipOperationsController extends ChangeNotifier {
       identityReview: review,
       accountStatus: review == MemberIdentityReview.suspicious
           ? MemberAccountStatus.blocked
-          : MemberAccountStatus.active,
+          : current.accountStatus == MemberAccountStatus.pendingActivation
+              ? MemberAccountStatus.pendingActivation
+              : MemberAccountStatus.active,
     );
     final scope = _memberScopes[memberId] ?? GeographicScope.kaduna;
     await _persistMemberState(
