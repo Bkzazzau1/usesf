@@ -6,6 +6,49 @@ import '../session.dart';
 import '../ui/tgcg_design.dart';
 import 'operational_call_store.dart';
 
+class OperationalCallOverlay extends StatelessWidget {
+  const OperationalCallOverlay({
+    super.key,
+    required this.child,
+  });
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final session = TgcgSession.of(context);
+    if (session.role != TgcgRole.member || session.accessId.isEmpty) {
+      return child;
+    }
+    final membership = MembershipOperations.of(context);
+    final member = membership.memberById(session.accessId);
+    if (member == null || member.isBlocked) return child;
+    final calls = OperationalCalls.of(context);
+    if (calls.incomingForMember(member.id).isEmpty) return child;
+
+    return Stack(
+      children: [
+        child,
+        SafeArea(
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 620),
+                child: Material(
+                  color: Colors.transparent,
+                  child: IncomingOperationalCallCard(memberId: member.id),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class OperationalCallStage extends StatefulWidget {
   const OperationalCallStage({
     super.key,
