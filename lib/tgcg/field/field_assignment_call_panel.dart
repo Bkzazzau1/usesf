@@ -204,7 +204,19 @@ class _GroupFieldCallCard extends StatelessWidget {
                           kind: OperationalCallKind.audio,
                         ),
                 icon: const Icon(Icons.call_outlined, size: 18),
-                label: const Text('Chairman'),
+                label: const Text('Chairman audio'),
+              ),
+              OutlinedButton.icon(
+                onPressed: chairman == null || !chairmanGps
+                    ? null
+                    : () => _callDirect(
+                          context,
+                          member: chairman,
+                          assignmentId: chairmanAssignment?.id,
+                          kind: OperationalCallKind.video,
+                        ),
+                icon: const Icon(Icons.videocam_outlined, size: 18),
+                label: const Text('Chairman video'),
               ),
               OutlinedButton.icon(
                 onPressed: memberIds.isEmpty
