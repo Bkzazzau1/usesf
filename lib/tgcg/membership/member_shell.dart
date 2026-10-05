@@ -699,7 +699,19 @@ class _MemberAssignmentCardState extends State<_MemberAssignmentCard> {
         assignments.assignmentById(widget.assignment.id) ?? widget.assignment;
     final presence = assignments.presenceFor(current);
     final device = widget.managedDevice;
-    final actions = _actionsFor(current.status);
+    final restricted = current.systemIntelligenceRestricted;
+    final group = current.groupAssignmentId == null
+        ? null
+        : assignments.groupAssignmentById(current.groupAssignmentId!);
+    final actions = _actionsFor(
+      current.status,
+      groupAssignment: current.belongsToGroup,
+    );
+    final canSubmitGroup = current.isGroupChairman &&
+        current.groupAssignmentId != null &&
+        group != null &&
+        !group.isTerminal &&
+        current.status == AssignmentStatus.active;
 
     return Container(
       width: double.infinity,
@@ -769,19 +781,27 @@ class _MemberAssignmentCardState extends State<_MemberAssignmentCard> {
                           color: _assignmentStatusColor(current.status),
                           compact: true,
                         ),
-                        TgcgStatusPill(
-                          label: _presenceLabel(presence),
-                          color: _presenceColor(presence),
-                          compact: true,
-                        ),
-                        if (device != null)
+                        if (!restricted)
+                          TgcgStatusPill(
+                            label: _presenceLabel(presence),
+                            color: _presenceColor(presence),
+                            compact: true,
+                          ),
+                        if (current.isGroupChairman)
+                          const TgcgStatusPill(
+                            label: 'CHAIRMAN',
+                            color: TgcgColors.accentStrong,
+                            compact: true,
+                          ),
+                        if (!restricted && device != null)
                           TgcgStatusPill(
                             label: device.id,
                             color: TgcgColors.info,
                             icon: Icons.phone_android_outlined,
                             compact: true,
                           ),
-                        if (tracking.isTrackingAssignment(current.id))
+                        if (!restricted &&
+                            tracking.isTrackingAssignment(current.id))
                           const TgcgStatusPill(
                             label: 'LIVE GPS',
                             color: TgcgColors.success,
@@ -803,7 +823,7 @@ class _MemberAssignmentCardState extends State<_MemberAssignmentCard> {
               ),
             ],
           ),
-          if (current.lastLocation != null) ...[
+          if (!restricted && current.lastLocation != null) ...[
             const SizedBox(height: 10),
             Text(
               'Last GPS: ${current.lastLocation!.latitude.toStringAsFixed(6)}, '
@@ -864,6 +884,16 @@ class _MemberAssignmentCardState extends State<_MemberAssignmentCard> {
               }).toList(),
             ),
           ],
+          if (canSubmitGroup) ...[
+            const SizedBox(height: 11),
+            FilledButton.icon(
+              onPressed: _busy
+                  ? null
+                  : () => _submitGroupAssignment(current),
+              icon: const Icon(Icons.task_alt_rounded, size: 17),
+              label: const Text('Submit group assignment'),
+            ),
+          ],
           if ((current.status == AssignmentStatus.checkedIn ||
                   current.status == AssignmentStatus.active) &&
               device != null) ...[
@@ -872,38 +902,39 @@ class _MemberAssignmentCardState extends State<_MemberAssignmentCard> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                FilledButton.tonalIcon(
-                  onPressed: _busy || tracking.isStarting
-                      ? null
-                      : () async {
-                          try {
-                            if (tracking.isTrackingAssignment(current.id)) {
-                              await tracking.stop();
-                            } else {
-                              await tracking.start(
-                                assignmentId: current.id,
-                                deviceId: device.id,
+                if (!restricted)
+                  FilledButton.tonalIcon(
+                    onPressed: _busy || tracking.isStarting
+                        ? null
+                        : () async {
+                            try {
+                              if (tracking.isTrackingAssignment(current.id)) {
+                                await tracking.stop();
+                              } else {
+                                await tracking.start(
+                                  assignmentId: current.id,
+                                  deviceId: device.id,
+                                );
+                              }
+                            } on StateError catch (error) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(error.message)),
                               );
                             }
-                          } on StateError catch (error) {
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(error.message)),
-                            );
-                          }
-                        },
-                  icon: Icon(
-                    tracking.isTrackingAssignment(current.id)
-                        ? Icons.location_disabled_outlined
-                        : Icons.location_searching_rounded,
-                    size: 17,
+                          },
+                    icon: Icon(
+                      tracking.isTrackingAssignment(current.id)
+                          ? Icons.location_disabled_outlined
+                          : Icons.location_searching_rounded,
+                      size: 17,
+                    ),
+                    label: Text(
+                      tracking.isTrackingAssignment(current.id)
+                          ? 'Stop live GPS'
+                          : 'Start live GPS',
+                    ),
                   ),
-                  label: Text(
-                    tracking.isTrackingAssignment(current.id)
-                        ? 'Stop live GPS'
-                        : 'Start live GPS',
-                  ),
-                ),
                 OutlinedButton.icon(
                   onPressed: _busy
                       ? null
@@ -927,7 +958,8 @@ class _MemberAssignmentCardState extends State<_MemberAssignmentCard> {
               ],
             ),
           ],
-          if (device == null &&
+          if (!restricted &&
+              device == null &&
               (current.status == AssignmentStatus.enRoute ||
                   current.status == AssignmentStatus.gpsMismatch ||
                   current.status == AssignmentStatus.active)) ...[
@@ -944,6 +976,35 @@ class _MemberAssignmentCardState extends State<_MemberAssignmentCard> {
         ],
       ),
     );
+  }
+
+  Future<void> _submitGroupAssignment(
+    MemberAssignment assignment,
+  ) async {
+    final groupAssignmentId = assignment.groupAssignmentId;
+    if (groupAssignmentId == null || !assignment.isGroupChairman) return;
+    setState(() => _busy = true);
+    final tracking = AssignmentTracking.of(context, listen: false);
+    try {
+      await Assignments.of(context, listen: false).submitGroupAssignment(
+        groupAssignmentId: groupAssignmentId,
+        chairmanMemberId: widget.memberId,
+      );
+      if (tracking.isTrackingAssignment(assignment.id)) {
+        await tracking.stop();
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Group assignment submitted.')),
+      );
+    } on StateError catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _captureEvidence(
@@ -1094,9 +1155,11 @@ class _MemberAssignmentCardState extends State<_MemberAssignmentCard> {
         );
       }
       if (!mounted) return;
-      final message = updated.status == AssignmentStatus.checkedIn
-          ? 'Presence confirmed inside the assigned polling-unit geofence.'
-          : 'GPS captured, but the device is outside the assigned polling-unit geofence.';
+      final message = assignment.systemIntelligenceRestricted
+          ? 'Check-in recorded.'
+          : updated.status == AssignmentStatus.checkedIn
+              ? 'Presence confirmed inside the assigned polling-unit geofence.'
+              : 'GPS captured, but the device is outside the assigned polling-unit geofence.';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
       );
@@ -1160,8 +1223,29 @@ enum _MemberAssignmentAction {
   complete,
 }
 
-List<_MemberAssignmentAction> _actionsFor(AssignmentStatus status) =>
-    switch (status) {
+List<_MemberAssignmentAction> _actionsFor(
+  AssignmentStatus status, {
+  bool groupAssignment = false,
+}) {
+  if (groupAssignment) {
+    return switch (status) {
+      AssignmentStatus.assigned => const [
+          _MemberAssignmentAction.accept,
+          _MemberAssignmentAction.decline,
+        ],
+      AssignmentStatus.accepted => const [
+          _MemberAssignmentAction.enRoute,
+        ],
+      AssignmentStatus.enRoute || AssignmentStatus.gpsMismatch => const [
+          _MemberAssignmentAction.checkIn,
+        ],
+      AssignmentStatus.checkedIn => const [
+          _MemberAssignmentAction.start,
+        ],
+      _ => const [],
+    };
+  }
+  return switch (status) {
       AssignmentStatus.assigned => const [
           _MemberAssignmentAction.accept,
           _MemberAssignmentAction.decline,
@@ -1182,6 +1266,7 @@ List<_MemberAssignmentAction> _actionsFor(AssignmentStatus status) =>
         ],
       _ => const [],
     };
+}
 
 AssignmentStatus? _statusForAction(_MemberAssignmentAction action) =>
     switch (action) {
