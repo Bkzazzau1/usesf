@@ -756,7 +756,9 @@ class _MemberAssignmentCardState extends State<_MemberAssignmentCard> {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      current.targetScope.label,
+                      _memberAssignmentTargetLabel(current, group),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: TgcgColors.muted,
                         fontSize: 10.5,
@@ -1432,6 +1434,21 @@ class _Detail extends StatelessWidget {
           ],
         ),
       );
+}
+
+String _memberAssignmentTargetLabel(
+  MemberAssignment assignment,
+  GroupAssignment? group,
+) {
+  if (group == null ||
+      group.distribution != GroupAssignmentDistribution.together ||
+      group.targetScopes.isEmpty) {
+    return assignment.targetScope.label;
+  }
+  final shown =
+      group.targetScopes.take(2).map((scope) => scope.label).join(' • ');
+  final remaining = group.targetScopes.length - 2;
+  return remaining > 0 ? '$shown • +$remaining' : shown;
 }
 
 String _assignmentStatusLabel(AssignmentStatus status) => switch (status) {
