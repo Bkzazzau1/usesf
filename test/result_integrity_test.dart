@@ -31,7 +31,7 @@ void main() {
       submittedBy: 'AG-001',
       submittedAt: DateTime.utc(2026, 9, 27),
       status: RecordStatus.submitted,
-      source: SubmissionSource.app,
+      source: SubmissionSource.manual,
       partyVotes: partyVotes,
       totalVotesRecorded: totalVotesRecorded,
       accreditedVoters: accreditedVoters,
@@ -54,6 +54,52 @@ void main() {
       );
 
       expect(result.arithmeticValid, isFalse);
+      expect(result.requiresHumanReview, isTrue);
+    });
+
+    test('app submission without result-form evidence requires review', () {
+      final appResult = ElectionResultSubmission(
+        id: 'RES-APP-NO-FORM',
+        pollingUnitScope: pollingUnit,
+        submittedBy: 'AG-001',
+        submittedAt: DateTime.utc(2026, 9, 27),
+        status: RecordStatus.submitted,
+        source: SubmissionSource.app,
+        partyVotes: const {'P1': 120, 'P2': 80},
+        totalVotesRecorded: 200,
+        accreditedVoters: 230,
+      );
+
+      final result = ResultIntegrityPolicy.validate(appResult);
+
+      expect(result.formEvidencePresent, isFalse);
+      expect(result.requiresHumanReview, isTrue);
+    });
+
+    test('captured app form without OCR requires review', () {
+      final appResult = ElectionResultSubmission(
+        id: 'RES-APP-NO-OCR',
+        pollingUnitScope: pollingUnit,
+        submittedBy: 'AG-001',
+        submittedAt: DateTime.utc(2026, 9, 27),
+        status: RecordStatus.submitted,
+        source: SubmissionSource.app,
+        partyVotes: const {'P1': 120, 'P2': 80},
+        totalVotesRecorded: 200,
+        accreditedVoters: 230,
+        resultForm: EvidenceAttachment(
+          id: 'FORM-1',
+          type: EvidenceType.resultForm,
+          fileName: 'form.jpg',
+          createdAt: DateTime.utc(2026, 9, 27),
+          uploaderId: 'AG-001',
+        ),
+      );
+
+      final result = ResultIntegrityPolicy.validate(appResult);
+
+      expect(result.formEvidencePresent, isTrue);
+      expect(result.ocrProcessed, isFalse);
       expect(result.requiresHumanReview, isTrue);
     });
 
