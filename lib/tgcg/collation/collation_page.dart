@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../membership/membership_store.dart';
 import '../results/result_operations_store.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
@@ -13,7 +14,6 @@ class CollationPage extends StatefulWidget {
 }
 
 class _CollationPageState extends State<CollationPage> {
-  final engine = CollationEngine.prototypeSeed();
   final List<GeographicScope> path = [];
 
   @override
@@ -26,7 +26,9 @@ class _CollationPageState extends State<CollationPage> {
 
   @override
   Widget build(BuildContext context) {
+    final membership = MembershipOperations.of(context);
     final resultStore = ResultOperations.of(context);
+    final engine = CollationEngine.fromGeography(membership.geography);
     final scope = path.last;
     final summary = engine.summarize(scope, resultStore.submissions);
     final children = engine.childScopes(scope);
