@@ -257,21 +257,31 @@ List<CoverageExceptionItem> buildCoverageExceptions({
   required bool resultActivityStarted,
 }) {
   final items = <CoverageExceptionItem>[];
-  final expectedRole = _coordinatorRoleFor(scope.level);
-  if (scope.level != GeographyLevel.state && expectedRole != null) {
+  final coordinatorScopes = scope.level == GeographyLevel.state
+      ? registry
+          .lgasForState(scope.stateId ?? kadunaStateId)
+          .map((item) => item.scope)
+          .toList(growable: false)
+      : <GeographicScope>[scope];
+  for (final coordinatorScope in coordinatorScopes) {
+    final expectedRole = _coordinatorRoleFor(coordinatorScope.level);
+    if (expectedRole == null ||
+        coordinatorScope.level == GeographyLevel.state) {
+      continue;
+    }
     final filled = governance
-        .roleAssignmentsForScope(scope)
+        .roleAssignmentsForScope(coordinatorScope)
         .any(
           (item) =>
               item.active &&
               item.role == expectedRole &&
-              _sameOperationalScope(item.scope, scope),
+              _sameOperationalScope(item.scope, coordinatorScope),
         );
     if (!filled) {
       items.add(
         CoverageExceptionItem(
           kind: CoverageExceptionKind.missingCoordinator,
-          scope: scope,
+          scope: coordinatorScope,
           title: 'Coordinator role missing',
           detail: 'No active ${_roleTitle(expectedRole)}',
           severity: 3,
@@ -521,7 +531,7 @@ class _StateCoverageIntelligencePageState
           }),
         ),
         const SizedBox(height: 14),
-        _CoverageMetrics(snapshot: current, registry: registry),
+        _CoverageMetrics(snapshot: current),
         const SizedBox(height: 16),
         _CommandShortcuts(onOpen: widget.onOpenModule),
         const SizedBox(height: 16),
@@ -530,43 +540,46 @@ class _StateCoverageIntelligencePageState
           total: exceptions.length,
           onOpenScope: _openScope,
         ),
-        const SizedBox(height: 16),
-        _CoverageFilters(
-          search: _search,
-          status: _status,
-          onSearch: (_) => setState(() {}),
-          onStatus: (value) => setState(() => _status = value),
-          onClear: () {
-            _search.clear();
-            setState(() => _status = null);
-          },
-        ),
-        const SizedBox(height: 16),
-        TgcgSectionCard(
-          title: scope.level == GeographyLevel.state
-              ? 'LGA readiness board'
-              : '${_childLevelTitle(scope.level)} readiness board',
-          trailing: TgcgStatusPill(
-            label: '${visible.length} AREA${visible.length == 1 ? '' : 'S'}',
-            color: TgcgColors.primary,
-            compact: true,
+        if (scope.level != GeographyLevel.pollingUnit) ...[
+          const SizedBox(height: 16),
+          _CoverageFilters(
+            search: _search,
+            status: _status,
+            onSearch: (_) => setState(() {}),
+            onStatus: (value) => setState(() => _status = value),
+            onClear: () {
+              _search.clear();
+              setState(() => _status = null);
+            },
           ),
-          child: visible.isEmpty
-              ? const TgcgEmptyState(
-                  icon: Icons.map_outlined,
-                  title: 'No matching coverage area',
-                  message: 'Change the current filters.',
-                )
-              : Column(
-                  children: [
-                    for (final snapshot in visible)
-                      _CoverageAreaCard(
-                        snapshot: snapshot,
-                        onOpen: () => _openScope(snapshot.scope),
-                      ),
-                  ],
-                ),
-        ),
+          const SizedBox(height: 16),
+          TgcgSectionCard(
+            title: scope.level == GeographyLevel.state
+                ? 'LGA readiness board'
+                : '${_childLevelTitle(scope.level)} readiness board',
+            trailing: TgcgStatusPill(
+              label:
+                  '${visible.length} AREA${visible.length == 1 ? '' : 'S'}',
+              color: TgcgColors.primary,
+              compact: true,
+            ),
+            child: visible.isEmpty
+                ? const TgcgEmptyState(
+                    icon: Icons.map_outlined,
+                    title: 'No matching coverage area',
+                    message: 'Change the current filters.',
+                  )
+                : Column(
+                    children: [
+                      for (final snapshot in visible)
+                        _CoverageAreaCard(
+                          snapshot: snapshot,
+                          onOpen: () => _openScope(snapshot.scope),
+                        ),
+                    ],
+                  ),
+          ),
+        ],
         if (scope.level == GeographyLevel.pollingUnit) ...[
           const SizedBox(height: 16),
           _PollingUnitCommandPanel(
@@ -608,13 +621,9 @@ class _StateCoverageIntelligencePageState
 }
 
 class _CoverageMetrics extends StatelessWidget {
-  const _CoverageMetrics({
-    required this.snapshot,
-    required this.registry,
-  });
+  const _CoverageMetrics({required this.snapshot});
 
   final CoverageAreaSnapshot snapshot;
-  final GeographyRegistry registry;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
