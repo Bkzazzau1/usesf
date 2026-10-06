@@ -9,6 +9,7 @@ import 'analytics/ai_data_analytics_page.dart';
 import 'collation/collation_page.dart';
 import 'communications/bulk_communications_page.dart';
 import 'communications/communications_page.dart';
+import 'communications/state_communications_command_page.dart';
 import 'dashboard_page.dart';
 import 'domain/permissions.dart';
 import 'discussion/discussion_room_page.dart';
@@ -112,6 +113,9 @@ class _TgcgShellState extends State<TgcgShell> {
     final executiveReporting =
         allowed.contains(TgcgModule.reports) &&
         session.role == TgcgRole.stateCoordinator;
+    final stateCommunications =
+        allowed.contains(TgcgModule.communications) &&
+        session.role == TgcgRole.stateCoordinator;
     final destinations = _destinations
         .where((item) => allowed.contains(item.module))
         .map(
@@ -167,6 +171,15 @@ class _TgcgShellState extends State<TgcgShell> {
                 item.module,
                 'Executive Reporting Centre',
                 Icons.summarize_outlined,
+                _NavGroup.command,
+              );
+            }
+            if (item.module == TgcgModule.communications &&
+                stateCommunications) {
+              return _Destination(
+                item.module,
+                'State Communications Command',
+                Icons.campaign_outlined,
                 _NavGroup.command,
               );
             }
@@ -250,6 +263,7 @@ class _TgcgShellState extends State<TgcgShell> {
                             membershipIntelligence: membershipIntelligence,
                             stateAiReview: stateAiReview,
                             executiveReporting: executiveReporting,
+                            stateCommunications: stateCommunications,
                             showAlerts: allowed.contains(TgcgModule.alertCenter),
                             onAlerts: () => _select(TgcgModule.alertCenter),
                             onTour: () => _openTour(allowed),
@@ -327,7 +341,10 @@ class _TgcgShellState extends State<TgcgShell> {
               : const ResultCapturePage(),
         TgcgModule.collation => const CollationPage(),
         TgcgModule.mediaIntelligence => const MediaIntelligencePage(),
-        TgcgModule.communications => const CommunicationsPage(),
+        TgcgModule.communications =>
+          session.role == TgcgRole.stateCoordinator
+              ? StateCommunicationsCommandPage(onOpenModule: _select)
+              : const CommunicationsPage(),
         TgcgModule.bulkCommunications => const BulkCommunicationsPage(),
         TgcgModule.discussionRoom => const DiscussionRoomPage(),
         TgcgModule.meetingRoom => const MeetingRoomPage(),
@@ -634,6 +651,7 @@ class _CommandBar extends StatelessWidget {
     required this.membershipIntelligence,
     required this.stateAiReview,
     required this.executiveReporting,
+    required this.stateCommunications,
     required this.showAlerts,
     required this.onAlerts,
     required this.onTour,
@@ -646,6 +664,7 @@ class _CommandBar extends StatelessWidget {
   final bool membershipIntelligence;
   final bool stateAiReview;
   final bool executiveReporting;
+  final bool stateCommunications;
   final bool showAlerts;
   final VoidCallback onAlerts;
   final VoidCallback onTour;
@@ -689,6 +708,7 @@ class _CommandBar extends StatelessWidget {
               membershipIntelligence: membershipIntelligence,
               stateAiReview: stateAiReview,
               executiveReporting: executiveReporting,
+              stateCommunications: stateCommunications,
             ),
             style: const TextStyle(color: TgcgColors.ink, fontSize: 14, fontWeight: FontWeight.w900),
           ),
@@ -835,6 +855,7 @@ String _moduleLabel(
   bool membershipIntelligence = false,
   bool stateAiReview = false,
   bool executiveReporting = false,
+  bool stateCommunications = false,
 }) => switch (module) {
       TgcgModule.overview => 'Command Overview',
       TgcgModule.memberEnrollment => 'Member Enrolment',

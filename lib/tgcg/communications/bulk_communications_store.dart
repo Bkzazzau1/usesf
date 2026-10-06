@@ -127,6 +127,8 @@ class BulkDeliveryJob {
     required this.eligibleRecipientCount,
     required this.suppressedCount,
     required this.channelPlan,
+    this.targetRoles = const [],
+    this.targetMemberIds = const [],
     this.scheduledFor,
     this.sentCount = 0,
     this.deliveredCount = 0,
@@ -147,6 +149,8 @@ class BulkDeliveryJob {
   final int eligibleRecipientCount;
   final int suppressedCount;
   final Map<BulkCommunicationChannel, int> channelPlan;
+  final List<TgcgRole> targetRoles;
+  final List<String> targetMemberIds;
   final int sentCount;
   final int deliveredCount;
   final int failedCount;
@@ -358,6 +362,8 @@ class BulkCommunicationsController extends ChangeNotifier {
     required String actorId,
     required TgcgRole actorRole,
     required GeographicScope actorScope,
+    List<TgcgRole> targetRoles = const [],
+    List<String> targetMemberIds = const [],
     DateTime? scheduledFor,
   }) async {
     if (!TgcgPermissionPolicy.allows(actorRole, TgcgCapability.sendBroadcast)) {
@@ -371,7 +377,25 @@ class BulkCommunicationsController extends ChangeNotifier {
       return null;
     }
 
-    final targetContacts = contactsForScope(targetScope);
+    final roleFilter = targetRoles.toSet();
+    final memberFilter = targetMemberIds
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toSet();
+
+    var targetContacts = contactsForScope(targetScope);
+    if (roleFilter.isNotEmpty) {
+      targetContacts = targetContacts.where((contact) {
+        final roles = _governance.activeRolesForMember(contact.memberId);
+        return roles.any((record) => roleFilter.contains(record.role));
+      }).toList(growable: false);
+    }
+    if (memberFilter.isNotEmpty) {
+      targetContacts = targetContacts
+          .where((contact) => memberFilter.contains(contact.memberId))
+          .toList(growable: false);
+    }
+
     final channelPlan = <BulkCommunicationChannel, int>{
       for (final channel in BulkCommunicationChannel.values) channel: 0,
     };
@@ -419,6 +443,8 @@ class BulkCommunicationsController extends ChangeNotifier {
       eligibleRecipientCount: eligible,
       suppressedCount: suppressed,
       channelPlan: Map.unmodifiable(channelPlan),
+      targetRoles: List.unmodifiable(roleFilter),
+      targetMemberIds: List.unmodifiable(memberFilter),
     );
 
     await _persistence?.persistMutation(
@@ -436,7 +462,10 @@ class BulkCommunicationsController extends ChangeNotifier {
       entityType: 'bulk_delivery_job',
       entityId: job.id,
       detail:
-          '${job.purpose.name} delivery queued for ${job.eligibleRecipientCount} eligible recipients within ${targetScope.label}.',
+          '${job.purpose.name} delivery queued for ${job.eligibleRecipientCount} eligible recipients within ${targetScope.label}'
+          '${job.targetRoles.isEmpty ? '' : ' • roles: ${job.targetRoles.map((item) => item.name).join(', ')}'}'
+          '${job.targetMemberIds.isEmpty ? '' : ' • explicit members: ${job.targetMemberIds.length}'}'
+          '.',
       scope: targetScope,
     );
     notifyListeners();
@@ -473,6 +502,8 @@ class BulkCommunicationsController extends ChangeNotifier {
           for (final entry in value.channelPlan.entries)
             entry.key.name: entry.value,
         },
+        'target_roles': value.targetRoles.map((item) => item.name).toList(),
+        'target_member_ids': value.targetMemberIds,
       };
 }
 
