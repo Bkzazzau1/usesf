@@ -233,6 +233,7 @@ class _TgcgAppState extends State<TgcgApp> {
     fieldOperationsController =
         FieldOperationsController.productionFoundation(
       persistence: offlinePersistenceController,
+      membership: membershipOperationsController,
     );
     resultOperationsController =
         ResultOperationsController.productionFoundation(
