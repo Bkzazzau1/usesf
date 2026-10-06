@@ -486,7 +486,7 @@ class _MemberAccessPageState extends State<MemberAccessPage> {
 
       // Authentication always enters through the permanent member identity.
       // Roles and assignments are resolved after sign-in.
-      TgcgSession.of(context, listen: false).signIn(
+      await TgcgSession.of(context, listen: false).signIn(
         role: TgcgRole.member,
         operatorName: member.fullName,
         accessId: member.id,
