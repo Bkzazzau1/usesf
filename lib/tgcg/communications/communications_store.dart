@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import '../domain/local_id.dart';
 import '../domain/models.dart';
 import '../domain/permissions.dart';
 import '../governance/governance_store.dart';
@@ -391,12 +392,13 @@ class CommunicationsController extends ChangeNotifier {
       return false;
     }
 
+    final createdAt = DateTime.now().toUtc();
     final message = OperationalMessage(
-      id: 'MSG-${(_messages.length + 1).toString().padLeft(4, '0')}',
+      id: newLocalId('MSG', createdAt),
       roomId: room.id,
       senderId: senderId,
       body: body.trim(),
-      createdAt: DateTime.now().toUtc(),
+      createdAt: createdAt,
       deliveryState: MessageDeliveryState.localQueued,
     );
     await _persistence?.persistMutation(
@@ -436,13 +438,14 @@ class CommunicationsController extends ChangeNotifier {
     }
     if (!_within(userScope, targetScope)) return false;
 
+    final createdAt = DateTime.now().toUtc();
     final broadcast = OperationalBroadcast(
-      id: 'BCAST-${(_broadcasts.length + 1).toString().padLeft(4, '0')}',
+      id: newLocalId('BCAST', createdAt),
       title: title.trim(),
       body: body.trim(),
       scope: targetScope,
       senderId: senderId,
-      createdAt: DateTime.now().toUtc(),
+      createdAt: createdAt,
       deliveryState: BroadcastDeliveryState.queued,
     );
     await _persistence?.persistMutation(
