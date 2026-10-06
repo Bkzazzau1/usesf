@@ -942,63 +942,92 @@ class _LgaPerformanceBoard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(TgcgRadius.sm),
                   border: Border.all(color: TgcgColors.border),
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    SizedBox(
-                      width: 42,
-                      child: Text(
-                        item.readinessScore == null
-                            ? '—'
-                            : '${item.readinessScore}',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
+                    Row(
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 34,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: _coverageColor(item)
+                                .withValues(alpha: .07),
+                            borderRadius:
+                                BorderRadius.circular(TgcgRadius.sm),
+                          ),
+                          child: Text(
+                            item.readinessScore == null
+                                ? '—'
+                                : '${item.readinessScore}',
+                            style: TextStyle(
+                              color: _coverageColor(item),
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            item.scope.lgaName ?? item.scope.label,
+                            style: const TextStyle(
+                              color: TgcgColors.ink,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        TgcgStatusPill(
+                          label: _coverageStateLabel(item.readinessState),
                           color: _coverageColor(item),
-                          fontWeight: FontWeight.w900,
+                          compact: true,
                         ),
-                      ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        item.scope.lgaName ?? item.scope.label,
-                        style: const TextStyle(
-                          color: TgcgColors.ink,
-                          fontWeight: FontWeight.w800,
+                    const SizedBox(height: 7),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        TgcgStatusPill(
+                          label:
+                              '${item.staffedPollingUnits}/${item.expectedPollingUnits} STAFF',
+                          color: item.unstaffedPollingUnits == 0 &&
+                                  item.expectedPollingUnits > 0
+                              ? TgcgColors.success
+                              : TgcgColors.warning,
+                          compact: true,
                         ),
-                      ),
-                    ),
-                    TgcgStatusPill(
-                      label:
-                          '${item.staffedPollingUnits}/${item.expectedPollingUnits} STAFF',
-                      color: item.unstaffedPollingUnits == 0 &&
-                              item.expectedPollingUnits > 0
-                          ? TgcgColors.success
-                          : TgcgColors.warning,
-                      compact: true,
-                    ),
-                    const SizedBox(width: 5),
-                    TgcgStatusPill(
-                      label:
-                          '${item.gpsActiveMembers}/${item.deployedMembers} GPS',
-                      color: item.deployedMembers > 0 &&
-                              item.gpsActiveMembers == item.deployedMembers
-                          ? TgcgColors.success
-                          : TgcgColors.warning,
-                      compact: true,
-                    ),
-                    const SizedBox(width: 5),
-                    if (item.conflictingResultPollingUnits > 0)
-                      TgcgStatusPill(
-                        label:
-                            '${item.conflictingResultPollingUnits} CONFLICT',
-                        color: TgcgColors.danger,
-                        compact: true,
-                      ),
-                    const SizedBox(width: 6),
-                    TgcgStatusPill(
-                      label: _coverageStateLabel(item.readinessState),
-                      color: _coverageColor(item),
-                      compact: true,
+                        TgcgStatusPill(
+                          label:
+                              '${item.gpsActiveMembers}/${item.deployedMembers} GPS',
+                          color: item.deployedMembers > 0 &&
+                                  item.gpsActiveMembers ==
+                                      item.deployedMembers
+                              ? TgcgColors.success
+                              : TgcgColors.warning,
+                          compact: true,
+                        ),
+                        TgcgStatusPill(
+                          label:
+                              '${item.receivedResultPollingUnits} RESULT PUs',
+                          color: TgcgColors.ai,
+                          compact: true,
+                        ),
+                        if (item.openIncidents > 0)
+                          TgcgStatusPill(
+                            label: '${item.openIncidents} INCIDENTS',
+                            color: TgcgColors.danger,
+                            compact: true,
+                          ),
+                        if (item.conflictingResultPollingUnits > 0)
+                          TgcgStatusPill(
+                            label:
+                                '${item.conflictingResultPollingUnits} CONFLICT',
+                            color: TgcgColors.danger,
+                            compact: true,
+                          ),
+                      ],
                     ),
                   ],
                 ),
