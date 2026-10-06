@@ -101,6 +101,16 @@ class ManagedDeviceController extends ChangeNotifier {
         _persistence = persistence,
         _devices = List<ManagedDevice>.of(devices);
 
+  factory ManagedDeviceController.productionFoundation({
+    required MembershipOperationsController membership,
+    required OfflinePersistenceController persistence,
+  }) =>
+      ManagedDeviceController(
+        membership: membership,
+        persistence: persistence,
+        devices: const [],
+      );
+
   factory ManagedDeviceController.prototypeSeed({
     required MembershipOperationsController membership,
     required OfflinePersistenceController persistence,
