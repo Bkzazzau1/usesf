@@ -15,6 +15,11 @@ class _FakeRemoteResponderAuth implements RemoteResponderAuthGateway {
   );
 
   int authenticationCalls = 0;
+  int validationCalls = 0;
+  RemoteResponderSessionResult validationResult =
+      const RemoteResponderSessionResult(
+    status: RemoteResponderSessionStatus.active,
+  );
 
   @override
   Future<RemoteResponderAuthenticationResult> authenticate({
@@ -25,6 +30,14 @@ class _FakeRemoteResponderAuth implements RemoteResponderAuthGateway {
   }) async {
     authenticationCalls += 1;
     return authenticationResult;
+  }
+
+  @override
+  Future<RemoteResponderSessionResult> validateSession({
+    required String sessionToken,
+  }) async {
+    validationCalls += 1;
+    return validationResult;
   }
 }
 
@@ -150,6 +163,37 @@ void main() {
     expect(result.status, ResponderAuthenticationStatus.authenticated);
     expect(result.responder?.id, fixture.responder.id);
     expect(fixture.remote.authenticationCalls, 1);
+  });
+
+  test('revoked central session invalidates connected responder session',
+      () async {
+    final fixture = await buildFixture();
+    fixture.remote.validationResult =
+        const RemoteResponderSessionResult(
+      status: RemoteResponderSessionStatus.revoked,
+    );
+
+    final result = await fixture.emergency.validateConnectedSession(
+      sessionToken: 'server-session-token',
+    );
+
+    expect(result, ResponderSessionValidationStatus.revoked);
+    expect(fixture.remote.validationCalls, 1);
+  });
+
+  test('network loss does not revoke an already authenticated offline session',
+      () async {
+    final fixture = await buildFixture();
+    fixture.remote.validationResult =
+        const RemoteResponderSessionResult(
+      status: RemoteResponderSessionStatus.unavailable,
+    );
+
+    final result = await fixture.emergency.validateConnectedSession(
+      sessionToken: 'server-session-token',
+    );
+
+    expect(result, ResponderSessionValidationStatus.unavailable);
   });
 
   test('central rejection is never overridden by a valid local secret',
