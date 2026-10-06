@@ -210,11 +210,11 @@ void main() {
       );
     });
 
-    test('State Coordinator can queue an LGA operational broadcast', () {
+    test('State Coordinator can queue an LGA operational broadcast', () async {
       final lga = geography.lga('KD-ZARIA')!;
       final beforeAudit = governance.auditEvents.length;
 
-      final ok = communications.sendBroadcast(
+      final ok = await communications.sendBroadcast(
         title: 'Zaria command notice',
         body: 'Operational coordination notice',
         targetScope: lga.scope,

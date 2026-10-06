@@ -1,8 +1,11 @@
 import 'package:flutter/widgets.dart';
 
+import '../domain/local_id.dart';
 import '../domain/models.dart';
 import '../domain/permissions.dart';
 import '../governance/governance_store.dart';
+import '../offline/offline_payloads.dart';
+import '../offline/offline_persistence.dart';
 
 enum CommunicationRoomType {
   stateCommand,
@@ -80,16 +83,26 @@ class CommunicationsController extends ChangeNotifier {
     required List<OperationalRoom> rooms,
     required List<OperationalMessage> messages,
     required List<OperationalBroadcast> broadcasts,
+    OfflinePersistenceController? persistence,
   })  : _governance = governance,
         _rooms = rooms,
         _messages = messages,
-        _broadcasts = broadcasts;
+        _broadcasts = broadcasts,
+        _persistence = persistence;
 
-  factory CommunicationsController.prototypeSeed(
-    GovernanceOperationsController governance,
-  ) {
-    final now = DateTime.utc(2026, 9, 27, 8, 25);
+  factory CommunicationsController.productionFoundation({
+    required GovernanceOperationsController governance,
+    required OfflinePersistenceController persistence,
+  }) =>
+      CommunicationsController._(
+        governance: governance,
+        rooms: _operationalRooms(),
+        messages: <OperationalMessage>[],
+        broadcasts: <OperationalBroadcast>[],
+        persistence: persistence,
+      );
 
+  static List<OperationalRoom> _operationalRooms() {
     final kadunaState = GeographicScope(
       level: GeographyLevel.state,
       country: 'Nigeria',
@@ -151,9 +164,7 @@ class CommunicationsController extends ChangeNotifier {
       wardName: 'Ward 01',
     );
 
-    return CommunicationsController._(
-      governance: governance,
-      rooms: [
+    return [
         const OperationalRoom(
           id: 'ROOM-STATE',
           name: 'Kaduna State Operations',
@@ -210,7 +221,17 @@ class CommunicationsController extends ChangeNotifier {
           scope: GeographicScope.kaduna,
           description: 'Device, sync and application support desk.',
         ),
-      ],
+      ];
+  }
+
+  factory CommunicationsController.prototypeSeed(
+    GovernanceOperationsController governance,
+  ) {
+    final now = DateTime.utc(2026, 9, 27, 8, 25);
+
+    return CommunicationsController._(
+      governance: governance,
+      rooms: _operationalRooms(),
       messages: [
         OperationalMessage(
           id: 'MSG-0001',
@@ -279,10 +300,55 @@ class CommunicationsController extends ChangeNotifier {
   final List<OperationalRoom> _rooms;
   final List<OperationalMessage> _messages;
   final List<OperationalBroadcast> _broadcasts;
+  final OfflinePersistenceController? _persistence;
 
   List<OperationalRoom> get rooms => List.unmodifiable(_rooms);
   List<OperationalMessage> get messages => List.unmodifiable(_messages);
   List<OperationalBroadcast> get broadcasts => List.unmodifiable(_broadcasts);
+
+  Future<void> hydrateFromOffline() async {
+    final persistence = _persistence;
+    if (persistence == null) return;
+
+    final messageRows =
+        await persistence.readEntities(entityType: 'communication_message');
+    final broadcastRows =
+        await persistence.readEntities(entityType: 'operational_broadcast');
+    var changed = false;
+
+    for (final row in messageRows) {
+      final restored = _messageFromJson(row);
+      if (restored == null ||
+          !_rooms.any((room) => room.id == restored.roomId)) {
+        continue;
+      }
+      final index = _messages.indexWhere((item) => item.id == restored.id);
+      if (index < 0) {
+        _messages.add(restored);
+      } else {
+        _messages[index] = restored;
+      }
+      changed = true;
+    }
+
+    for (final row in broadcastRows) {
+      final restored = _broadcastFromJson(row);
+      if (restored == null) continue;
+      final index = _broadcasts.indexWhere((item) => item.id == restored.id);
+      if (index < 0) {
+        _broadcasts.add(restored);
+      } else {
+        _broadcasts[index] = restored;
+      }
+      changed = true;
+    }
+
+    if (changed) {
+      _messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      _broadcasts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      notifyListeners();
+    }
+  }
 
   List<OperationalRoom> roomsForScope(GeographicScope userScope) =>
       _rooms.where((room) => _overlaps(userScope, room.scope)).toList(growable: false);
@@ -301,14 +367,14 @@ class CommunicationsController extends ChangeNotifier {
       _broadcasts.where((item) => _overlaps(userScope, item.scope)).toList(growable: false)
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-  bool sendMessage({
+  Future<bool> sendMessage({
     required String roomId,
     required String senderId,
     required String body,
     required TgcgRole role,
     required GeographicScope userScope,
     bool capabilityAuthorized = false,
-  }) {
+  }) async {
     final roomIndex = _rooms.indexWhere((room) => room.id == roomId);
     if (roomIndex < 0 || body.trim().isEmpty) return false;
     final room = _rooms[roomIndex];
@@ -326,13 +392,22 @@ class CommunicationsController extends ChangeNotifier {
       return false;
     }
 
+    final createdAt = DateTime.now().toUtc();
     final message = OperationalMessage(
-      id: 'MSG-${(_messages.length + 1).toString().padLeft(4, '0')}',
+      id: newLocalId('MSG', createdAt),
       roomId: room.id,
       senderId: senderId,
       body: body.trim(),
-      createdAt: DateTime.now().toUtc(),
+      createdAt: createdAt,
       deliveryState: MessageDeliveryState.localQueued,
+    );
+    await _persistence?.persistMutation(
+      entityType: 'communication_message',
+      entityId: message.id,
+      mutationType: SyncMutationType.create,
+      payload: _messageToJson(message),
+      scopeKey: scopeStorageKey(room.scope),
+      ownerId: senderId,
     );
     _messages.add(message);
     _governance.recordAudit(
@@ -347,7 +422,7 @@ class CommunicationsController extends ChangeNotifier {
     return true;
   }
 
-  bool sendBroadcast({
+  Future<bool> sendBroadcast({
     required String title,
     required String body,
     required GeographicScope targetScope,
@@ -355,7 +430,7 @@ class CommunicationsController extends ChangeNotifier {
     required TgcgRole role,
     required GeographicScope userScope,
     bool capabilityAuthorized = false,
-  }) {
+  }) async {
     if (title.trim().isEmpty || body.trim().isEmpty) return false;
     if (!capabilityAuthorized &&
         !TgcgPermissionPolicy.allows(role, TgcgCapability.sendBroadcast)) {
@@ -363,14 +438,23 @@ class CommunicationsController extends ChangeNotifier {
     }
     if (!_within(userScope, targetScope)) return false;
 
+    final createdAt = DateTime.now().toUtc();
     final broadcast = OperationalBroadcast(
-      id: 'BCAST-${(_broadcasts.length + 1).toString().padLeft(4, '0')}',
+      id: newLocalId('BCAST', createdAt),
       title: title.trim(),
       body: body.trim(),
       scope: targetScope,
       senderId: senderId,
-      createdAt: DateTime.now().toUtc(),
+      createdAt: createdAt,
       deliveryState: BroadcastDeliveryState.queued,
+    );
+    await _persistence?.persistMutation(
+      entityType: 'operational_broadcast',
+      entityId: broadcast.id,
+      mutationType: SyncMutationType.create,
+      payload: _broadcastToJson(broadcast),
+      scopeKey: scopeStorageKey(targetScope),
+      ownerId: senderId,
     );
     _broadcasts.insert(0, broadcast);
     _governance.recordAudit(
@@ -383,6 +467,105 @@ class CommunicationsController extends ChangeNotifier {
     );
     notifyListeners();
     return true;
+  }
+
+  static Map<String, Object?> _messageToJson(
+    OperationalMessage message,
+  ) =>
+      {
+        'id': message.id,
+        'roomId': message.roomId,
+        'senderId': message.senderId,
+        'body': message.body,
+        'createdAt': message.createdAt.toUtc().toIso8601String(),
+        'deliveryState': message.deliveryState.name,
+        'replyToMessageId': message.replyToMessageId,
+      };
+
+  static OperationalMessage? _messageFromJson(Map<String, Object?> row) {
+    final id = row['id']?.toString();
+    final roomId = row['roomId']?.toString();
+    final senderId = row['senderId']?.toString();
+    final body = row['body']?.toString();
+    final createdAt =
+        DateTime.tryParse(row['createdAt']?.toString() ?? '')?.toUtc();
+    final deliveryState = _enumValue(
+      MessageDeliveryState.values,
+      row['deliveryState'],
+    );
+    if (id == null ||
+        roomId == null ||
+        senderId == null ||
+        body == null ||
+        createdAt == null ||
+        deliveryState == null) {
+      return null;
+    }
+    return OperationalMessage(
+      id: id,
+      roomId: roomId,
+      senderId: senderId,
+      body: body,
+      createdAt: createdAt,
+      deliveryState: deliveryState,
+      replyToMessageId: row['replyToMessageId']?.toString(),
+    );
+  }
+
+  static Map<String, Object?> _broadcastToJson(
+    OperationalBroadcast broadcast,
+  ) =>
+      {
+        'id': broadcast.id,
+        'title': broadcast.title,
+        'body': broadcast.body,
+        'scope': geographicScopeToJson(broadcast.scope),
+        'senderId': broadcast.senderId,
+        'createdAt': broadcast.createdAt.toUtc().toIso8601String(),
+        'deliveryState': broadcast.deliveryState.name,
+      };
+
+  static OperationalBroadcast? _broadcastFromJson(
+    Map<String, Object?> row,
+  ) {
+    final id = row['id']?.toString();
+    final title = row['title']?.toString();
+    final body = row['body']?.toString();
+    final scope = geographicScopeFromJson(row['scope']);
+    final senderId = row['senderId']?.toString();
+    final createdAt =
+        DateTime.tryParse(row['createdAt']?.toString() ?? '')?.toUtc();
+    final deliveryState = _enumValue(
+      BroadcastDeliveryState.values,
+      row['deliveryState'],
+    );
+    if (id == null ||
+        title == null ||
+        body == null ||
+        scope == null ||
+        senderId == null ||
+        createdAt == null ||
+        deliveryState == null) {
+      return null;
+    }
+    return OperationalBroadcast(
+      id: id,
+      title: title,
+      body: body,
+      scope: scope,
+      senderId: senderId,
+      createdAt: createdAt,
+      deliveryState: deliveryState,
+    );
+  }
+
+  static T? _enumValue<T extends Enum>(List<T> values, Object? raw) {
+    final name = raw?.toString();
+    if (name == null) return null;
+    for (final value in values) {
+      if (value.name == name) return value;
+    }
+    return null;
   }
 
   static bool _isLocalFieldRoom(

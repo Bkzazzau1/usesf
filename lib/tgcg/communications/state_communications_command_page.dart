@@ -402,7 +402,7 @@ class _StateCommunicationsCommandPageState
   }) async {
     setState(() => _sending = true);
     try {
-      final ok = communications.sendBroadcast(
+      final ok = await communications.sendBroadcast(
         title: _broadcastTitle.text,
         body: _broadcastBody.text,
         targetScope: _targetScope,
@@ -426,6 +426,15 @@ class _StateCommunicationsCommandPageState
           ),
         ),
       );
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content:
+                Text('Broadcast could not be queued securely on this device.'),
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _sending = false);
     }

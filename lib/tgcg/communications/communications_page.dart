@@ -156,72 +156,89 @@ class _CommunicationsPageState extends State<CommunicationsPage> {
     );
   }
 
-  void _sendMessage(
+  Future<void> _sendMessage(
     BuildContext context, {
     required CommunicationsController store,
     required TgcgSessionController session,
     required OperationalRoom room,
-  }) {
-    final ok = store.sendMessage(
-      roomId: room.id,
-      senderId: session.accessId.isEmpty
-          ? session.operatorName
-          : session.accessId,
-      body: messageController.text,
-      role: session.role!,
-      userScope: TgcgAccessPolicy.authorizingScope(
-            context,
-            TgcgCapability.sendOperationalMessage,
-            targetScope: room.scope,
-            listen: false,
-          ) ??
-          session.scope,
-      capabilityAuthorized: TgcgAccessPolicy.allows(
-        context,
-        TgcgCapability.sendOperationalMessage,
-        targetScope: room.scope,
-        listen: false,
-      ),
-    );
-    if (!ok) return;
-    messageController.clear();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Message saved locally and queued for delivery.'),
-      ),
-    );
+  }) async {
+    try {
+      final ok = await store.sendMessage(
+        roomId: room.id,
+        senderId:
+            session.accessId.isEmpty ? session.operatorName : session.accessId,
+        body: messageController.text,
+        role: session.role!,
+        userScope: TgcgAccessPolicy.authorizingScope(
+              context,
+              TgcgCapability.sendOperationalMessage,
+              targetScope: room.scope,
+              listen: false,
+            ) ??
+            session.scope,
+        capabilityAuthorized: TgcgAccessPolicy.allows(
+          context,
+          TgcgCapability.sendOperationalMessage,
+          targetScope: room.scope,
+          listen: false,
+        ),
+      );
+      if (!ok || !context.mounted) return;
+      messageController.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Message saved locally and queued for delivery.'),
+        ),
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Message could not be queued securely on this device.'),
+        ),
+      );
+    }
   }
 
-  void _sendBroadcast(
+  Future<void> _sendBroadcast(
     BuildContext context, {
     required CommunicationsController store,
     required TgcgSessionController session,
-  }) {
+  }) async {
     final authority = TgcgAccessPolicy.authorizingScope(
       context,
       TgcgCapability.sendBroadcast,
       listen: false,
     );
     if (authority == null) return;
-    final ok = store.sendBroadcast(
-      title: broadcastTitleController.text,
-      body: broadcastBodyController.text,
-      targetScope: authority,
-      senderId: session.accessId.isEmpty
-          ? session.operatorName
-          : session.accessId,
-      role: session.role!,
-      userScope: authority,
-      capabilityAuthorized: true,
-    );
-    if (!ok) return;
-    broadcastTitleController.clear();
-    broadcastBodyController.clear();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Broadcast queued for authorized delivery.'),
-      ),
-    );
+    try {
+      final ok = await store.sendBroadcast(
+        title: broadcastTitleController.text,
+        body: broadcastBodyController.text,
+        targetScope: authority,
+        senderId:
+            session.accessId.isEmpty ? session.operatorName : session.accessId,
+        role: session.role!,
+        userScope: authority,
+        capabilityAuthorized: true,
+      );
+      if (!ok || !context.mounted) return;
+      broadcastTitleController.clear();
+      broadcastBodyController.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Broadcast queued for authorized delivery.'),
+        ),
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('Broadcast could not be queued securely on this device.'),
+        ),
+      );
+    }
   }
 }
 

@@ -80,10 +80,11 @@ class _TgcgAppState extends State<TgcgApp> {
       await evidenceOperationsController.hydrateFromOffline();
       await fieldOperationsController.hydrateFromOffline();
       await resultOperationsController.hydrateFromOffline();
+      await communicationsController.hydrateFromOffline();
       await operationalCallController.hydrateFromOffline();
       await commandMeetingController.hydrateFromOffline();
     } catch (_) {
-      // Keep the prototype-seeded in-memory state available if a persisted
+      // Keep the currently loaded in-memory state available if a persisted
       // record is corrupt or from an incompatible development build.
     }
   }
@@ -138,8 +139,10 @@ class _TgcgAppState extends State<TgcgApp> {
         ResultOperationsController.productionFoundation(
       persistence: offlinePersistenceController,
     );
-    communicationsController =
-        CommunicationsController.prototypeSeed(governanceOperationsController);
+    communicationsController = CommunicationsController.productionFoundation(
+      governance: governanceOperationsController,
+      persistence: offlinePersistenceController,
+    );
     bulkCommunicationsController =
         BulkCommunicationsController.productionFoundation(
       membership: membershipOperationsController,
