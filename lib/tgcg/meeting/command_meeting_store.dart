@@ -4,6 +4,7 @@ import '../domain/local_id.dart';
 import '../domain/models.dart';
 import '../geography/geography_registry.dart';
 import '../governance/governance_store.dart';
+import '../membership/membership_store.dart';
 import '../offline/offline_payloads.dart';
 import '../offline/offline_persistence.dart';
 
@@ -140,13 +141,16 @@ class CommandMeetingController extends ChangeNotifier {
   CommandMeetingController({
     required OfflinePersistenceController persistence,
     required GovernanceOperationsController governance,
+    required MembershipOperationsController membership,
     List<CommandMeeting> meetings = const [],
   })  : _persistence = persistence,
         _governance = governance,
+        _membership = membership,
         _meetings = List<CommandMeeting>.of(meetings);
 
   final OfflinePersistenceController _persistence;
   final GovernanceOperationsController _governance;
+  final MembershipOperationsController _membership;
   final List<CommandMeeting> _meetings;
 
   List<CommandMeeting> get meetings => List.unmodifiable(_meetings);
@@ -224,6 +228,23 @@ class CommandMeetingController extends ChangeNotifier {
         .toList(growable: false);
     if (invitees.isEmpty) {
       throw StateError('Select at least one meeting invitee.');
+    }
+    for (final memberId in invitees) {
+      final member = _membership.memberById(memberId);
+      if (member == null) {
+        throw ArgumentError('Unknown USESF member: $memberId');
+      }
+      if (member.isBlocked) {
+        throw StateError('Blocked members cannot be invited to command meetings.');
+      }
+      final memberScope = _membership.registrationScopeForMember(memberId);
+      if (scope.level != GeographyLevel.state &&
+          (memberScope == null ||
+              !GeographyRegistry.scopeContains(scope, memberScope))) {
+        throw StateError(
+          '${member.fullName} is outside the selected meeting geography.',
+        );
+      }
     }
 
     final now = DateTime.now().toUtc();
