@@ -49,6 +49,15 @@ class FieldOperationsController extends ChangeNotifier {
         _reports = reports,
         _persistence = persistence;
 
+  factory FieldOperationsController.productionFoundation({
+    required OfflinePersistenceController persistence,
+  }) =>
+      FieldOperationsController._(
+        incidents: const [],
+        reports: const [],
+        persistence: persistence,
+      );
+
   factory FieldOperationsController.prototypeSeed({
     OfflinePersistenceController? persistence,
   }) {
