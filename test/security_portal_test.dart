@@ -1,18 +1,31 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:usesf/tgcg/domain/models.dart';
 import 'package:usesf/tgcg/domain/permissions.dart';
 import 'package:usesf/tgcg/geography/geography_registry.dart';
 import 'package:usesf/tgcg/governance/governance_store.dart';
+import 'package:usesf/tgcg/offline/offline_database_memory.dart';
+import 'package:usesf/tgcg/offline/offline_persistence.dart';
 import 'package:usesf/tgcg/security/emergency_response_store.dart';
 import 'package:usesf/tgcg/session.dart';
+import 'package:usesf/tgcg/sync/sync_models.dart';
 
 void main() {
+  setUpAll(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    FlutterSecureStorage.setMockInitialValues({});
+  });
+
   group('Security Portal', () {
     test('security officer can only respond to dispatches', () {
       expect(
         TgcgPermissionPolicy.capabilitiesFor(TgcgRole.securityOfficer),
         {TgcgCapability.respondToDispatch},
       );
-      expect(allowedModules(TgcgRole.securityOfficer), {TgcgModule.securityResponse});
+      expect(
+        allowedModules(TgcgRole.securityOfficer),
+        {TgcgModule.securityResponse},
+      );
     });
 
     test('session carries the agency and clears it on sign-out', () {
@@ -46,25 +59,117 @@ void main() {
 
       expect(visible('AGENCY-POLICE', jemaa), ['DSP-0002']);
       expect(visible('AGENCY-NSCDC', jemaa), ['DSP-0003']);
-      expect(visible('AGENCY-POLICE', GeographicScope.kaduna).toSet(), {'DSP-0001', 'DSP-0002'});
+      expect(
+        visible('AGENCY-POLICE', GeographicScope.kaduna).toSet(),
+        {'DSP-0001', 'DSP-0002'},
+      );
     });
 
-    test('response updates are timestamped and audited', () {
+    test('response updates are timestamped and audited', () async {
       final governance = GovernanceOperationsController.prototypeSeed();
       final emergency = EmergencyResponseController.prototypeSeed(governance);
       final before = governance.auditEvents.length;
 
-      emergency.updateStatus(
+      await emergency.updateStatus(
         dispatchId: 'DSP-0002',
         status: EmergencyDispatchStatus.acknowledged,
         actorId: 'AP/12345',
       );
 
-      final updated = emergency.dispatches.firstWhere((item) => item.id == 'DSP-0002');
+      final updated =
+          emergency.dispatches.firstWhere((item) => item.id == 'DSP-0002');
       expect(updated.status, EmergencyDispatchStatus.acknowledged);
       expect(updated.acknowledgedAt, isNotNull);
       expect(updated.lastUpdatedBy, 'AP/12345');
       expect(governance.auditEvents.length, before + 1);
+    });
+
+    test('production agencies and dispatch lifecycle survive restart', () async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final persistence = OfflinePersistenceController(
+        openDatabase: () async => InMemoryOfflineDatabase(),
+      );
+      await persistence.initialize();
+      final governance = GovernanceOperationsController.productionFoundation(
+        persistence: persistence,
+      );
+      final emergency = EmergencyResponseController.productionFoundation(
+        governance: governance,
+        persistence: persistence,
+      );
+
+      expect(emergency.agencies, isEmpty);
+      expect(emergency.dispatches, isEmpty);
+
+      final agency = await emergency.upsertAgency(
+        id: 'AGENCY-KD-POLICE',
+        name: 'Kaduna Police Response Desk',
+        shortName: 'Police',
+        type: EmergencyAgencyType.police,
+        coverage: GeographicScope.kaduna,
+        commandDesk: 'Kaduna State Operations Desk',
+        contactPhone: '+2348000000101',
+        actorId: 'SYSTEM-ADMIN',
+      );
+      final dispatch = await emergency.assign(
+        incidentId: 'INC-REAL-001',
+        agencyId: agency.id,
+        scope: GeographicScope.kaduna,
+        priority: EmergencyDispatchPriority.urgent,
+        actorId: 'STATE-COORD',
+        instructions: 'Confirm response and report status.',
+      );
+      await emergency.updateStatus(
+        dispatchId: dispatch.id,
+        status: EmergencyDispatchStatus.acknowledged,
+        actorId: 'AP/REAL-001',
+        actingAgencyId: agency.id,
+      );
+
+      expect(emergency.dispatches.single.acknowledgedAt, isNotNull);
+
+      final agencyMutation = persistence.outbox.lastWhere(
+        (item) => item.entityType == 'emergency_agency',
+      );
+      final dispatchMutations = persistence.outbox
+          .where(
+            (item) =>
+                item.entityType == 'emergency_dispatch' &&
+                item.entityId == dispatch.id,
+          )
+          .toList(growable: false);
+      expect(agencyMutation.state, SyncState.queued);
+      expect(dispatchMutations, hasLength(2));
+      expect(
+        dispatchMutations.every((item) => item.state == SyncState.queued),
+        isTrue,
+      );
+
+      final restored = EmergencyResponseController.productionFoundation(
+        governance: governance,
+        persistence: persistence,
+      );
+      expect(restored.agencies, isEmpty);
+      expect(restored.dispatches, isEmpty);
+
+      await restored.hydrateFromOffline();
+
+      expect(restored.agencies, hasLength(1));
+      expect(restored.agencies.single.id, agency.id);
+      expect(restored.agencies.single.name, 'Kaduna Police Response Desk');
+      expect(restored.dispatches, hasLength(1));
+      expect(restored.dispatches.single.id, dispatch.id);
+      expect(
+        restored.dispatches.single.status,
+        EmergencyDispatchStatus.acknowledged,
+      );
+      expect(restored.dispatches.single.acknowledgedAt, isNotNull);
+      expect(
+        restored.dispatches.any(
+          (item) => const {'DSP-0001', 'DSP-0002', 'DSP-0003'}.contains(item.id),
+        ),
+        isFalse,
+      );
     });
   });
 }
