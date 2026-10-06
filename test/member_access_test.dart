@@ -66,23 +66,28 @@ void main() {
       expect(access().capabilities, isEmpty);
     });
 
-    test('several roles combine automatically, each within its own scope', () {
+    test('several roles combine automatically, each within its own scope',
+        () async {
       final unit = geography.pollingUnit('KD-KN-W01-PU001')!.scope;
       final otherUnit = geography.pollingUnit('KD-ZA-W01-PU004')!.scope;
       final kadunaNorthLga = geography.lga('KD-KADUNA-NORTH')!.scope;
-      governance.assignRole(
+      await governance.assignRole(
         subjectId: memberId,
         subjectName: 'Amina Yusuf',
         role: TgcgRole.pollingUnitAgent,
         scope: unit,
         assignedBy: 'COORD-1',
+        actorRole: TgcgRole.stateCoordinator,
+        authorizedScope: GeographicScope.kaduna,
       );
-      governance.assignRole(
+      await governance.assignRole(
         subjectId: memberId,
         subjectName: 'Amina Yusuf',
         role: TgcgRole.mediaOfficer,
         scope: kadunaNorthLga,
         assignedBy: 'COORD-1',
+        actorRole: TgcgRole.stateCoordinator,
+        authorizedScope: GeographicScope.kaduna,
       );
 
       final resolved = access();
