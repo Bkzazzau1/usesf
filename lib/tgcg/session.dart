@@ -323,7 +323,8 @@ Set<TgcgModule> modulesForCapabilities(
   if (has(TgcgCapability.exportReports)) {
     modules.add(TgcgModule.reports);
   }
-  if (has(TgcgCapability.viewAudit) ||
+  if (role == TgcgRole.stateCoordinator ||
+      has(TgcgCapability.viewAudit) ||
       has(TgcgCapability.manageUsers) ||
       has(TgcgCapability.manageSystemSettings)) {
     modules.add(TgcgModule.governance);
