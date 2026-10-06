@@ -186,6 +186,7 @@ class _TgcgAppState extends State<TgcgApp> {
 
     try {
       await oldMembership.clearLocalCredentials();
+      await oldEmergency.clearLocalCredentials();
       await oldOffline.clearPresentationData();
     } catch (_) {
       // Recreating all in-memory controllers still restores the presentation
