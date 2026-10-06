@@ -2,6 +2,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:usesf/tgcg/domain/models.dart';
 import 'package:usesf/tgcg/field/field_operations_store.dart';
+import 'package:usesf/tgcg/geography/geography_registry.dart';
+import 'package:usesf/tgcg/membership/membership_store.dart';
 import 'package:usesf/tgcg/offline/offline_database_memory.dart';
 import 'package:usesf/tgcg/offline/offline_persistence.dart';
 
@@ -235,6 +237,100 @@ void main() {
           restored.statusHistoryForIncident('INC-0004');
       expect(restoredHistory, hasLength(1));
       expect(restoredHistory.single.actorId, 'STATE-COORD');
+    });
+
+    test('incident ownership history survives restart', () async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final persistence = OfflinePersistenceController(
+        openDatabase: () async => InMemoryOfflineDatabase(),
+      );
+      await persistence.initialize();
+      final membership = MembershipOperationsController.productionFoundation(
+        GeographyRegistry.prototypeSeed(),
+        persistence: persistence,
+      );
+      final officer = await membership.createMember(
+        fullName: 'Responsible Field Officer',
+        registrationScope: GeographicScope.kaduna,
+      );
+      final store = FieldOperationsController.productionFoundation(
+        persistence: persistence,
+        membership: membership,
+      );
+      const scope = GeographicScope(
+        level: GeographyLevel.pollingUnit,
+        country: 'Nigeria',
+        zoneId: 'NW',
+        stateId: 'KD',
+        senatorialDistrictId: 'SD/053/KD',
+        lgaId: 'KD-KADUNA-NORTH',
+        wardId: 'KD-KN-W01',
+        pollingUnitId: 'KD-KN-W01-PU001',
+      );
+      final incident = await store.createIncident(
+        title: 'Ownership test',
+        category: 'Operations',
+        severity: IncidentSeverity.high,
+        scope: scope,
+        reporterId: 'PU-COORD-001',
+        actorRole: TgcgRole.pollingUnitCoordinator,
+        authorizedScope: scope,
+      );
+
+      await store.assignIncidentOwnership(
+        incident.id,
+        responsibleMemberId: officer.id,
+        teamName: 'Kaduna Central Response Desk',
+        note: 'Take ownership.',
+        actorId: 'STATE-COORD',
+        actorRole: TgcgRole.stateCoordinator,
+        authorizedScope: GeographicScope.kaduna,
+      );
+      await store.assignIncidentOwnership(
+        incident.id,
+        responsibleMemberId: officer.id,
+        teamName: 'State Incident Command Desk',
+        actorId: 'STATE-COORD-2',
+        actorRole: TgcgRole.stateCoordinator,
+        authorizedScope: GeographicScope.kaduna,
+      );
+
+      expect(store.ownershipHistoryForIncident(incident.id), hasLength(2));
+      expect(
+        store.currentOwnershipForIncident(incident.id)?.action,
+        IncidentOwnershipAction.reassigned,
+      );
+
+      final restoredMembership =
+          MembershipOperationsController.productionFoundation(
+        GeographyRegistry.prototypeSeed(),
+        persistence: persistence,
+      );
+      await restoredMembership.hydrateFromOffline();
+      final restored = FieldOperationsController.productionFoundation(
+        persistence: persistence,
+        membership: restoredMembership,
+      );
+      await restored.hydrateFromOffline();
+
+      final history = restored.ownershipHistoryForIncident(incident.id);
+      expect(history, hasLength(2));
+      expect(history.first.actorId, 'STATE-COORD');
+      expect(history.last.actorId, 'STATE-COORD-2');
+      expect(history.last.teamName, 'State Incident Command Desk');
+      expect(history.last.responsibleMemberId, officer.id);
+
+      await restored.clearIncidentOwnership(
+        incident.id,
+        actorId: 'STATE-COORD',
+        actorRole: TgcgRole.stateCoordinator,
+        authorizedScope: GeographicScope.kaduna,
+      );
+      expect(restored.currentOwnershipForIncident(incident.id), isNull);
+      expect(
+        restored.ownershipHistoryForIncident(incident.id).last.action,
+        IncidentOwnershipAction.cleared,
+      );
     });
 
     test('direct status mutation outside actor scope is rejected', () async {
