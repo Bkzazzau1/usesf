@@ -163,6 +163,15 @@ Assignments are separate from roles.
 - Blocked members and members outside a non-State meeting geography cannot be invited.
 - Meeting records support durable post-meeting action items with optional member owner, due date and completion state. Creation/completion of meetings and actions remains governance-audited.
 - State Command Meetings does not create a second RTC/video stack; live audio/video/conference media continues through the existing operational-call stage.
+- The State Coordinator's Governance module is rendered as State Governance Control. It is an operational authority/accountability workspace, not a backend administration console.
+- State Governance Control is explicitly available to the State Coordinator even though that role does not receive `viewAudit`, `manageUsers` or `manageSystemSettings`.
+- State Governance Control derives its state from the authoritative member, role, assignment, sync and safeguard stores. It does not create a second permission model.
+- Governance exceptions include leadership vacancies, multiple holders for one leadership post, coordinator roles at the wrong geographic level, blocked/pending/identity-review members still holding authority, one member holding multiple coordinator posts, orphan role records, sync failures/conflicts and disabled protected safeguards.
+- Senatorial/LGA/loaded-Ward/loaded-PU leadership coverage uses the same role records as Membership Intelligence and State Coverage Intelligence.
+- Active assignment-granted capabilities are shown separately as temporary authority. Assignment access remains limited to the existing assignment-grantable capability set and disappears when the assignment no longer confers access.
+- State Coordinator interventions hand off to Roles & Authorization, Membership Intelligence, Assignment Control, State Coverage and AI Review; role mutation remains in the audited Roles & Authorization workflow.
+- Raw audit records, user administration, backend identity approval, sync conflict reconciliation and system-setting mutation remain protected backend/System Admin or audit-capability functions.
+- System safeguards and sync health may be shown to the State Coordinator as aggregate/read-only governance state, but the State Coordinator cannot toggle protected settings or inspect protected mutation payloads from State Governance Control.
 - Role and assignment history remain auditable after deactivation.
 
 ## Product principles
@@ -198,6 +207,7 @@ Assignments are separate from roles.
 15. Media Intelligence
 16. Reports & Exports / State Executive Reporting Centre
 17. System Monitoring
+18. Data & Governance / State Governance Control
 
 ## Architecture direction
 
