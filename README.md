@@ -101,6 +101,15 @@ Assignments are separate from roles.
 - The coordinator grants only the temporary app capabilities needed for the assignment; evidence capture may be delegated through assignment-management authority even when the coordinator's own evidence interface is review-only.
 - Assignment-only access disappears automatically when the assignment is completed, cancelled or removed.
 - GPS remains required for evidence capture and individual assignment completion; group submission is chairman-controlled while member telemetry is retained internally.
+- Result submission and State result review are separate responsibilities. Authorized field roles capture and submit polling-unit results; the State Coordinator does not receive the result-entry workspace.
+- On supported Android/iOS devices, field result capture uses the camera, SHA-256 evidence hashing, a GPS capture attempt and on-device ML Kit OCR. OCR-extracted figures auto-fill the result form for human confirmation and are persisted separately from the submitted/manual figures.
+- Unsupported OCR platforms still preserve the captured result form and route the record with OCR unavailable; the system never fabricates extracted figures.
+- The State Coordinator's Result module is rendered as Result Intelligence. It accounts for every polling unit in the loaded canonical catalogue as Missing, Received, AI Review, Conflict, Disputed or Verified.
+- State Result Intelligence scores each submission from stored evidence/integrity, GPS presence, arithmetic validation, polling-unit/submitter scope checks, duplicate/conflict state and OCR/manual comparison. AI findings are advisory; only an authorized human reviewer may Verify or Dispute a result.
+- AI/OCR-extracted party figures are retained with the result record and remain auditable after synchronization/hydration.
+- Multiple unresolved submissions for one polling unit remain a Conflict until competing records are disputed/rejected/archived or otherwise resolved. Rejected/archived submissions do not satisfy polling-unit result accounting.
+- Result Intelligence may call a registered submitter through the existing GPS-bound operational-call workflow when that member has active GPS.
+- Result Intelligence verifies individual polling-unit records; Collation aggregates verified records upward. A USESF Verified result remains an internally verified unofficial field result and is not an official electoral declaration.
 - Role and assignment history remain auditable after deactivation.
 
 ## Product principles
@@ -125,7 +134,7 @@ Assignments are separate from roles.
 5. Kaduna geography and polling-unit registry
 6. Field Monitoring / State Field Command Monitoring
 7. Evidence Capture / State Evidence Intelligence
-8. Result Capture & Verification
+8. Result Capture / State Result Intelligence
 9. Collation
 10. Situation Room and Live Operations
 11. Communications, discussion and meeting rooms
