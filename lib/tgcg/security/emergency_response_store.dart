@@ -1,4 +1,9 @@
+import 'dart:convert';
+import 'dart:math';
+
+import 'package:cryptography/cryptography.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../domain/local_id.dart';
 import '../domain/models.dart';
@@ -49,6 +54,38 @@ class EmergencyAgency {
   final bool active;
 }
 
+class EmergencyResponderProfile {
+  const EmergencyResponderProfile({
+    required this.id,
+    required this.agencyId,
+    required this.serviceNumber,
+    required this.displayName,
+    required this.authorizedScope,
+    required this.createdAt,
+    required this.createdBy,
+    this.active = true,
+  });
+
+  final String id;
+  final String agencyId;
+  final String serviceNumber;
+  final String displayName;
+  final GeographicScope authorizedScope;
+  final DateTime createdAt;
+  final String createdBy;
+  final bool active;
+}
+
+class _ResponderCredential {
+  const _ResponderCredential({
+    required this.salt,
+    required this.hash,
+  });
+
+  final String salt;
+  final String hash;
+}
+
 class EmergencyDispatch {
   const EmergencyDispatch({
     required this.id,
@@ -90,10 +127,12 @@ class EmergencyResponseController extends ChangeNotifier {
     required GovernanceOperationsController governance,
     required List<EmergencyAgency> agencies,
     required List<EmergencyDispatch> dispatches,
+    List<EmergencyResponderProfile> responders = const [],
     OfflinePersistenceController? persistence,
   })  : _governance = governance,
         _agencies = agencies,
         _dispatches = dispatches,
+        _responders = List<EmergencyResponderProfile>.of(responders),
         _persistence = persistence;
 
   factory EmergencyResponseController.productionFoundation({
@@ -104,6 +143,7 @@ class EmergencyResponseController extends ChangeNotifier {
         governance: governance,
         agencies: <EmergencyAgency>[],
         dispatches: <EmergencyDispatch>[],
+        responders: <EmergencyResponderProfile>[],
         persistence: persistence,
       );
 
@@ -239,10 +279,15 @@ class EmergencyResponseController extends ChangeNotifier {
   final GovernanceOperationsController _governance;
   final List<EmergencyAgency> _agencies;
   final List<EmergencyDispatch> _dispatches;
+  final List<EmergencyResponderProfile> _responders;
   final OfflinePersistenceController? _persistence;
+  final FlutterSecureStorage _credentialStorage =
+      const FlutterSecureStorage();
 
   List<EmergencyAgency> get agencies => List.unmodifiable(_agencies);
   List<EmergencyDispatch> get dispatches => List.unmodifiable(_dispatches);
+  List<EmergencyResponderProfile> get responders =>
+      List.unmodifiable(_responders);
 
   Future<void> hydrateFromOffline() async {
     final persistence = _persistence;
@@ -252,6 +297,8 @@ class EmergencyResponseController extends ChangeNotifier {
         await persistence.readEntities(entityType: 'emergency_agency');
     final dispatchRows =
         await persistence.readEntities(entityType: 'emergency_dispatch');
+    final responderRows =
+        await persistence.readEntities(entityType: 'emergency_responder');
     var changed = false;
 
     for (final row in agencyRows) {
@@ -281,9 +328,26 @@ class EmergencyResponseController extends ChangeNotifier {
       changed = true;
     }
 
+    for (final row in responderRows) {
+      final responder = _responderFromJson(row);
+      if (responder == null ||
+          !_agencies.any((agency) => agency.id == responder.agencyId)) {
+        continue;
+      }
+      final index =
+          _responders.indexWhere((item) => item.id == responder.id);
+      if (index < 0) {
+        _responders.add(responder);
+      } else {
+        _responders[index] = responder;
+      }
+      changed = true;
+    }
+
     if (changed) {
       _agencies.sort((a, b) => a.shortName.compareTo(b.shortName));
       _dispatches.sort((a, b) => b.assignedAt.compareTo(a.assignedAt));
+      _responders.sort((a, b) => a.displayName.compareTo(b.displayName));
       notifyListeners();
     }
   }
@@ -355,6 +419,179 @@ class EmergencyResponseController extends ChangeNotifier {
     );
     notifyListeners();
     return agency;
+  }
+
+  Future<EmergencyResponderProfile> provisionResponder({
+    required String agencyId,
+    required String serviceNumber,
+    required String displayName,
+    required String accessCode,
+    required GeographicScope responderScope,
+    required String actorId,
+    required TgcgRole actorRole,
+    required GeographicScope authorizedScope,
+    bool active = true,
+  }) async {
+    final agency = agencyById(agencyId);
+    if (agency == null || !agency.active) {
+      throw StateError('Configure an active response agency first.');
+    }
+    if (!TgcgPermissionPolicy.may(
+      actorRole,
+      authorizedScope,
+      TgcgCapability.manageSystemSettings,
+      targetScope: responderScope,
+    )) {
+      throw StateError(
+        'This account cannot provision security responders in the selected scope.',
+      );
+    }
+    if (!_within(agency.coverage, responderScope)) {
+      throw StateError(
+        'Responder scope must be inside the configured agency coverage.',
+      );
+    }
+
+    final normalizedService = _normalizeServiceNumber(serviceNumber);
+    final normalizedName = displayName.trim();
+    if (normalizedService.length < 4) {
+      throw ArgumentError('Enter a valid service or force number.');
+    }
+    if (normalizedName.length < 3) {
+      throw ArgumentError('Enter the responder name and rank.');
+    }
+    if (accessCode.length < 8) {
+      throw ArgumentError('Responder access code must contain at least 8 characters.');
+    }
+
+    final now = DateTime.now().toUtc();
+    final existingIndex = _responders.indexWhere(
+      (item) =>
+          item.agencyId == agencyId &&
+          _normalizeServiceNumber(item.serviceNumber) == normalizedService,
+    );
+    final previous = existingIndex < 0 ? null : _responders[existingIndex];
+    final responder = EmergencyResponderProfile(
+      id: previous?.id ?? newLocalId('RESP', now),
+      agencyId: agencyId,
+      serviceNumber: normalizedService,
+      displayName: normalizedName,
+      authorizedScope: responderScope,
+      createdAt: previous?.createdAt ?? now,
+      createdBy: previous?.createdBy ?? actorId,
+      active: active,
+    );
+
+    final credential = await _newResponderCredential(accessCode);
+    final credentialKey = _responderCredentialKey(responder.id);
+    final previousCredential = await _credentialStorage.read(key: credentialKey);
+    await _credentialStorage.write(
+      key: credentialKey,
+      value: jsonEncode({
+        'salt': credential.salt,
+        'hash': credential.hash,
+      }),
+    );
+
+    try {
+      await _persistence?.persistMutation(
+        entityType: 'emergency_responder',
+        entityId: responder.id,
+        mutationType: SyncMutationType.upsert,
+        payload: _responderToJson(responder),
+        scopeKey: scopeStorageKey(responderScope),
+        ownerId: normalizedService,
+      );
+    } catch (_) {
+      if (previousCredential == null) {
+        await _credentialStorage.delete(key: credentialKey);
+      } else {
+        await _credentialStorage.write(
+          key: credentialKey,
+          value: previousCredential,
+        );
+      }
+      rethrow;
+    }
+
+    if (existingIndex < 0) {
+      _responders.add(responder);
+    } else {
+      _responders[existingIndex] = responder;
+    }
+    _responders.sort((a, b) => a.displayName.compareTo(b.displayName));
+    _governance.recordAudit(
+      actorId: actorId,
+      action: 'emergency_responder_provisioned',
+      entityType: 'emergency_responder',
+      entityId: responder.id,
+      detail:
+          '${responder.displayName} provisioned for ${agency.shortName} within ${responderScope.label}.',
+      scope: responderScope,
+    );
+    notifyListeners();
+    return responder;
+  }
+
+  Future<EmergencyResponderProfile?> verifyResponderCredential({
+    required String agencyId,
+    required String serviceNumber,
+    required String accessCode,
+    required GeographicScope requestedScope,
+  }) async {
+    final agency = agencyById(agencyId);
+    if (agency == null || !agency.active || accessCode.isEmpty) return null;
+
+    final normalizedService = _normalizeServiceNumber(serviceNumber);
+    EmergencyResponderProfile? responder;
+    for (final item in _responders) {
+      if (item.active &&
+          item.agencyId == agencyId &&
+          _normalizeServiceNumber(item.serviceNumber) == normalizedService) {
+        responder = item;
+        break;
+      }
+    }
+    if (responder == null ||
+        !_within(agency.coverage, requestedScope) ||
+        !_within(responder.authorizedScope, requestedScope)) {
+      return null;
+    }
+
+    final stored = await _credentialStorage.read(
+      key: _responderCredentialKey(responder.id),
+    );
+    if (stored == null || stored.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(stored);
+      if (decoded is! Map ||
+          decoded['salt'] is! String ||
+          decoded['hash'] is! String) {
+        return null;
+      }
+      final credential = _ResponderCredential(
+        salt: decoded['salt'] as String,
+        hash: decoded['hash'] as String,
+      );
+      final actual = base64UrlEncode(
+        await _deriveAccessCode(
+          accessCode,
+          base64Url.decode(credential.salt),
+        ),
+      );
+      if (!_constantTimeEquals(credential.hash, actual)) return null;
+      return responder;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> clearLocalCredentials() async {
+    for (final responder in _responders) {
+      await _credentialStorage.delete(
+        key: _responderCredentialKey(responder.id),
+      );
+    }
   }
 
   List<EmergencyAgency> agenciesForScope(GeographicScope scope) => _agencies
@@ -547,6 +784,52 @@ class EmergencyResponseController extends ChangeNotifier {
     notifyListeners();
   }
 
+  static Map<String, Object?> _responderToJson(
+    EmergencyResponderProfile responder,
+  ) =>
+      {
+        'id': responder.id,
+        'agencyId': responder.agencyId,
+        'serviceNumber': responder.serviceNumber,
+        'displayName': responder.displayName,
+        'authorizedScope': geographicScopeToJson(responder.authorizedScope),
+        'createdAt': responder.createdAt.toUtc().toIso8601String(),
+        'createdBy': responder.createdBy,
+        'active': responder.active,
+      };
+
+  static EmergencyResponderProfile? _responderFromJson(
+    Map<String, Object?> row,
+  ) {
+    final id = row['id']?.toString();
+    final agencyId = row['agencyId']?.toString();
+    final serviceNumber = row['serviceNumber']?.toString();
+    final displayName = row['displayName']?.toString();
+    final authorizedScope = geographicScopeFromJson(row['authorizedScope']);
+    final createdAt =
+        DateTime.tryParse(row['createdAt']?.toString() ?? '')?.toUtc();
+    final createdBy = row['createdBy']?.toString();
+    if (id == null ||
+        agencyId == null ||
+        serviceNumber == null ||
+        displayName == null ||
+        authorizedScope == null ||
+        createdAt == null ||
+        createdBy == null) {
+      return null;
+    }
+    return EmergencyResponderProfile(
+      id: id,
+      agencyId: agencyId,
+      serviceNumber: serviceNumber,
+      displayName: displayName,
+      authorizedScope: authorizedScope,
+      createdAt: createdAt,
+      createdBy: createdBy,
+      active: row['active'] != false,
+    );
+  }
+
   static Map<String, Object?> _agencyToJson(EmergencyAgency agency) => {
         'id': agency.id,
         'name': agency.name,
@@ -647,6 +930,53 @@ class EmergencyResponseController extends ChangeNotifier {
       closedAt: _date(row['closedAt']),
       lastUpdatedBy: _clean(row['lastUpdatedBy']),
     );
+  }
+
+  static Future<_ResponderCredential> _newResponderCredential(
+    String accessCode,
+  ) async {
+    final random = Random.secure();
+    final salt = List<int>.generate(
+      16,
+      (_) => random.nextInt(256),
+      growable: false,
+    );
+    final hash = await _deriveAccessCode(accessCode, salt);
+    return _ResponderCredential(
+      salt: base64UrlEncode(salt),
+      hash: base64UrlEncode(hash),
+    );
+  }
+
+  static Future<List<int>> _deriveAccessCode(
+    String accessCode,
+    List<int> salt,
+  ) async {
+    final algorithm = Pbkdf2(
+      macAlgorithm: Hmac.sha256(),
+      iterations: 120000,
+      bits: 256,
+    );
+    final secret = await algorithm.deriveKey(
+      secretKey: SecretKey(utf8.encode(accessCode)),
+      nonce: salt,
+    );
+    return secret.extractBytes();
+  }
+
+  static String _normalizeServiceNumber(String value) =>
+      value.trim().toUpperCase().replaceAll(RegExp(r'\\s+'), '');
+
+  static String _responderCredentialKey(String responderId) =>
+      'usesf.security.responder.$responderId.access_code';
+
+  static bool _constantTimeEquals(String a, String b) {
+    if (a.length != b.length) return false;
+    var difference = 0;
+    for (var index = 0; index < a.length; index++) {
+      difference |= a.codeUnitAt(index) ^ b.codeUnitAt(index);
+    }
+    return difference == 0;
   }
 
   static T? _enumValue<T extends Enum>(List<T> values, Object? raw) {
