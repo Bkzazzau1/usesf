@@ -126,6 +126,16 @@ Assignments are separate from roles.
 - Leadership coverage separately accounts for Senatorial, all 23 LGA coordinator posts, loaded Ward coordinator posts and loaded Polling Unit coordinator posts, and lists the actual vacant scopes.
 - Membership Intelligence may call a GPS-active member through the existing operational-call workflow and may hand off to Member Enrolment, Roles & Authorization, Assignment Control, State Coverage Intelligence and Result Intelligence.
 - Membership Intelligence does not duplicate enrolment, role mutation or assignment creation; those remain authoritative in their dedicated modules.
+- The State Coordinator's AI Verification module is rendered as State AI Review Centre and moved into the command/intelligence surface; lower authorized roles retain the existing scoped AI Verification workflow.
+- State AI Review Centre builds its queue from real domain state rather than hard-coded review counts: identity-review state, active Assignment Edge AI findings/events, evidence-integrity exceptions and unresolved result validation/conflicts.
+- The State AI queue is explainable. Every case records why it needs review, its scope/reference/member where available, severity and the authoritative workspace for follow-up.
+- Derived assignment GPS/device findings are queued only after an assignment enters its operational lifecycle; a newly assigned job waiting for acceptance is not treated as a GPS anomaly. Explicit durable AI events may still surface at any lifecycle stage.
+- Durable Assignment Edge AI events can be marked resolved by the State Coordinator after human review. Derived telemetry findings remain until the underlying GPS/device condition changes.
+- Evidence without a stored cryptographic content hash is a critical integrity review case and is handed to Evidence Intelligence; the AI Review Centre does not fabricate an integrity decision.
+- Result conflicts are deduplicated into one critical polling-unit review case, while non-conflicting results enter review only when their durable status/validation requires human attention.
+- Identity cases are visible statewide, but identity approval/suspicious marking remains a backend/System Admin human-review authority. The State Coordinator is never given silent or automatic face/PVC approval authority by this module.
+- State AI Review Centre hands cases to Membership Intelligence, Assignment Control, Evidence Intelligence and Result Intelligence rather than creating a second mutation path for those domains.
+- AI never silently closes, verifies, approves or changes the underlying operational record.
 - Role and assignment history remain auditable after deactivation.
 
 ## Product principles
@@ -150,14 +160,15 @@ Assignments are separate from roles.
 4. Jobs & Assignment Control
 5. Geographic Operations / State Coverage Intelligence
 6. Field Monitoring / State Field Command Monitoring
-7. Evidence Capture / State Evidence Intelligence
-8. Result Capture / State Result Intelligence
-9. Collation
-10. Situation Room and Live Operations
-11. Communications, discussion and meeting rooms
-12. Media Intelligence
-13. Reporting, audit and governance
-14. System Monitoring
+7. AI Verification / State AI Review Centre
+8. Evidence Capture / State Evidence Intelligence
+9. Result Capture / State Result Intelligence
+10. Collation
+11. Situation Room and Live Operations
+12. Communications, discussion and meeting rooms
+13. Media Intelligence
+14. Reporting, audit and governance
+15. System Monitoring
 
 ## Architecture direction
 
