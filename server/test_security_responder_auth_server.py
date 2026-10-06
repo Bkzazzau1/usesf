@@ -83,7 +83,7 @@ class ResponderAuthServiceTest(unittest.TestCase):
         revoked = self.service.validate_session(token)
         self.assertEqual(revoked.status, "revoked")
 
-    def test_session_expires_after_absolute_lifetime(self):
+    def test_session_remains_active_until_explicit_revocation(self):
         issued_at = datetime(2026, 10, 6, 8, 0, tzinfo=timezone.utc)
         authenticated = self.service.authenticate(
             agency_id="AGENCY-POLICE",
@@ -94,17 +94,17 @@ class ResponderAuthServiceTest(unittest.TestCase):
         )
         token = authenticated.responder["sessionToken"]
 
-        before_expiry = self.service.validate_session(
+        much_later = self.service.validate_session(
             token,
-            now=issued_at + timedelta(hours=7, minutes=59),
+            now=issued_at + timedelta(days=3650),
         )
-        self.assertEqual(before_expiry.status, "active")
+        self.assertEqual(much_later.status, "active")
 
-        expired = self.service.validate_session(
-            token,
-            now=issued_at + timedelta(hours=8),
+        self.assertTrue(self.service.revoke_session(token))
+        self.assertEqual(
+            self.service.validate_session(token).status,
+            "revoked",
         )
-        self.assertEqual(expired.status, "revoked")
 
     def test_reprovision_revokes_existing_sessions(self):
         authenticated = self.service.authenticate(
