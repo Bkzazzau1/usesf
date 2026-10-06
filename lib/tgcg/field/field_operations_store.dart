@@ -287,7 +287,10 @@ class FieldOperationsController extends ChangeNotifier {
   List<IncidentStatusTransitionEvent> statusHistoryForIncident(
     String incidentId,
   ) =>
-      List.unmodifiable(_statusHistory[incidentId] ?? const []);
+      List.unmodifiable(
+        _statusHistory[incidentId] ??
+            const <IncidentStatusTransitionEvent>[],
+      );
 
   Future<void> hydrateFromOffline() async {
     final persistence = _persistence;
