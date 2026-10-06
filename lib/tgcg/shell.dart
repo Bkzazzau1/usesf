@@ -23,6 +23,7 @@ import 'governance/governance_page.dart';
 import 'governance/role_assignment_page.dart';
 import 'media/media_intelligence_page.dart';
 import 'meeting/meeting_room_page.dart';
+import 'meeting/state_command_meetings_page.dart';
 import 'membership/member_operations_page.dart';
 import 'membership/membership_intelligence_page.dart';
 import 'membership/member_shell.dart';
@@ -116,6 +117,9 @@ class _TgcgShellState extends State<TgcgShell> {
     final stateCommunications =
         allowed.contains(TgcgModule.communications) &&
         session.role == TgcgRole.stateCoordinator;
+    final stateCommandMeetings =
+        allowed.contains(TgcgModule.meetingRoom) &&
+        session.role == TgcgRole.stateCoordinator;
     final destinations = _destinations
         .where((item) => allowed.contains(item.module))
         .map(
@@ -180,6 +184,15 @@ class _TgcgShellState extends State<TgcgShell> {
                 item.module,
                 'State Communications Command',
                 Icons.campaign_outlined,
+                _NavGroup.command,
+              );
+            }
+            if (item.module == TgcgModule.meetingRoom &&
+                stateCommandMeetings) {
+              return _Destination(
+                item.module,
+                'State Command Meetings',
+                Icons.video_camera_front_outlined,
                 _NavGroup.command,
               );
             }
@@ -264,6 +277,7 @@ class _TgcgShellState extends State<TgcgShell> {
                             stateAiReview: stateAiReview,
                             executiveReporting: executiveReporting,
                             stateCommunications: stateCommunications,
+                            stateCommandMeetings: stateCommandMeetings,
                             showAlerts: allowed.contains(TgcgModule.alertCenter),
                             onAlerts: () => _select(TgcgModule.alertCenter),
                             onTour: () => _openTour(allowed),
@@ -347,7 +361,10 @@ class _TgcgShellState extends State<TgcgShell> {
               : const CommunicationsPage(),
         TgcgModule.bulkCommunications => const BulkCommunicationsPage(),
         TgcgModule.discussionRoom => const DiscussionRoomPage(),
-        TgcgModule.meetingRoom => const MeetingRoomPage(),
+        TgcgModule.meetingRoom =>
+          session.role == TgcgRole.stateCoordinator
+              ? StateCommandMeetingsPage(onOpenModule: _select)
+              : const MeetingRoomPage(),
         TgcgModule.systemMonitoring => const SystemMonitoringPage(),
         TgcgModule.reports =>
           session.role == TgcgRole.stateCoordinator
@@ -652,6 +669,7 @@ class _CommandBar extends StatelessWidget {
     required this.stateAiReview,
     required this.executiveReporting,
     required this.stateCommunications,
+    required this.stateCommandMeetings,
     required this.showAlerts,
     required this.onAlerts,
     required this.onTour,
@@ -665,6 +683,7 @@ class _CommandBar extends StatelessWidget {
   final bool stateAiReview;
   final bool executiveReporting;
   final bool stateCommunications;
+  final bool stateCommandMeetings;
   final bool showAlerts;
   final VoidCallback onAlerts;
   final VoidCallback onTour;
@@ -709,6 +728,7 @@ class _CommandBar extends StatelessWidget {
               stateAiReview: stateAiReview,
               executiveReporting: executiveReporting,
               stateCommunications: stateCommunications,
+              stateCommandMeetings: stateCommandMeetings,
             ),
             style: const TextStyle(color: TgcgColors.ink, fontSize: 14, fontWeight: FontWeight.w900),
           ),
@@ -856,6 +876,7 @@ String _moduleLabel(
   bool stateAiReview = false,
   bool executiveReporting = false,
   bool stateCommunications = false,
+  bool stateCommandMeetings = false,
 }) => switch (module) {
       TgcgModule.overview => 'Command Overview',
       TgcgModule.memberEnrollment => 'Member Enrolment',
@@ -884,7 +905,8 @@ String _moduleLabel(
       TgcgModule.communications => 'Communications',
       TgcgModule.bulkCommunications => 'Bulk Communications Centre',
       TgcgModule.discussionRoom => 'Discussion Forum',
-      TgcgModule.meetingRoom => 'Meeting Room',
+      TgcgModule.meetingRoom =>
+        stateCommandMeetings ? 'State Command Meetings' : 'Meeting Room',
       TgcgModule.systemMonitoring => 'System Monitoring',
       TgcgModule.reports =>
         executiveReporting ? 'Executive Reporting Centre' : 'Reports & Exports',
