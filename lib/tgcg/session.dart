@@ -115,6 +115,7 @@ class TgcgSessionController extends ChangeNotifier {
 
   void recordActivity() {
     if (!isSecuritySession || !isAuthenticated) return;
+    if (enforceSecurityExpiry()) return;
     _lastActivityAt = _clock().toUtc();
   }
 
