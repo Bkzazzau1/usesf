@@ -3,6 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:usesf/tgcg/session.dart';
 
 void main() {
+  setUpAll(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
+  });
+
   group('Persistent login sessions', () {
     setUp(() {
       FlutterSecureStorage.setMockInitialValues({});
