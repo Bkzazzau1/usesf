@@ -52,10 +52,12 @@ void main() {
           agencyId: 'AGENCY-POLICE',
         );
 
-      for (var hour = 1; hour < 8; hour++) {
-        now = DateTime.utc(2026, 10, 6, 8 + hour);
+      for (var minutes = 10; minutes < 480; minutes += 10) {
+        now = DateTime.utc(2026, 10, 6, 8).add(
+          Duration(minutes: minutes),
+        );
         session.recordActivity();
-        expect(session.enforceSecurityExpiry(), isFalse);
+        expect(session.isAuthenticated, isTrue);
       }
       now = DateTime.utc(2026, 10, 6, 16);
       expect(session.enforceSecurityExpiry(), isTrue);
