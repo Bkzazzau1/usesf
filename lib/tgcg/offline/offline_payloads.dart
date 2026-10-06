@@ -173,6 +173,7 @@ Map<String, Object?> resultSubmissionToJson(
       'resultForm': submission.resultForm == null
           ? null
           : evidenceToJson(submission.resultForm!),
+      'ocrPartyVotes': submission.ocrPartyVotes,
       'validation': submission.validation == null
           ? null
           : {
