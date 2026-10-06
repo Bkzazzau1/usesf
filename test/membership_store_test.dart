@@ -1,5 +1,7 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:usesf/tgcg/assignments/assignment_store.dart';
+import 'package:usesf/tgcg/devices/managed_device_store.dart';
 import 'package:usesf/tgcg/domain/models.dart';
 import 'package:usesf/tgcg/geography/geography_registry.dart';
 import 'package:usesf/tgcg/membership/membership_store.dart';
@@ -27,6 +29,115 @@ void main() {
     });
 
     tearDown(() => store.dispose());
+
+    test('production membership, devices and assignments restart cleanly',
+        () async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final persistence = OfflinePersistenceController(
+        openDatabase: () async => InMemoryOfflineDatabase(),
+      );
+      await persistence.initialize();
+      final productionGeography = GeographyRegistry.prototypeSeed();
+      final membership =
+          MembershipOperationsController.productionFoundation(
+        productionGeography,
+        persistence: persistence,
+      );
+      final devices = ManagedDeviceController.productionFoundation(
+        membership: membership,
+        persistence: persistence,
+      );
+      final assignments = AssignmentController.productionFoundation(
+        membership: membership,
+        devices: devices,
+        persistence: persistence,
+      );
+
+      expect(membership.members, isEmpty);
+      expect(devices.devices, isEmpty);
+      expect(assignments.assignments, isEmpty);
+      expect(assignments.groupAssignments, isEmpty);
+      expect(membership.geography.lgaCount, 23);
+      expect(membership.geography.pollingUnits, isNotEmpty);
+
+      final zaria = productionGeography.lga('KD-ZARIA')!;
+      final member = await membership.createMember(
+        fullName: 'Persisted Field Member',
+        phoneNumber: '+2348012345678',
+        registrationScope: zaria.scope,
+      );
+      final device = await devices.registerDevice(
+        label: 'Field Device',
+        registeredBy: 'STATE-COORD',
+      );
+      final assignedDevice = await devices.assignToMember(
+        deviceId: device.id,
+        memberId: member.id,
+        assignedBy: 'STATE-COORD',
+        authorizedScope: GeographicScope.kaduna,
+      );
+      final assignment = await assignments.createAssignment(
+        title: 'Persisted field duty',
+        memberId: member.id,
+        targetScopeOverride: zaria.scope,
+        assignedBy: 'STATE-COORD',
+        authorizedScope: GeographicScope.kaduna,
+        assignerCapabilities: const {},
+      );
+
+      expect(assignedDevice.assignedMemberId, member.id);
+      expect(assignment.memberId, member.id);
+      expect(assignment.deviceId, device.id);
+
+      final restoredGeography = GeographyRegistry.prototypeSeed();
+      final restoredMembership =
+          MembershipOperationsController.productionFoundation(
+        restoredGeography,
+        persistence: persistence,
+      );
+      final restoredDevices = ManagedDeviceController.productionFoundation(
+        membership: restoredMembership,
+        persistence: persistence,
+      );
+      final restoredAssignments = AssignmentController.productionFoundation(
+        membership: restoredMembership,
+        devices: restoredDevices,
+        persistence: persistence,
+      );
+
+      await restoredMembership.hydrateFromOffline();
+      await restoredDevices.hydrateFromOffline();
+      await restoredAssignments.hydrateFromOffline();
+
+      expect(restoredMembership.members, hasLength(1));
+      expect(restoredMembership.members.single.id, member.id);
+      expect(restoredMembership.members.single.fullName, 'Persisted Field Member');
+      expect(
+        restoredMembership.members.any(
+          (item) => const {
+            'Amina Yusuf',
+            'Samuel Terna',
+            'Chinedu Okafor',
+          }.contains(item.fullName),
+        ),
+        isFalse,
+      );
+      expect(restoredDevices.devices, hasLength(1));
+      expect(restoredDevices.devices.single.id, device.id);
+      expect(restoredDevices.devices.single.assignedMemberId, member.id);
+      expect(restoredAssignments.assignments, hasLength(1));
+      expect(restoredAssignments.assignments.single.id, assignment.id);
+      expect(restoredAssignments.assignments.single.memberId, member.id);
+      expect(restoredAssignments.assignments.single.deviceId, device.id);
+      expect(restoredAssignments.groupAssignments, isEmpty);
+
+      membership.dispose();
+      devices.dispose();
+      assignments.dispose();
+      restoredMembership.dispose();
+      restoredDevices.dispose();
+      restoredAssignments.dispose();
+    });
 
     test('creates a member without a phone number', () async {
       final before = store.members.length;
