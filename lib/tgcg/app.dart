@@ -94,15 +94,17 @@ class _TgcgAppState extends State<TgcgApp> {
   void _createControllers() {
     sessionController = TgcgSessionController();
     offlinePersistenceController = OfflinePersistenceController();
-    membershipOperationsController = MembershipOperationsController.prototypeSeed(
-      GeographyRegistry.prototypeSeed(),
+    final geography = GeographyRegistry.prototypeSeed();
+    membershipOperationsController =
+        MembershipOperationsController.productionFoundation(
+      geography,
       persistence: offlinePersistenceController,
     );
-    managedDeviceController = ManagedDeviceController.prototypeSeed(
+    managedDeviceController = ManagedDeviceController.productionFoundation(
       membership: membershipOperationsController,
       persistence: offlinePersistenceController,
     );
-    assignmentController = AssignmentController.prototypeSeed(
+    assignmentController = AssignmentController.productionFoundation(
       membership: membershipOperationsController,
       devices: managedDeviceController,
       persistence: offlinePersistenceController,
