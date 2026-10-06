@@ -97,14 +97,20 @@ class ResponderAuthenticationResult {
   const ResponderAuthenticationResult._({
     required this.status,
     this.responder,
+    this.remoteSessionToken,
+    this.remoteSessionExpiresAt,
     this.lockedUntil,
   });
 
   const ResponderAuthenticationResult.authenticated(
-    EmergencyResponderProfile responder,
-  ) : this._(
+    EmergencyResponderProfile responder, {
+    String? remoteSessionToken,
+    DateTime? remoteSessionExpiresAt,
+  }) : this._(
           status: ResponderAuthenticationStatus.authenticated,
           responder: responder,
+          remoteSessionToken: remoteSessionToken,
+          remoteSessionExpiresAt: remoteSessionExpiresAt,
         );
 
   const ResponderAuthenticationResult.rejected()
@@ -118,6 +124,8 @@ class ResponderAuthenticationResult {
 
   final ResponderAuthenticationStatus status;
   final EmergencyResponderProfile? responder;
+  final String? remoteSessionToken;
+  final DateTime? remoteSessionExpiresAt;
   final DateTime? lockedUntil;
 }
 
@@ -646,7 +654,11 @@ class EmergencyResponseController extends ChangeNotifier {
             createdAt: now,
             createdBy: 'remote-auth',
           );
-          return ResponderAuthenticationResult.authenticated(responder);
+          return ResponderAuthenticationResult.authenticated(
+            responder,
+            remoteSessionToken: remote.sessionToken,
+            remoteSessionExpiresAt: remote.sessionExpiresAt,
+          );
         case RemoteResponderAuthenticationStatus.locked:
           final lockedUntil =
               remote.lockedUntil ?? now.add(_responderLockoutDuration);
@@ -729,6 +741,32 @@ class EmergencyResponseController extends ChangeNotifier {
     }
 
     return ResponderAuthenticationResult.authenticated(responder);
+  }
+
+enum ResponderSessionValidationStatus {
+  active,
+  revoked,
+  unavailable,
+}
+
+  Future<ResponderSessionValidationStatus> validateConnectedSession({
+    required String sessionToken,
+  }) async {
+    final remoteAuth = _remoteAuth;
+    if (remoteAuth == null) {
+      return ResponderSessionValidationStatus.unavailable;
+    }
+    final result = await remoteAuth.validateSession(sessionToken: sessionToken);
+    return switch (result.status) {
+      RemoteResponderSessionStatus.active =>
+        ResponderSessionValidationStatus.active,
+      RemoteResponderSessionStatus.revoked =>
+        ResponderSessionValidationStatus.revoked,
+      RemoteResponderSessionStatus.unavailable =>
+        ResponderSessionValidationStatus.unavailable,
+      RemoteResponderSessionStatus.serverError =>
+        ResponderSessionValidationStatus.revoked,
+    };
   }
 
   Future<EmergencyResponderProfile?> verifyResponderCredential({
