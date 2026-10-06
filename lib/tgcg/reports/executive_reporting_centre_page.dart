@@ -278,38 +278,14 @@ List<ExecutivePriorityItem> buildExecutivePriorities(
 ) {
   final items = <ExecutivePriorityItem>[];
 
-  for (final review in snapshot.aiReviewCases) {
-    if (review.severity != StateAiReviewSeverity.critical) continue;
+  if (snapshot.criticalAiCases > 0) {
     items.add(
       ExecutivePriorityItem(
-        title: review.title,
-        detail: review.detail,
+        title: 'Critical AI review queue',
+        detail:
+            '${snapshot.criticalAiCases} critical AI-assisted review case(s) require human attention.',
         severity: 4,
         module: TgcgModule.aiVerification,
-      ),
-    );
-  }
-
-  for (final exception in snapshot.coverageExceptions) {
-    if (exception.severity < 3) continue;
-    items.add(
-      ExecutivePriorityItem(
-        title: exception.title,
-        detail: '${exception.scope.label} • ${exception.detail}',
-        severity: exception.severity,
-        module: TgcgModule.geography,
-      ),
-    );
-  }
-
-  if (snapshot.vacantLgaCoordinators > 0) {
-    items.add(
-      ExecutivePriorityItem(
-        title: 'LGA leadership vacancies',
-        detail:
-            '${snapshot.vacantLgaCoordinators}/${snapshot.leadership.lgaExpected} LGA Coordinator posts are vacant.',
-        severity: 3,
-        module: TgcgModule.membershipNetwork,
       ),
     );
   }
@@ -334,6 +310,75 @@ List<ExecutivePriorityItem> buildExecutivePriorities(
             '${snapshot.stateCoverage.conflictingResultPollingUnits} polling unit(s) have conflicting result submissions.',
         severity: 4,
         module: TgcgModule.resultCapture,
+      ),
+    );
+  }
+
+  if (snapshot.vacantLgaCoordinators > 0) {
+    items.add(
+      ExecutivePriorityItem(
+        title: 'LGA leadership vacancies',
+        detail:
+            '${snapshot.vacantLgaCoordinators}/${snapshot.leadership.lgaExpected} LGA Coordinator posts are vacant.',
+        severity: 3,
+        module: TgcgModule.membershipNetwork,
+      ),
+    );
+  }
+
+  final staffingGaps = snapshot.coverageExceptions
+      .where(
+        (item) =>
+            item.kind == CoverageExceptionKind.unstaffedPollingUnit,
+      )
+      .length;
+  if (staffingGaps > 0) {
+    items.add(
+      ExecutivePriorityItem(
+        title: 'Polling-unit staffing gaps',
+        detail: '$staffingGaps polling unit(s) are below minimum staffing.',
+        severity: 3,
+        module: TgcgModule.geography,
+      ),
+    );
+  }
+
+  final gpsGaps = snapshot.coverageExceptions
+      .where((item) => item.kind == CoverageExceptionKind.gpsGap)
+      .length;
+  if (gpsGaps > 0) {
+    items.add(
+      ExecutivePriorityItem(
+        title: 'Field GPS attention',
+        detail: '$gpsGaps polling unit(s) have stale or mismatched GPS.',
+        severity: 3,
+        module: TgcgModule.fieldMonitoring,
+      ),
+    );
+  }
+
+  final missingResults = snapshot.coverageExceptions
+      .where((item) => item.kind == CoverageExceptionKind.resultMissing)
+      .length;
+  if (missingResults > 0) {
+    items.add(
+      ExecutivePriorityItem(
+        title: 'Polling-unit results missing',
+        detail: '$missingResults loaded polling unit(s) have no accountable result.',
+        severity: 3,
+        module: TgcgModule.resultCapture,
+      ),
+    );
+  }
+
+  if (snapshot.lgaCritical > 0) {
+    items.add(
+      ExecutivePriorityItem(
+        title: 'Critical LGA readiness',
+        detail:
+            '${snapshot.lgaCritical} LGA(s) are currently below the critical readiness threshold.',
+        severity: 3,
+        module: TgcgModule.geography,
       ),
     );
   }
