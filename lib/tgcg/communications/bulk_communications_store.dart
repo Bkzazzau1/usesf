@@ -544,6 +544,9 @@ class BulkCommunicationsController extends ChangeNotifier {
         },
         'target_roles': value.targetRoles.map((item) => item.name).toList(),
         'target_member_ids': value.targetMemberIds,
+        'sent_count': value.sentCount,
+        'delivered_count': value.deliveredCount,
+        'failed_count': value.failedCount,
       };
 
   CommunicationPreference? _preferenceFromPayload(
