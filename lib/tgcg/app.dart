@@ -130,7 +130,8 @@ class _TgcgAppState extends State<TgcgApp> {
       governance: governanceOperationsController,
       membership: membershipOperationsController,
     );
-    fieldOperationsController = FieldOperationsController.prototypeSeed(
+    fieldOperationsController =
+        FieldOperationsController.productionFoundation(
       persistence: offlinePersistenceController,
     );
     resultOperationsController =

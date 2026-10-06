@@ -13,6 +13,88 @@ void main() {
   });
 
   group('FieldOperationsController', () {
+    test('production foundation starts empty and hydrates only persisted field records',
+        () async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final persistence = OfflinePersistenceController(
+        openDatabase: () async => InMemoryOfflineDatabase(),
+      );
+      await persistence.initialize();
+
+      final store = FieldOperationsController.productionFoundation(
+        persistence: persistence,
+      );
+      expect(store.incidents, isEmpty);
+      expect(store.reports, isEmpty);
+      expect(store.unresolvedIncidentCount, 0);
+      expect(store.evidenceCount, 0);
+
+      const scope = GeographicScope(
+        level: GeographyLevel.pollingUnit,
+        country: 'Nigeria',
+        zoneId: 'NW',
+        zoneName: 'North West',
+        stateId: 'KD',
+        stateName: 'Kaduna',
+        senatorialDistrictId: 'SD/053/KD',
+        senatorialDistrictName: 'Kaduna Central',
+        lgaId: 'KD-KADUNA-NORTH',
+        lgaName: 'Kaduna North',
+        wardId: 'KD-KN-W01',
+        wardName: 'Ward 01',
+        pollingUnitId: 'KD-KN-W01-PU001',
+        pollingUnitName: 'PU 001',
+      );
+
+      final incident = await store.createIncident(
+        title: 'Observed access delay',
+        category: 'Access',
+        severity: IncidentSeverity.medium,
+        scope: scope,
+        reporterId: 'MEM-FIELD-001',
+        summary: 'Gate access delayed for operational review.',
+      );
+      final report = await store.submitFieldReport(
+        category: 'Operational update',
+        summary: 'Access issue reported and queued for coordinator review.',
+        scope: scope,
+        reporterId: 'MEM-FIELD-001',
+        incidentId: incident.id,
+      );
+
+      final restored = FieldOperationsController.productionFoundation(
+        persistence: persistence,
+      );
+      expect(restored.incidents, isEmpty);
+      expect(restored.reports, isEmpty);
+
+      await restored.hydrateFromOffline();
+
+      expect(restored.incidents, hasLength(1));
+      expect(restored.reports, hasLength(1));
+      expect(restored.incidents.single.id, incident.id);
+      expect(restored.reports.single.id, report.id);
+      expect(restored.incidents.single.reporterId, 'MEM-FIELD-001');
+      expect(restored.reports.single.reporterId, 'MEM-FIELD-001');
+      expect(
+        restored.incidents.any(
+          (item) => const {
+            'INC-0002',
+            'INC-0003',
+            'INC-0004',
+            'INC-0005',
+          }.contains(item.id),
+        ),
+        isFalse,
+      );
+      expect(
+        restored.reports.any(
+          (item) => const {'RPT-0002', 'RPT-0003'}.contains(item.id),
+        ),
+        isFalse,
+      );
+    });
+
     test('state scope sees all prototype incidents', () {
       final store = FieldOperationsController.prototypeSeed();
 

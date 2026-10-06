@@ -75,9 +75,9 @@ class GovernanceOperationsController extends ChangeNotifier {
     final now = DateTime.now().toUtc();
     return GovernanceOperationsController._(
       persistence: persistence,
-      auditEvents: const [],
+      auditEvents: <AuditEvent>[],
       settings: _defaultSettings(now),
-      roleAssignments: const [],
+      roleAssignments: <RoleAssignmentRecord>[],
     );
   }
 
