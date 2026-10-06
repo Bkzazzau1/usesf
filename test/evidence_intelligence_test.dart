@@ -193,6 +193,8 @@ void main() {
         summary: 'Field report with attached evidence.',
         scope: pu.scope,
         reporterId: 'MEM-0001',
+        actorRole: TgcgRole.pollingUnitAgent,
+        authorizedScope: pu.scope,
         evidence: [
           EvidenceAttachment(
             id: 'EVD-RPT-TEST',
@@ -274,6 +276,8 @@ void main() {
         summary: 'Evidence persists after restart.',
         scope: pu.scope,
         reporterId: 'MEM-0001',
+        actorRole: TgcgRole.pollingUnitAgent,
+        authorizedScope: pu.scope,
         evidence: [
           EvidenceAttachment(
             id: 'EVD-FIELD-HYDRATE',

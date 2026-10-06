@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../access/access_policy.dart';
 import '../domain/permissions.dart';
 import '../field/field_operations_store.dart';
 import '../session.dart';
@@ -338,6 +339,31 @@ class _SecurityResponsePortalPageState extends State<SecurityResponsePortalPage>
     final emergency = EmergencyResponse.of(context, listen: false);
     final field = FieldOperations.of(context, listen: false);
     final actor = session.accessId.isEmpty ? session.operatorName : session.accessId;
+    // Dispatching moves the incident to "assigned", so the same authority
+    // must hold before an agency is dispatched at all.
+    final assignCapability =
+        incidentStatusMutationCapability(IncidentStatus.assigned);
+    final actorRole = TgcgAccessPolicy.roleFor(
+      context,
+      assignCapability,
+      targetScope: incident.scope,
+      listen: false,
+    );
+    final authorizedScope = TgcgAccessPolicy.authorizingScope(
+      context,
+      assignCapability,
+      targetScope: incident.scope,
+      listen: false,
+    );
+    if (actorRole == null || authorizedScope == null) {
+      instructions.dispose();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Your access does not allow assigning this incident.'),
+        ),
+      );
+      return;
+    }
     final dispatch = emergency.assign(
       incidentId: incident.id,
       agencyId: agencyId,
@@ -346,8 +372,22 @@ class _SecurityResponsePortalPageState extends State<SecurityResponsePortalPage>
       actorId: actor,
       instructions: instructions.text,
     );
-    field.updateIncidentStatus(incident.id, IncidentStatus.assigned);
     instructions.dispose();
+    try {
+      await field.updateIncidentStatus(
+        incident.id,
+        IncidentStatus.assigned,
+        actorId: actor,
+        actorRole: actorRole,
+        authorizedScope: authorizedScope,
+      );
+    } on StateError catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    }
+    if (!context.mounted) return;
     setState(() => selectedDispatchId = dispatch.id);
     final agency = emergency.agencyById(agencyId);
     if (!context.mounted) return;

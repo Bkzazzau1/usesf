@@ -4,7 +4,6 @@ import 'package:usesf/tgcg/domain/models.dart';
 import 'package:usesf/tgcg/field/field_operations_store.dart';
 import 'package:usesf/tgcg/offline/offline_database_memory.dart';
 import 'package:usesf/tgcg/offline/offline_persistence.dart';
-import 'package:usesf/tgcg/sync/sync_models.dart';
 
 void main() {
   setUpAll(() {

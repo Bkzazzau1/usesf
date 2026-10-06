@@ -919,11 +919,11 @@ class _IncidentInspector extends StatelessWidget {
               children: [
                 if (canAcknowledge && item.status == IncidentStatus.reported)
                   FilledButton.icon(
-                    onPressed: () => FieldOperations.of(context, listen: false)
-                        .updateIncidentStatus(
-                          item.id,
-                          IncidentStatus.acknowledged,
-                        ),
+                    onPressed: () => _changeIncidentStatus(
+                      context,
+                      item,
+                      IncidentStatus.acknowledged,
+                    ),
                     icon: const Icon(Icons.done_rounded, size: 17),
                     label: const Text('Acknowledge'),
                   ),
@@ -932,11 +932,11 @@ class _IncidentInspector extends StatelessWidget {
                     item.status != IncidentStatus.resolved &&
                     item.status != IncidentStatus.closed)
                   OutlinedButton.icon(
-                    onPressed: () => FieldOperations.of(context, listen: false)
-                        .updateIncidentStatus(
-                          item.id,
-                          IncidentStatus.investigating,
-                        ),
+                    onPressed: () => _changeIncidentStatus(
+                      context,
+                      item,
+                      IncidentStatus.investigating,
+                    ),
                     icon: const Icon(Icons.manage_search_rounded, size: 17),
                     label: const Text('Investigate'),
                   ),
@@ -945,10 +945,11 @@ class _IncidentInspector extends StatelessWidget {
                         item.severity == IncidentSeverity.critical) &&
                     item.status != IncidentStatus.escalated)
                   OutlinedButton.icon(
-                    onPressed: () => FieldOperations.of(
+                    onPressed: () => _changeIncidentStatus(
                       context,
-                      listen: false,
-                    ).updateIncidentStatus(item.id, IncidentStatus.escalated),
+                      item,
+                      IncidentStatus.escalated,
+                    ),
                     icon: const Icon(Icons.arrow_upward_rounded, size: 17),
                     label: const Text('Escalate'),
                   ),
@@ -956,10 +957,11 @@ class _IncidentInspector extends StatelessWidget {
                     item.status != IncidentStatus.resolved &&
                     item.status != IncidentStatus.closed)
                   OutlinedButton.icon(
-                    onPressed: () => FieldOperations.of(
+                    onPressed: () => _changeIncidentStatus(
                       context,
-                      listen: false,
-                    ).updateIncidentStatus(item.id, IncidentStatus.resolved),
+                      item,
+                      IncidentStatus.resolved,
+                    ),
                     icon: const Icon(Icons.task_alt_rounded, size: 17),
                     label: const Text('Resolve'),
                   ),
@@ -968,6 +970,45 @@ class _IncidentInspector extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// Changes an incident's status with the role and scope that authorize that
+/// specific transition for the signed-in member (same rule as Field
+/// Monitoring), surfacing any refusal from the durable store.
+Future<void> _changeIncidentStatus(
+  BuildContext context,
+  FieldIncident item,
+  IncidentStatus status,
+) async {
+  final session = TgcgSession.of(context, listen: false);
+  final capability = incidentStatusMutationCapability(status);
+  final actorRole = TgcgAccessPolicy.roleFor(
+    context,
+    capability,
+    targetScope: item.scope,
+    listen: false,
+  );
+  final authorizedScope = TgcgAccessPolicy.authorizingScope(
+    context,
+    capability,
+    targetScope: item.scope,
+    listen: false,
+  );
+  if (actorRole == null || authorizedScope == null) return;
+  try {
+    await FieldOperations.of(context, listen: false).updateIncidentStatus(
+      item.id,
+      status,
+      actorId: session.accessId.isEmpty ? session.operatorName : session.accessId,
+      actorRole: actorRole,
+      authorizedScope: authorizedScope,
+    );
+  } on StateError catch (error) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(error.message)),
     );
   }
 }
