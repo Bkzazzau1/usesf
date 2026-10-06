@@ -1,110 +1,101 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:usesf/tgcg/session.dart';
 
 void main() {
-  group('Security responder session lifetime', () {
-    test('inactivity expires a security session', () {
-      var now = DateTime.utc(2026, 10, 6, 17);
-      final session = TgcgSessionController(clock: () => now)
-        ..signIn(
-          role: TgcgRole.securityOfficer,
-          operatorName: 'Responder',
-          accessId: 'AP/100',
-          agencyId: 'AGENCY-POLICE',
-        );
+  group('Persistent login sessions', () {
+    setUp(() {
+      FlutterSecureStorage.setMockInitialValues({});
+    });
 
-      now = now.add(const Duration(minutes: 15));
-      expect(session.enforceSecurityExpiry(), isTrue);
-      expect(session.isAuthenticated, isFalse);
+    test('authenticated session restores after controller reconstruction',
+        () async {
+      final first = TgcgSessionController();
+      await first.signIn(
+        role: TgcgRole.stateCoordinator,
+        operatorName: 'State Coordinator',
+        accessId: 'STATE-001',
+        scope: GeographicScope.kaduna,
+      );
+
+      final restored = TgcgSessionController();
+      await restored.restorePersistedSession();
+
+      expect(restored.isAuthenticated, isTrue);
+      expect(restored.role, TgcgRole.stateCoordinator);
+      expect(restored.operatorName, 'State Coordinator');
+      expect(restored.accessId, 'STATE-001');
+      expect(restored.scope.stateId, 'KD');
+    });
+
+    test('security session token survives app-style reconstruction', () async {
+      final first = TgcgSessionController();
+      await first.signIn(
+        role: TgcgRole.securityOfficer,
+        operatorName: 'Insp. Musa Bello',
+        accessId: 'AP/12345',
+        agencyId: 'AGENCY-POLICE',
+        scope: GeographicScope.kaduna,
+        securitySessionToken: 'persistent-device-session',
+      );
+
+      final restored = TgcgSessionController();
+      await restored.restorePersistedSession();
+
+      expect(restored.isAuthenticated, isTrue);
+      expect(restored.role, TgcgRole.securityOfficer);
+      expect(restored.agencyId, 'AGENCY-POLICE');
       expect(
-        session.lastTerminationReason,
-        SessionTerminationReason.inactivityTimeout,
+        restored.securitySessionToken,
+        'persistent-device-session',
       );
     });
 
-    test('late activity cannot revive an already idle session', () {
-      var now = DateTime.utc(2026, 10, 6, 17);
-      final session = TgcgSessionController(clock: () => now)
-        ..signIn(
-          role: TgcgRole.securityOfficer,
-          operatorName: 'Responder',
-          accessId: 'AP/100B',
-          agencyId: 'AGENCY-POLICE',
-        );
+    test('explicit sign-out clears the persisted device session', () async {
+      final first = TgcgSessionController();
+      await first.signIn(
+        role: TgcgRole.member,
+        operatorName: 'Member',
+        accessId: 'MEM-001',
+        scope: GeographicScope.kaduna,
+      );
+      await first.signOut();
 
-      now = now.add(const Duration(minutes: 16));
-      session.recordActivity();
+      final restored = TgcgSessionController();
+      await restored.restorePersistedSession();
 
-      expect(session.isAuthenticated, isFalse);
+      expect(first.isAuthenticated, isFalse);
+      expect(restored.isAuthenticated, isFalse);
       expect(
-        session.lastTerminationReason,
-        SessionTerminationReason.inactivityTimeout,
+        first.lastTerminationReason,
+        SessionTerminationReason.explicitSignOut,
       );
     });
 
-    test('activity cannot extend a security session beyond eight hours', () {
-      var now = DateTime.utc(2026, 10, 6, 8);
-      final session = TgcgSessionController(clock: () => now)
-        ..signIn(
-          role: TgcgRole.securityOfficer,
-          operatorName: 'Responder',
-          accessId: 'AP/101',
-          agencyId: 'AGENCY-POLICE',
-        );
-
-      for (var minutes = 10; minutes < 480; minutes += 10) {
-        now = DateTime.utc(2026, 10, 6, 8).add(
-          Duration(minutes: minutes),
-        );
-        session.recordActivity();
-        expect(session.isAuthenticated, isTrue);
-      }
-      now = DateTime.utc(2026, 10, 6, 16);
-      expect(session.enforceSecurityExpiry(), isTrue);
-      expect(
-        session.lastTerminationReason,
-        SessionTerminationReason.absoluteLifetime,
+    test('scope changes remain persisted without forcing re-login', () async {
+      const zaria = GeographicScope(
+        level: GeographyLevel.lga,
+        country: 'Nigeria',
+        zoneId: 'NW',
+        stateId: 'KD',
+        lgaId: 'KD-ZARIA',
+        lgaName: 'Zaria',
       );
-    });
-
-    test('backgrounding immediately locks a security session', () {
-      final session = TgcgSessionController()
-        ..signIn(
-          role: TgcgRole.securityOfficer,
-          operatorName: 'Responder',
-          accessId: 'AP/102',
-          agencyId: 'AGENCY-POLICE',
-          securitySessionToken: 'ephemeral-token',
-        );
-
-      expect(session.lockForBackground(), isTrue);
-      expect(session.isAuthenticated, isFalse);
-      expect(session.securitySessionToken, isNull);
-      expect(
-        session.lastTerminationReason,
-        SessionTerminationReason.backgroundLock,
+      final first = TgcgSessionController();
+      await first.signIn(
+        role: TgcgRole.lgaCoordinator,
+        operatorName: 'LGA Coordinator',
+        accessId: 'LGA-001',
+        scope: GeographicScope.kaduna,
       );
-    });
+      first.updateScope(zaria);
+      await Future<void>.delayed(Duration.zero);
 
-    test('server token expiry terminates the local session', () {
-      var now = DateTime.utc(2026, 10, 6, 17);
-      final session = TgcgSessionController(clock: () => now)
-        ..signIn(
-          role: TgcgRole.securityOfficer,
-          operatorName: 'Responder',
-          accessId: 'AP/103',
-          agencyId: 'AGENCY-POLICE',
-          securitySessionToken: 'ephemeral-token',
-          securitySessionExpiresAt:
-              now.add(const Duration(minutes: 10)),
-        );
+      final restored = TgcgSessionController();
+      await restored.restorePersistedSession();
 
-      now = now.add(const Duration(minutes: 10));
-      expect(session.enforceSecurityExpiry(), isTrue);
-      expect(
-        session.lastTerminationReason,
-        SessionTerminationReason.remoteSessionExpired,
-      );
+      expect(restored.isAuthenticated, isTrue);
+      expect(restored.scope.lgaId, 'KD-ZARIA');
     });
   });
 
