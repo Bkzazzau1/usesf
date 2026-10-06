@@ -426,6 +426,15 @@ class _StateCommunicationsCommandPageState
           ),
         ),
       );
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content:
+                Text('Broadcast could not be queued securely on this device.'),
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _sending = false);
     }
