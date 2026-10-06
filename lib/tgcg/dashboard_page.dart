@@ -603,6 +603,12 @@ class _OperationsProgressPanel extends StatelessWidget {
             '${collation.conflictingPollingUnitIds.length}',
             warning: collation.conflictingPollingUnitIds.isNotEmpty,
           ),
+          if (!collation.catalogueComplete)
+            _ProgressRow(
+              'PU catalogue gaps',
+              '${collation.catalogueGapAreaIds.length}',
+              warning: true,
+            ),
           const SizedBox(height: 10),
           const TgcgStatusPill(
             label: 'UNOFFICIAL FIELD DATA',
