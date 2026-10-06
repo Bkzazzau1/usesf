@@ -385,6 +385,7 @@ class _CaptureWorkspaceState extends State<_CaptureWorkspace> {
             (existing) =>
                 existing.pollingUnitScope.pollingUnitId ==
                     selectedUnit.scope.pollingUnitId &&
+                existing.status != RecordStatus.disputed &&
                 existing.status != RecordStatus.rejected &&
                 existing.status != RecordStatus.archived,
           );
