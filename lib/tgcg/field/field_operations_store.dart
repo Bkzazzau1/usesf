@@ -53,8 +53,8 @@ class FieldOperationsController extends ChangeNotifier {
     required OfflinePersistenceController persistence,
   }) =>
       FieldOperationsController._(
-        incidents: const [],
-        reports: const [],
+        incidents: <FieldIncident>[],
+        reports: <FieldReport>[],
         persistence: persistence,
       );
 
