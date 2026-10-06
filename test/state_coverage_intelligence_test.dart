@@ -224,19 +224,17 @@ void main() {
       );
     });
 
-    test('fresh managed-device GPS contributes to readiness', () {
+    test('fresh managed-device GPS contributes to readiness', () async {
       final lga = geography.lga('KD-ZARIA')!;
-      final active = assignments
-          .assignmentsForScope(lga.scope)
-          .where((item) => !item.isTerminal)
-          .toList();
-      if (active.isEmpty) return;
-
-      final memberId = active.first.memberId;
-      var device = devices.deviceForMember(memberId);
-      if (device == null) {
-        throw StateError('Expected a managed device for seeded field member.');
-      }
+      await assignments.createAssignment(
+        title: 'Coverage GPS test duty',
+        memberId: 'MEM-0001',
+        targetScopeOverride: lga.scope,
+        assignedBy: 'STATE-COORD',
+        authorizedScope: GeographicScope.kaduna,
+        assignerCapabilities: const {},
+      );
+      final device = devices.deviceForMember('MEM-0001')!;
       final before = snapshot(lga.scope);
 
       devices.recordHeartbeat(
@@ -251,7 +249,10 @@ void main() {
 
       final after = snapshot(lga.scope);
 
-      expect(after.gpsActiveMembers, greaterThanOrEqualTo(before.gpsActiveMembers));
+      expect(
+        after.gpsActiveMembers,
+        greaterThanOrEqualTo(before.gpsActiveMembers),
+      );
       expect(after.gpsActiveMembers, greaterThan(0));
     });
   });
