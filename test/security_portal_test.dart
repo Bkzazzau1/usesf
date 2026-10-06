@@ -255,8 +255,8 @@ void main() {
         authorizedScope: GeographicScope.kaduna,
       );
 
-      expect(
-        () => emergency.provisionResponder(
+      await expectLater(
+        emergency.provisionResponder(
           agencyId: agency.id,
           serviceNumber: 'FRSC/12345',
           displayName: 'Responder Officer',
