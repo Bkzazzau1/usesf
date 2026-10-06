@@ -11,6 +11,7 @@ import '../domain/permissions.dart';
 import '../governance/governance_store.dart';
 import '../offline/offline_payloads.dart';
 import '../offline/offline_persistence.dart';
+import 'remote_responder_auth.dart';
 
 enum EmergencyAgencyType {
   police,
@@ -175,15 +176,18 @@ class EmergencyResponseController extends ChangeNotifier {
     required List<EmergencyDispatch> dispatches,
     List<EmergencyResponderProfile> responders = const [],
     OfflinePersistenceController? persistence,
+    RemoteResponderAuthGateway? remoteAuth,
   })  : _governance = governance,
         _agencies = agencies,
         _dispatches = dispatches,
         _responders = List<EmergencyResponderProfile>.of(responders),
-        _persistence = persistence;
+        _persistence = persistence,
+        _remoteAuth = remoteAuth;
 
   factory EmergencyResponseController.productionFoundation({
     required GovernanceOperationsController governance,
     required OfflinePersistenceController persistence,
+    RemoteResponderAuthGateway? remoteAuth,
   }) =>
       EmergencyResponseController._(
         governance: governance,
@@ -191,6 +195,7 @@ class EmergencyResponseController extends ChangeNotifier {
         dispatches: <EmergencyDispatch>[],
         responders: <EmergencyResponderProfile>[],
         persistence: persistence,
+        remoteAuth: remoteAuth,
       );
 
   factory EmergencyResponseController.prototypeSeed(
@@ -327,6 +332,7 @@ class EmergencyResponseController extends ChangeNotifier {
   final List<EmergencyDispatch> _dispatches;
   final List<EmergencyResponderProfile> _responders;
   final OfflinePersistenceController? _persistence;
+  final RemoteResponderAuthGateway? _remoteAuth;
   final FlutterSecureStorage _credentialStorage =
       const FlutterSecureStorage();
 
@@ -528,6 +534,18 @@ class EmergencyResponseController extends ChangeNotifier {
       active: active,
     );
 
+    final remoteAuth = _remoteAuth;
+    if (remoteAuth != null) {
+      await remoteAuth.provisionCredential(
+        responderId: responder.id,
+        agencyId: responder.agencyId,
+        serviceNumber: responder.serviceNumber,
+        displayName: responder.displayName,
+        accessCode: accessCode,
+        authorizedScope: responder.authorizedScope,
+      );
+    }
+
     final credential = await _newResponderCredential(accessCode);
     final credentialKey = _responderCredentialKey(responder.id);
     final previousCredential = await _credentialStorage.read(key: credentialKey);
@@ -592,11 +610,81 @@ class EmergencyResponseController extends ChangeNotifier {
     required GeographicScope requestedScope,
   }) async {
     final normalizedService = _normalizeServiceNumber(serviceNumber);
-    final attemptKey =
-        _responderAttemptKey(agencyId, normalizedService);
+    final attemptKey = _responderAttemptKey(agencyId, normalizedService);
     final now = DateTime.now().toUtc();
-    final attemptState = await _readAttemptState(attemptKey);
+    var attemptState = await _readAttemptState(attemptKey);
 
+    final remoteAuth = _remoteAuth;
+    if (remoteAuth != null) {
+      final remote = await remoteAuth.authenticate(
+        agencyId: agencyId,
+        serviceNumber: normalizedService,
+        accessCode: accessCode,
+        requestedScope: requestedScope,
+      );
+      switch (remote.status) {
+        case RemoteResponderAuthenticationStatus.authenticated:
+          final remoteScope = remote.authorizedScope;
+          final remoteResponderId = remote.responderId;
+          final remoteAgencyId = remote.agencyId;
+          final remoteService = remote.serviceNumber;
+          final remoteName = remote.displayName;
+          if (remoteScope == null ||
+              remoteResponderId == null ||
+              remoteAgencyId != agencyId ||
+              remoteService == null ||
+              _normalizeServiceNumber(remoteService) != normalizedService ||
+              remoteName == null ||
+              !_within(remoteScope, requestedScope)) {
+            return const ResponderAuthenticationResult.rejected();
+          }
+          await _credentialStorage.delete(key: attemptKey);
+          EmergencyResponderProfile? responder;
+          for (final item in _responders) {
+            if (item.id == remoteResponderId ||
+                (item.agencyId == agencyId &&
+                    _normalizeServiceNumber(item.serviceNumber) ==
+                        normalizedService)) {
+              responder = item;
+              break;
+            }
+          }
+          responder ??= EmergencyResponderProfile(
+            id: remoteResponderId,
+            agencyId: agencyId,
+            serviceNumber: normalizedService,
+            displayName: remoteName,
+            authorizedScope: remoteScope,
+            createdAt: now,
+            createdBy: 'remote-auth',
+          );
+          return ResponderAuthenticationResult.authenticated(responder);
+        case RemoteResponderAuthenticationStatus.locked:
+          final lockedUntil =
+              remote.lockedUntil ?? now.add(_responderLockoutDuration);
+          await _writeAttemptState(
+            attemptKey: attemptKey,
+            failedAttempts: _responderMaxFailures,
+            windowStartedAt: attemptState?.windowStartedAt ?? now,
+            lockedUntil: lockedUntil,
+            updatedAt: now,
+          );
+          return ResponderAuthenticationResult.locked(lockedUntil);
+        case RemoteResponderAuthenticationStatus.rejected:
+          final localLockedUntil = await _registerFailedAttempt(
+            attemptKey: attemptKey,
+            previous: attemptState,
+            now: now,
+          );
+          return localLockedUntil == null
+              ? const ResponderAuthenticationResult.rejected()
+              : ResponderAuthenticationResult.locked(localLockedUntil);
+        case RemoteResponderAuthenticationStatus.unavailable:
+          break;
+      }
+    }
+
+    attemptState = await _readAttemptState(attemptKey);
     if (attemptState?.lockedUntil != null &&
         now.isBefore(attemptState!.lockedUntil!)) {
       return ResponderAuthenticationResult.locked(
@@ -606,6 +694,7 @@ class EmergencyResponseController extends ChangeNotifier {
     if (attemptState?.lockedUntil != null &&
         !now.isBefore(attemptState!.lockedUntil!)) {
       await _credentialStorage.delete(key: attemptKey);
+      attemptState = null;
     }
 
     final agency = agencyById(agencyId);
@@ -1065,15 +1154,32 @@ class EmergencyResponseController extends ChangeNotifier {
     final lockedUntil = failedAttempts >= _responderMaxFailures
         ? now.add(_responderLockoutDuration)
         : null;
+    await _writeAttemptState(
+      attemptKey: attemptKey,
+      failedAttempts: failedAttempts,
+      windowStartedAt: windowStartedAt,
+      lockedUntil: lockedUntil,
+      updatedAt: now,
+    );
+    return lockedUntil;
+  }
+
+  Future<void> _writeAttemptState({
+    required String attemptKey,
+    required int failedAttempts,
+    required DateTime windowStartedAt,
+    required DateTime? lockedUntil,
+    required DateTime updatedAt,
+  }) async {
     await _credentialStorage.write(
       key: attemptKey,
       value: jsonEncode({
         'failedAttempts': failedAttempts,
-        'windowStartedAt': windowStartedAt.toIso8601String(),
-        'lockedUntil': lockedUntil?.toIso8601String(),
+        'windowStartedAt': windowStartedAt.toUtc().toIso8601String(),
+        'lockedUntil': lockedUntil?.toUtc().toIso8601String(),
+        'updatedAt': updatedAt.toUtc().toIso8601String(),
       }),
     );
-    return lockedUntil;
   }
 
   Future<bool> _verifyStoredResponderCredential(
