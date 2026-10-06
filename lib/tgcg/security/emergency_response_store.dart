@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import '../domain/local_id.dart';
 import '../domain/models.dart';
+import '../domain/permissions.dart';
 import '../governance/governance_store.dart';
 import '../offline/offline_payloads.dart';
 import '../offline/offline_persistence.dart';
@@ -296,8 +297,20 @@ class EmergencyResponseController extends ChangeNotifier {
     required String commandDesk,
     required String contactPhone,
     required String actorId,
+    required TgcgRole actorRole,
+    required GeographicScope authorizedScope,
     bool active = true,
   }) async {
+    if (!TgcgPermissionPolicy.may(
+      actorRole,
+      authorizedScope,
+      TgcgCapability.manageSystemSettings,
+      targetScope: coverage,
+    )) {
+      throw StateError(
+        'This account cannot configure emergency agencies in the selected scope.',
+      );
+    }
     final agency = EmergencyAgency(
       id: id.trim(),
       name: name.trim(),
