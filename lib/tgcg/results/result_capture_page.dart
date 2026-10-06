@@ -769,7 +769,7 @@ class _EvidencePanel extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Container(
-            minHeight: 170,
+            constraints: const BoxConstraints(minHeight: 170),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               gradient: const LinearGradient(

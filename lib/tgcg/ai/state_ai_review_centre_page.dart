@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../assignments/assignment_store.dart';
-import '../domain/models.dart';
-import '../domain/permissions.dart';
 import '../edge_ai/assignment_edge_ai_store.dart';
 import '../evidence/evidence_store.dart';
 import '../field/field_operations_store.dart';
@@ -257,8 +255,16 @@ List<StateAiReviewCase> buildStateAiReviewCases({
       )
       .toList(growable: false);
 
+  // Conflict candidates match Result Intelligence accounting: a verified
+  // result still counts, so a later submission contradicting an already
+  // verified result is flagged rather than silently ignored.
   final resultGroups = <String, List<ElectionResultSubmission>>{};
-  for (final result in unresolvedResults) {
+  for (final result in results.submissions) {
+    if (result.status == RecordStatus.disputed ||
+        result.status == RecordStatus.rejected ||
+        result.status == RecordStatus.archived) {
+      continue;
+    }
     final key =
         result.pollingUnitScope.pollingUnitId ??
         result.pollingUnitScope.label;
@@ -267,9 +273,7 @@ List<StateAiReviewCase> buildStateAiReviewCases({
 
   final conflictKeys = <String>{};
   for (final entry in resultGroups.entries) {
-    final active = entry.value
-        .where((item) => item.status != RecordStatus.disputed)
-        .toList(growable: false);
+    final active = entry.value;
     if (active.length <= 1) continue;
     conflictKeys.add(entry.key);
     active.sort((a, b) => b.submittedAt.compareTo(a.submittedAt));

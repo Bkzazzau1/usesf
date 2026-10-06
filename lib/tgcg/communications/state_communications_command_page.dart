@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../assignments/assignment_store.dart';
-import '../domain/models.dart';
-import '../domain/permissions.dart';
 import '../governance/governance_store.dart';
 import '../meeting/operational_call_store.dart';
 import '../membership/membership_store.dart';

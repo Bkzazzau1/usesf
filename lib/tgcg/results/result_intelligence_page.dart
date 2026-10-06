@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../access/access_policy.dart';
 import '../assignments/assignment_control_actions.dart';
-import '../domain/models.dart';
 import '../domain/permissions.dart';
 import '../geography/geography_registry.dart';
 import '../membership/membership_store.dart';
@@ -507,7 +506,7 @@ class _ResultIntelligencePageState extends State<ResultIntelligencePage> {
               item: item,
               assessment: buildResultAiAssessment(
                 item,
-                accountConflict: account.hasConflict,
+                accountConflict: account?.hasConflict ?? false,
                 canonicalPollingUnitKnown: account != null,
               ),
             );

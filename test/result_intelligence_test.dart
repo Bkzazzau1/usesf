@@ -1,3 +1,4 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:usesf/tgcg/domain/models.dart';
 import 'package:usesf/tgcg/evidence/device_evidence_service.dart';
@@ -9,6 +10,12 @@ import 'package:usesf/tgcg/results/result_intelligence_page.dart';
 import 'package:usesf/tgcg/results/result_operations_store.dart';
 
 void main() {
+  setUpAll(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    // Saved results are encrypted with a key held in secure storage.
+    FlutterSecureStorage.setMockInitialValues({});
+  });
+
   group('Result Intelligence accounting', () {
     test('prototype accounting distinguishes missing, review and conflict PUs', () {
       final geography = GeographyRegistry.prototypeSeed();

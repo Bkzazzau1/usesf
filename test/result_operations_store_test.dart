@@ -57,6 +57,14 @@ void main() {
       registeredVoters: 500,
       ocrPartyVotes: const {'P1': 100, 'P2': 80, 'P3': 20},
       ocrConfidence: .96,
+      // App submissions must carry the result-form photo to skip review.
+      resultForm: EvidenceAttachment(
+        id: 'FORM-TEST-001',
+        type: EvidenceType.resultForm,
+        fileName: 'pu001_ec8a.jpg',
+        createdAt: DateTime.utc(2026, 9, 27, 17),
+        uploaderId: 'AG-BA-001',
+      ),
     );
 
     expect(submission.validation?.requiresHumanReview, isFalse);

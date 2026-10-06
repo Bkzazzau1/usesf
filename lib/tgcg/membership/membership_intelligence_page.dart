@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import '../assignments/assignment_control_actions.dart';
 import '../assignments/assignment_store.dart';
 import '../devices/managed_device_store.dart';
-import '../domain/models.dart';
-import '../domain/permissions.dart';
 import '../governance/governance_store.dart';
 import '../meeting/operational_call_store.dart';
 import '../results/result_operations_store.dart';
@@ -127,7 +125,7 @@ MemberIntelligenceSnapshot buildMemberIntelligenceSnapshot({
   final device = devices.deviceForMember(member.id);
   final gps = calls.gpsSnapshotForMember(member.id);
   final registrationScope = membership.registrationScopeForMember(member.id);
-  final homePollingUnit = membership.homePollingUnitForMember(member.id);
+  final homePollingUnit = membership.pollingUnitLinkForMember(member.id);
   final resultSubmissions =
       results.submissions.where((item) => item.submittedBy == member.id).length;
   final assignmentEvidence = assignments.assignments
@@ -241,7 +239,7 @@ LeadershipCoverageSummary buildLeadershipCoverage({
       }).length;
 
   final districtScopes =
-      geography.districts.map((item) => item.scope).toList(growable: false);
+      geography.senatorialDistricts.map((item) => item.scope).toList(growable: false);
   final lgaScopes =
       geography.lgas.map((item) => item.scope).toList(growable: false);
 
@@ -292,7 +290,7 @@ List<LeadershipVacancy> buildLeadershipVacancies({
 }) {
   final geography = membership.geography;
   final targets = <(GeographicScope, TgcgRole)>[
-    for (final district in geography.districts)
+    for (final district in geography.senatorialDistricts)
       (district.scope, TgcgRole.senatorialCoordinator),
     for (final lga in geography.lgas)
       (lga.scope, TgcgRole.lgaCoordinator),

@@ -4,7 +4,6 @@ import '../access/access_policy.dart';
 import '../ai/state_ai_review_centre_page.dart';
 import '../assignments/assignment_store.dart';
 import '../devices/managed_device_store.dart';
-import '../domain/models.dart';
 import '../domain/permissions.dart';
 import '../edge_ai/assignment_edge_ai_store.dart';
 import '../evidence/evidence_store.dart';

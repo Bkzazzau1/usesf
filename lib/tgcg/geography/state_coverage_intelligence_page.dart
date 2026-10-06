@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import '../assignments/assignment_control_actions.dart';
 import '../assignments/assignment_store.dart';
 import '../devices/managed_device_store.dart';
-import '../domain/models.dart';
-import '../domain/permissions.dart';
 import '../field/field_operations_store.dart';
 import '../governance/governance_store.dart';
 import '../meeting/operational_call_store.dart';
@@ -398,7 +396,7 @@ List<CoverageExceptionItem> buildCoverageExceptions({
             kind: CoverageExceptionKind.resultConflict,
             scope: unit.scope,
             title: 'Conflicting PU results',
-            detail: '${unresolved} unresolved submissions',
+            detail: '$unresolved unresolved submissions',
             severity: 4,
           ),
         );
@@ -647,7 +645,7 @@ class _CoverageMetrics extends StatelessWidget {
                 label: 'Polling units',
                 value: '${snapshot.expectedPollingUnits}',
                 detail: snapshot.scope.level == GeographyLevel.state
-                    ? 'of ${kadunaPollingUnitCount} statewide target'
+                    ? 'of $kadunaPollingUnitCount statewide target'
                     : 'loaded in scope',
                 icon: Icons.how_to_vote_outlined,
                 tone: TgcgMetricTone.info,
@@ -766,7 +764,7 @@ class _ExceptionPanel extends StatelessWidget {
   Widget build(BuildContext context) => TgcgSectionCard(
         title: 'Needs attention',
         trailing: TgcgStatusPill(
-          label: '${total} OPEN',
+          label: '$total OPEN',
           color: total == 0 ? TgcgColors.success : TgcgColors.warning,
           icon: Icons.warning_amber_rounded,
           compact: true,

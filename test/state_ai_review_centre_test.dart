@@ -8,7 +8,6 @@ import 'package:usesf/tgcg/edge_ai/assignment_edge_ai_store.dart';
 import 'package:usesf/tgcg/evidence/evidence_store.dart';
 import 'package:usesf/tgcg/field/field_operations_store.dart';
 import 'package:usesf/tgcg/geography/geography_registry.dart';
-import 'package:usesf/tgcg/governance/governance_store.dart';
 import 'package:usesf/tgcg/membership/membership_store.dart';
 import 'package:usesf/tgcg/offline/offline_database_memory.dart';
 import 'package:usesf/tgcg/offline/offline_persistence.dart';
