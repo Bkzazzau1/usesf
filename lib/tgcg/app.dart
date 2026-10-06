@@ -82,6 +82,7 @@ class _TgcgAppState extends State<TgcgApp> {
       await resultOperationsController.hydrateFromOffline();
       await communicationsController.hydrateFromOffline();
       await bulkCommunicationsController.hydrateFromOffline();
+      await reportOperationsController.hydrateFromOffline();
       await operationalCallController.hydrateFromOffline();
       await commandMeetingController.hydrateFromOffline();
     } catch (_) {
@@ -151,8 +152,10 @@ class _TgcgAppState extends State<TgcgApp> {
       governance: governanceOperationsController,
       persistence: offlinePersistenceController,
     );
-    reportOperationsController =
-        ReportOperationsController.prototypeSeed(governanceOperationsController);
+    reportOperationsController = ReportOperationsController.productionFoundation(
+      governance: governanceOperationsController,
+      persistence: offlinePersistenceController,
+    );
     emergencyResponseController =
         EmergencyResponseController.prototypeSeed(governanceOperationsController);
   }
