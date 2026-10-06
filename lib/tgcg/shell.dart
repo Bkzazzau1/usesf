@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'access/access_policy.dart';
 import 'ai/ai_verification_page.dart';
+import 'ai/state_ai_review_centre_page.dart';
 import 'assignments/assignment_control_page.dart';
 import 'alerts/alert_center_page.dart';
 import 'analytics/ai_data_analytics_page.dart';
@@ -104,6 +105,9 @@ class _TgcgShellState extends State<TgcgShell> {
     final membershipIntelligence =
         allowed.contains(TgcgModule.membershipNetwork) &&
         session.role == TgcgRole.stateCoordinator;
+    final stateAiReview =
+        allowed.contains(TgcgModule.aiVerification) &&
+        session.role == TgcgRole.stateCoordinator;
     final destinations = _destinations
         .where((item) => allowed.contains(item.module))
         .map(
@@ -142,6 +146,15 @@ class _TgcgShellState extends State<TgcgShell> {
                 'Membership Intelligence',
                 Icons.groups_2_outlined,
                 item.group,
+              );
+            }
+            if (item.module == TgcgModule.aiVerification &&
+                stateAiReview) {
+              return _Destination(
+                item.module,
+                'State AI Review Centre',
+                Icons.auto_awesome_rounded,
+                _NavGroup.command,
               );
             }
             return item;
@@ -222,6 +235,7 @@ class _TgcgShellState extends State<TgcgShell> {
                             resultIntelligence: resultIntelligence,
                             coverageIntelligence: coverageIntelligence,
                             membershipIntelligence: membershipIntelligence,
+                            stateAiReview: stateAiReview,
                             showAlerts: allowed.contains(TgcgModule.alertCenter),
                             onAlerts: () => _select(TgcgModule.alertCenter),
                             onTour: () => _openTour(allowed),
@@ -275,7 +289,10 @@ class _TgcgShellState extends State<TgcgShell> {
               : const GeographyPage(),
         TgcgModule.assignmentControl => const AssignmentControlPage(),
         TgcgModule.liveOperations => const LiveOperationsPage(),
-        TgcgModule.aiVerification => const AiVerificationPage(),
+        TgcgModule.aiVerification =>
+          session.role == TgcgRole.stateCoordinator
+              ? StateAiReviewCentrePage(onOpenModule: _select)
+              : const AiVerificationPage(),
         TgcgModule.aiAnalytics => const AiDataAnalyticsPage(),
         TgcgModule.alertCenter => const AlertCenterPage(),
         TgcgModule.fieldMonitoring => const FieldMonitoringPage(),
@@ -598,6 +615,7 @@ class _CommandBar extends StatelessWidget {
     required this.resultIntelligence,
     required this.coverageIntelligence,
     required this.membershipIntelligence,
+    required this.stateAiReview,
     required this.showAlerts,
     required this.onAlerts,
     required this.onTour,
@@ -608,6 +626,7 @@ class _CommandBar extends StatelessWidget {
   final bool resultIntelligence;
   final bool coverageIntelligence;
   final bool membershipIntelligence;
+  final bool stateAiReview;
   final bool showAlerts;
   final VoidCallback onAlerts;
   final VoidCallback onTour;
@@ -649,6 +668,7 @@ class _CommandBar extends StatelessWidget {
               resultIntelligence: resultIntelligence,
               coverageIntelligence: coverageIntelligence,
               membershipIntelligence: membershipIntelligence,
+              stateAiReview: stateAiReview,
             ),
             style: const TextStyle(color: TgcgColors.ink, fontSize: 14, fontWeight: FontWeight.w900),
           ),
@@ -793,6 +813,7 @@ String _moduleLabel(
   bool resultIntelligence = false,
   bool coverageIntelligence = false,
   bool membershipIntelligence = false,
+  bool stateAiReview = false,
 }) => switch (module) {
       TgcgModule.overview => 'Command Overview',
       TgcgModule.memberEnrollment => 'Member Enrolment',
@@ -805,7 +826,8 @@ String _moduleLabel(
             : 'Geographic Operations',
       TgcgModule.assignmentControl => 'Assignment Control Centre',
       TgcgModule.liveOperations => 'Live Operations',
-      TgcgModule.aiVerification => 'AI Verification Centre',
+      TgcgModule.aiVerification =>
+        stateAiReview ? 'State AI Review Centre' : 'AI Verification Centre',
       TgcgModule.aiAnalytics => 'AI Data Analytics Centre',
       TgcgModule.alertCenter => 'Alert Centre',
       TgcgModule.fieldMonitoring => 'Field Monitoring',
