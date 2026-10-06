@@ -75,6 +75,7 @@ class _TgcgAppState extends State<TgcgApp> {
       await membershipOperationsController.hydrateFromOffline();
       await managedDeviceController.hydrateFromOffline();
       await assignmentController.hydrateFromOffline();
+      await governanceOperationsController.hydrateFromOffline();
       await assignmentEdgeAiController.hydrateFromOffline();
       await evidenceOperationsController.hydrateFromOffline();
       await fieldOperationsController.hydrateFromOffline();
@@ -120,7 +121,10 @@ class _TgcgAppState extends State<TgcgApp> {
       devices: managedDeviceController,
       persistence: offlinePersistenceController,
     );
-    governanceOperationsController = GovernanceOperationsController.prototypeSeed();
+    governanceOperationsController =
+        GovernanceOperationsController.productionFoundation(
+      persistence: offlinePersistenceController,
+    );
     commandMeetingController = CommandMeetingController(
       persistence: offlinePersistenceController,
       governance: governanceOperationsController,
