@@ -539,6 +539,12 @@ class ResponderAuthHttpHandler(BaseHTTPRequestHandler):
         if self.path == "/v1/security/responders/authenticate":
             self._handle_authenticate()
             return
+        if self.path == "/v1/security/responders/session/validate":
+            self._handle_session_validate()
+            return
+        if self.path == "/v1/security/responders/disable":
+            self._handle_disable()
+            return
         self._json(HTTPStatus.NOT_FOUND, {"message": "Not found."})
 
     def _handle_provision(self) -> None:
@@ -589,6 +595,53 @@ class ResponderAuthHttpHandler(BaseHTTPRequestHandler):
                 HTTPStatus.UNAUTHORIZED,
                 {"message": "Invalid responder credential."},
             )
+
+    def _handle_session_validate(self) -> None:
+        authorization = self.headers.get("Authorization", "")
+        prefix = "Bearer "
+        if not authorization.startswith(prefix):
+            self._json(
+                HTTPStatus.UNAUTHORIZED,
+                {"message": "Responder session is unavailable."},
+            )
+            return
+        token = authorization[len(prefix):].strip()
+        if not token:
+            self._json(
+                HTTPStatus.UNAUTHORIZED,
+                {"message": "Responder session is unavailable."},
+            )
+            return
+
+        result = self.service.validate_session(token)
+        if result.status == "active":
+            payload = dict(result.responder or {})
+            payload["sessionExpiresAt"] = _iso(result.expires_at)
+            self._json(HTTPStatus.OK, payload)
+        else:
+            self._json(
+                HTTPStatus.UNAUTHORIZED,
+                {"message": "Responder session is no longer active."},
+            )
+
+    def _handle_disable(self) -> None:
+        authorization = self.headers.get("Authorization", "")
+        expected = f"Bearer {self.admin_token}"
+        if not self.admin_token or not hmac.compare_digest(authorization, expected):
+            self._json(HTTPStatus.FORBIDDEN, {"message": "Forbidden."})
+            return
+        try:
+            payload = self._read_json()
+            disabled = self.service.disable_responder(
+                agency_id=str(payload["agencyId"]),
+                service_number=str(payload["serviceNumber"]),
+            )
+            self._json(
+                HTTPStatus.OK if disabled else HTTPStatus.NOT_FOUND,
+                {"disabled": disabled},
+            )
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+            self._json(HTTPStatus.BAD_REQUEST, {"message": str(error)})
 
     def _read_json(self) -> dict[str, Any]:
         length = int(self.headers.get("Content-Length", "0"))
