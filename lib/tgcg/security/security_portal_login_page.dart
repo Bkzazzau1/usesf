@@ -184,7 +184,6 @@ class _SecurityPortalLoginPageState extends State<SecurityPortalLoginPage> {
         ),
         const SizedBox(height: 18),
         DropdownButtonFormField<String>(
-          // Keyed so a demo profile can change the selection.
           key: ValueKey(_commandId),
           initialValue: _commandId,
           isExpanded: true,
