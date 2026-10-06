@@ -155,6 +155,14 @@ Assignments are separate from roles.
 - Provider states marked not configured, degraded or unavailable are treated as delivery-readiness gaps. Bulk jobs may remain Waiting for Provider until an eligible provider is actually ready.
 - State Communications Command hands detailed consent/provider administration to Bulk Communications, collaboration to Discussion Forum/Meeting Room and people investigation to Membership Intelligence.
 - Operational broadcasts and bulk jobs retain their existing governance audit trails and geographic authorization checks.
+- The State Coordinator's Meeting Room is rendered as State Command Meetings; lower authorized roles retain the general Meeting Room workflow.
+- State Command Meetings persist scheduled/live/completed/cancelled meeting records through encrypted local storage and the durable sync outbox rather than keeping State meeting history only in widget memory.
+- Meeting audiences are resolved as geography ∩ selected active role ∩ selected assignment-group members. Empty role/group filters are ignored.
+- A command meeting may be scheduled before participants have current GPS, but its live conference cannot start until every invitee has a fresh operational GPS snapshot. The conference itself uses the existing OperationalCallController and caller/recipient GPS policy.
+- State Command Meetings store the linked operational-call ID and reconcile joined, declined and no-response invitees into attended/declined/no-show accountability.
+- Blocked members and members outside a non-State meeting geography cannot be invited.
+- Meeting records support durable post-meeting action items with optional member owner, due date and completion state. Creation/completion of meetings and actions remains governance-audited.
+- State Command Meetings does not create a second RTC/video stack; live audio/video/conference media continues through the existing operational-call stage.
 - Role and assignment history remain auditable after deactivation.
 
 ## Product principles
@@ -184,10 +192,12 @@ Assignments are separate from roles.
 9. Result Capture / State Result Intelligence
 10. Collation
 11. Situation Room and Live Operations
-12. Communications / State Communications Command, discussion and meeting rooms
-13. Media Intelligence
-14. Reports & Exports / State Executive Reporting Centre
-15. System Monitoring
+12. Communications / State Communications Command
+13. Discussion Forum
+14. Meeting Room / State Command Meetings
+15. Media Intelligence
+16. Reports & Exports / State Executive Reporting Centre
+17. System Monitoring
 
 ## Architecture direction
 
