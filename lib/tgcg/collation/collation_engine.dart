@@ -98,7 +98,9 @@ class CollationEngine {
 
     final verifiedByPollingUnit = <String, List<ElectionResultSubmission>>{};
     for (final submission in verified) {
-      final puId = submission.pollingUnitScope.pollingUnitId;
+      final puId = _canonicalPollingUnitId(
+        submission.pollingUnitScope.pollingUnitId,
+      );
       if (puId == null) continue;
       verifiedByPollingUnit.putIfAbsent(puId, () => []).add(submission);
     }
@@ -125,7 +127,11 @@ class CollationEngine {
     }
 
     final includedPuIds = included
-        .map((submission) => submission.pollingUnitScope.pollingUnitId)
+        .map(
+          (submission) => _canonicalPollingUnitId(
+            submission.pollingUnitScope.pollingUnitId,
+          ),
+        )
         .whereType<String>()
         .toSet();
     final missing = expectedIds
@@ -180,6 +186,14 @@ class CollationEngine {
       if (unit.id == id) return unit;
     }
     return null;
+  }
+
+  String? _canonicalPollingUnitId(String? id) {
+    if (id == null || id.trim().isEmpty) return null;
+    final geography = _geography;
+    if (geography == null) return id;
+    final canonical = geography.pollingUnit(id);
+    return canonical?.scope.pollingUnitId ?? canonical?.code ?? id;
   }
 
   bool _submissionWithin(
