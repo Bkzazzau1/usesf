@@ -99,9 +99,19 @@ class _TgcgAppState extends State<TgcgApp>
 
     _validatingSecuritySession = true;
     try {
+      final agencyId = sessionController.agencyId;
+      final serviceNumber = sessionController.accessId;
+      if (agencyId == null || agencyId.isEmpty || serviceNumber.isEmpty) {
+        sessionController.signOut(
+          reason: SessionTerminationReason.centralValidationFailed,
+        );
+        return;
+      }
       final validation =
           await emergencyResponseController.validateConnectedSession(
         sessionToken: token,
+        agencyId: agencyId,
+        serviceNumber: serviceNumber,
       );
       if (!mounted ||
           !sessionController.isSecuritySession ||
@@ -111,6 +121,11 @@ class _TgcgAppState extends State<TgcgApp>
       if (validation == ResponderSessionValidationStatus.revoked) {
         sessionController.signOut(
           reason: SessionTerminationReason.centrallyRevoked,
+        );
+      } else if (validation ==
+          ResponderSessionValidationStatus.serverError) {
+        sessionController.signOut(
+          reason: SessionTerminationReason.centralValidationFailed,
         );
       }
     } finally {
