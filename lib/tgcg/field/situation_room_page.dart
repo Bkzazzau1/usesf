@@ -4,6 +4,7 @@ import '../access/access_policy.dart';
 import '../domain/permissions.dart';
 import '../session.dart';
 import '../geography/kaduna_map.dart';
+import '../membership/membership_store.dart';
 import '../ui/tgcg_design.dart';
 import 'field_operations_store.dart';
 
@@ -82,7 +83,13 @@ class _SituationRoomPageState extends State<SituationRoomPage> {
     final high = open
         .where((item) => item.severity == IncidentSeverity.high)
         .length;
-    final unassigned = open.where((item) => item.assignedTeam == null).length;
+    final unassigned = open
+        .where(
+          (item) =>
+              store.currentOwnershipForIncident(item.id) == null &&
+              item.assignedTeam == null,
+        )
+        .length;
     final evidence = incidents.fold<int>(
       0,
       (total, item) => total + item.evidence.length,
@@ -104,11 +111,6 @@ class _SituationRoomPageState extends State<SituationRoomPage> {
                 label: 'LIVE COMMAND',
                 color: TgcgColors.success,
                 icon: Icons.circle,
-              ),
-              TgcgStatusPill(
-                label: 'DEMO FEED',
-                color: TgcgColors.warning,
-                icon: Icons.science_outlined,
               ),
             ],
           ),
@@ -791,6 +793,9 @@ class _IncidentInspector extends StatelessWidget {
     }
 
     final color = _severityColor(item.severity);
+    final store = FieldOperations.of(context);
+    final currentOwnership = store.currentOwnershipForIncident(item.id);
+    final ownershipHistory = store.ownershipHistoryForIncident(item.id);
     final canAcknowledge = TgcgAccessPolicy.allows(
       context,
       TgcgCapability.acknowledgeIncident,
@@ -855,8 +860,14 @@ class _IncidentInspector extends StatelessWidget {
           _InspectorLine(
             icon: Icons.groups_2_outlined,
             label: 'Response owner',
-            value: item.assignedTeam ?? 'Unassigned',
+            value: store.ownershipLabelForIncident(item),
           ),
+          if (currentOwnership != null)
+            _InspectorLine(
+              icon: Icons.schedule_outlined,
+              label: 'Assigned',
+              value: _timeLabel(currentOwnership.changedAt),
+            ),
           _InspectorLine(
             icon: Icons.schedule_rounded,
             label: 'Reported',
@@ -900,6 +911,66 @@ class _IncidentInspector extends StatelessWidget {
             ...item.evidence.map(
               (evidence) => _EvidenceTile(evidence: evidence),
             ),
+          if (ownershipHistory.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+            const Text(
+              'Ownership history',
+              style: TextStyle(
+                color: TgcgColors.ink,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...ownershipHistory.reversed.take(4).map(
+              (event) => Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 7),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: TgcgColors.surfaceSoft,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: TgcgColors.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      event.action == IncidentOwnershipAction.cleared
+                          ? 'Ownership cleared'
+                          : event.ownerLabel,
+                      style: const TextStyle(
+                        color: TgcgColors.ink,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${_label(event.action.name)} by ${event.actorId} • ${_timeLabel(event.changedAt)}',
+                      style: const TextStyle(
+                        color: TgcgColors.muted,
+                        fontSize: 9.5,
+                      ),
+                    ),
+                    if (event.note != null && event.note!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        event.note!,
+                        style: const TextStyle(
+                          color: TgcgColors.muted,
+                          fontSize: 9.5,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
           if (canAcknowledge || canAssign || canClose) ...[
             const SizedBox(height: 14),
             const Divider(height: 1),
@@ -917,6 +988,27 @@ class _IncidentInspector extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
+                if (canAssign &&
+                    item.status != IncidentStatus.resolved &&
+                    item.status != IncidentStatus.closed)
+                  FilledButton.icon(
+                    onPressed: () => _assignIncidentOwner(context, item),
+                    icon: Icon(
+                      currentOwnership == null
+                          ? Icons.person_add_alt_1_outlined
+                          : Icons.manage_accounts_outlined,
+                      size: 17,
+                    ),
+                    label: Text(
+                      currentOwnership == null ? 'Assign owner' : 'Reassign owner',
+                    ),
+                  ),
+                if (canAssign && currentOwnership != null)
+                  OutlinedButton.icon(
+                    onPressed: () => _clearIncidentOwner(context, item),
+                    icon: const Icon(Icons.person_off_outlined, size: 17),
+                    label: const Text('Clear owner'),
+                  ),
                 if (canAcknowledge && item.status == IncidentStatus.reported)
                   FilledButton.icon(
                     onPressed: () => _changeIncidentStatus(
@@ -971,6 +1063,219 @@ class _IncidentInspector extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+Future<void> _assignIncidentOwner(
+  BuildContext context,
+  FieldIncident item,
+) async {
+  final session = TgcgSession.of(context, listen: false);
+  final actorRole = TgcgAccessPolicy.roleFor(
+    context,
+    TgcgCapability.assignIncident,
+    targetScope: item.scope,
+    listen: false,
+  );
+  final authorizedScope = TgcgAccessPolicy.authorizingScope(
+    context,
+    TgcgCapability.assignIncident,
+    targetScope: item.scope,
+    listen: false,
+  );
+  if (actorRole == null || authorizedScope == null) return;
+
+  final store = FieldOperations.of(context, listen: false);
+  final membership = MembershipOperations.of(context, listen: false);
+  final current = store.currentOwnershipForIncident(item.id);
+  final candidates = membership.members.where((member) {
+    if (member.isBlocked) return false;
+    final memberScope = membership.registrationScopeForMember(member.id);
+    return memberScope != null &&
+        TgcgPermissionPolicy.scopeAllows(memberScope, item.scope);
+  }).toList(growable: false)
+    ..sort((a, b) => a.fullName.compareTo(b.fullName));
+
+  var selectedMemberId = current?.responsibleMemberId;
+  if (selectedMemberId != null &&
+      !candidates.any((member) => member.id == selectedMemberId)) {
+    selectedMemberId = null;
+  }
+  final teamController = TextEditingController(text: current?.teamName ?? '');
+  final noteController = TextEditingController();
+
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => StatefulBuilder(
+      builder: (dialogContext, setDialogState) => AlertDialog(
+        title: Text(
+          current == null ? 'Assign incident owner' : 'Reassign incident owner',
+        ),
+        content: SizedBox(
+          width: 460,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String?>(
+                value: selectedMemberId,
+                decoration: const InputDecoration(
+                  labelText: 'Responsible officer',
+                  prefixIcon: Icon(Icons.person_outline_rounded),
+                ),
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('Team only / no specific officer'),
+                  ),
+                  ...candidates.map(
+                    (member) => DropdownMenuItem<String?>(
+                      value: member.id,
+                      child: Text(
+                        member.fullName,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ],
+                onChanged: (value) =>
+                    setDialogState(() => selectedMemberId = value),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: teamController,
+                decoration: const InputDecoration(
+                  labelText: 'Response team / desk',
+                  prefixIcon: Icon(Icons.groups_2_outlined),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: noteController,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Assignment note (optional)',
+                  prefixIcon: Icon(Icons.notes_rounded),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (selectedMemberId == null &&
+                  teamController.text.trim().isEmpty) {
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Select a responsible officer or enter a response team.',
+                    ),
+                  ),
+                );
+                return;
+              }
+              Navigator.pop(dialogContext, true);
+            },
+            child: Text(current == null ? 'Assign' : 'Reassign'),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  try {
+    if (confirmed == true) {
+      await store.assignIncidentOwnership(
+        item.id,
+        responsibleMemberId: selectedMemberId,
+        teamName: teamController.text,
+        note: noteController.text,
+        actorId:
+            session.accessId.isEmpty ? session.operatorName : session.accessId,
+        actorRole: actorRole,
+        authorizedScope: authorizedScope,
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Incident ownership updated.')),
+        );
+      }
+    }
+  } on StateError catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    }
+  } finally {
+    teamController.dispose();
+    noteController.dispose();
+  }
+}
+
+Future<void> _clearIncidentOwner(
+  BuildContext context,
+  FieldIncident item,
+) async {
+  final session = TgcgSession.of(context, listen: false);
+  final actorRole = TgcgAccessPolicy.roleFor(
+    context,
+    TgcgCapability.assignIncident,
+    targetScope: item.scope,
+    listen: false,
+  );
+  final authorizedScope = TgcgAccessPolicy.authorizingScope(
+    context,
+    TgcgCapability.assignIncident,
+    targetScope: item.scope,
+    listen: false,
+  );
+  if (actorRole == null || authorizedScope == null) return;
+
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Clear incident ownership?'),
+      content: const Text(
+        'The incident will remain open, but it will return to the unassigned command queue.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(dialogContext, true),
+          child: const Text('Clear ownership'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+
+  try {
+    await FieldOperations.of(context, listen: false).clearIncidentOwnership(
+      item.id,
+      actorId:
+          session.accessId.isEmpty ? session.operatorName : session.accessId,
+      actorRole: actorRole,
+      authorizedScope: authorizedScope,
+    );
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Incident returned to unassigned queue.')),
+      );
+    }
+  } on StateError catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    }
   }
 }
 
@@ -1247,8 +1552,9 @@ class _ResponseOwnership extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final groups = <String, int>{};
+    final store = FieldOperations.of(context);
     for (final incident in incidents) {
-      final key = incident.assignedTeam ?? 'Unassigned';
+      final key = store.ownershipLabelForIncident(incident);
       groups[key] = (groups[key] ?? 0) + 1;
     }
     final entries = groups.entries.toList()
