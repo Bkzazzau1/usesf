@@ -77,10 +77,13 @@ class _TgcgAppState extends State<TgcgApp> {
   }
 
   Future<void> _restoreSession() async {
-    await sessionController.restorePersistedSession();
-    if (!mounted) return;
-    setState(() => _sessionRestoreComplete = true);
-    unawaited(_enforceSecuritySession());
+    try {
+      await sessionController.restorePersistedSession();
+    } finally {
+      if (!mounted) return;
+      setState(() => _sessionRestoreComplete = true);
+      unawaited(_enforceSecuritySession());
+    }
   }
 
   Future<void> _enforceSecuritySession() async {
