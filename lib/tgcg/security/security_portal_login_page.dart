@@ -21,25 +21,25 @@ class SecurityPortalLoginPage extends StatefulWidget {
 
 class _SecurityPortalLoginPageState extends State<SecurityPortalLoginPage> {
   final _formKey = GlobalKey<FormState>();
-  final _name = TextEditingController();
   final _serviceNumber = TextEditingController();
   final _accessCode = TextEditingController();
 
   String? _agencyId;
   String _commandId = _stateCommand;
   bool _obscure = true;
+  bool _signingIn = false;
 
   static const _stateCommand = 'KD';
 
   @override
   void dispose() {
-    _name.dispose();
     _serviceNumber.dispose();
     _accessCode.dispose();
     super.dispose();
   }
 
-  void _signIn() {
+  Future<void> _signIn() async {
+    if (_signingIn) return;
     if (_agencyId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Select your agency to continue.')),
@@ -50,30 +50,70 @@ class _SecurityPortalLoginPageState extends State<SecurityPortalLoginPage> {
 
     final emergency = EmergencyResponse.of(context, listen: false);
     final geography = MembershipOperations.of(context, listen: false).geography;
-    final agency = emergency.agencyById(_agencyId!)!;
+    final agency = emergency.agencyById(_agencyId!);
+    if (agency == null || !agency.active) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This response agency is unavailable.')),
+      );
+      return;
+    }
     final scope = _commandId == _stateCommand
         ? GeographicScope.kaduna
         : geography.lga(_commandId)?.scope ?? GeographicScope.kaduna;
     final serviceNumber = _serviceNumber.text.trim().toUpperCase();
 
-    GovernanceOperations.of(context, listen: false).recordAudit(
-      actorId: serviceNumber,
-      action: 'security_portal_sign_in',
-      entityType: 'emergency_agency',
-      entityId: agency.id,
-      detail:
-          '${_name.text.trim()} (${agency.shortName}) signed in for ${scope.label}.',
-      scope: scope,
-    );
+    setState(() => _signingIn = true);
+    try {
+      final responder = await emergency.verifyResponderCredential(
+        agencyId: agency.id,
+        serviceNumber: serviceNumber,
+        accessCode: _accessCode.text,
+        requestedScope: scope,
+      );
+      if (!context.mounted) return;
 
-    Navigator.of(context).pop();
-    TgcgSession.of(context, listen: false).signIn(
-      role: TgcgRole.securityOfficer,
-      operatorName: _name.text,
-      accessId: serviceNumber,
-      scope: scope,
-      agencyId: agency.id,
-    );
+      final governance = GovernanceOperations.of(context, listen: false);
+      if (responder == null) {
+        governance.recordAudit(
+          actorId: serviceNumber,
+          action: 'security_portal_sign_in_rejected',
+          entityType: 'emergency_agency',
+          entityId: agency.id,
+          detail:
+              'Rejected security portal sign-in for ${agency.shortName} within ${scope.label}.',
+          scope: scope,
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Invalid responder credential or unauthorized command area.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      governance.recordAudit(
+        actorId: responder.serviceNumber,
+        action: 'security_portal_sign_in',
+        entityType: 'emergency_responder',
+        entityId: responder.id,
+        detail:
+            '${responder.displayName} (${agency.shortName}) signed in for ${scope.label}.',
+        scope: scope,
+      );
+
+      Navigator.of(context).pop();
+      TgcgSession.of(context, listen: false).signIn(
+        role: TgcgRole.securityOfficer,
+        operatorName: responder.displayName,
+        accessId: responder.serviceNumber,
+        scope: scope,
+        agencyId: agency.id,
+      );
+    } finally {
+      if (mounted) setState(() => _signingIn = false);
+    }
   }
 
   @override
@@ -207,45 +247,17 @@ class _SecurityPortalLoginPageState extends State<SecurityPortalLoginPage> {
               setState(() => _commandId = value ?? _stateCommand),
         ),
         const SizedBox(height: 12),
-        LayoutBuilder(
-          builder: (context, box) {
-            final name = TextFormField(
-              controller: _name,
-              textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                labelText: 'Officer name and rank',
-                prefixIcon: Icon(Icons.person_outline_rounded),
-              ),
-              validator: (value) => (value ?? '').trim().length < 3
-                  ? 'Enter your name and rank'
-                  : null,
-            );
-            final service = TextFormField(
-              controller: _serviceNumber,
-              textInputAction: TextInputAction.next,
-              textCapitalization: TextCapitalization.characters,
-              decoration: const InputDecoration(
-                labelText: 'Service / force number',
-                prefixIcon: Icon(Icons.badge_outlined),
-              ),
-              validator: (value) => (value ?? '').trim().length < 4
-                  ? 'Enter a valid service number'
-                  : null,
-            );
-            if (box.maxWidth < 520) {
-              return Column(
-                children: [name, const SizedBox(height: 12), service],
-              );
-            }
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: name),
-                const SizedBox(width: 12),
-                Expanded(child: service),
-              ],
-            );
-          },
+        TextFormField(
+          controller: _serviceNumber,
+          textInputAction: TextInputAction.next,
+          textCapitalization: TextCapitalization.characters,
+          decoration: const InputDecoration(
+            labelText: 'Service / force number',
+            prefixIcon: Icon(Icons.badge_outlined),
+          ),
+          validator: (value) => (value ?? '').trim().length < 4
+              ? 'Enter a valid service number'
+              : null,
         ),
         const SizedBox(height: 12),
         TextFormField(
@@ -265,17 +277,25 @@ class _SecurityPortalLoginPageState extends State<SecurityPortalLoginPage> {
               ),
             ),
           ),
-          validator: (value) => (value ?? '').length < 6
-              ? 'Access code must be at least 6 characters'
+          validator: (value) => (value ?? '').length < 8
+              ? 'Access code must be at least 8 characters'
               : null,
         ),
         const SizedBox(height: 18),
         SizedBox(
           width: double.infinity,
           child: FilledButton.icon(
-            onPressed: _signIn,
-            icon: const Icon(Icons.shield_outlined),
-            label: const Text('Enter Security Portal'),
+            onPressed: _signingIn ? null : _signIn,
+            icon: _signingIn
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.shield_outlined),
+            label: Text(
+              _signingIn ? 'Verifying credential...' : 'Enter Security Portal',
+            ),
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 17),
             ),
