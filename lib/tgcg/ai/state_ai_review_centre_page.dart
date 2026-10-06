@@ -120,16 +120,30 @@ List<StateAiReviewCase> buildStateAiReviewCases({
   }
 
   for (final assignment in assignments.assignments) {
-    if (assignment.isTerminal) continue;
+    if (assignment.isTerminal ||
+        assignment.status == AssignmentStatus.reassigned) {
+      continue;
+    }
 
     final snapshot = edgeAi.snapshotFor(assignment, now: current);
-    final significantFindings = snapshot.findings
-        .where(
-          (item) =>
-              item.severity == AssignmentEdgeAiSeverity.warning ||
-              item.severity == AssignmentEdgeAiSeverity.critical,
-        )
-        .toList(growable: false);
+    final operationalLifecycle = switch (assignment.status) {
+      AssignmentStatus.accepted ||
+      AssignmentStatus.enRoute ||
+      AssignmentStatus.checkedIn ||
+      AssignmentStatus.active ||
+      AssignmentStatus.overdue ||
+      AssignmentStatus.gpsMismatch => true,
+      _ => false,
+    };
+    final significantFindings = operationalLifecycle
+        ? snapshot.findings
+            .where(
+              (item) =>
+                  item.severity == AssignmentEdgeAiSeverity.warning ||
+                  item.severity == AssignmentEdgeAiSeverity.critical,
+            )
+            .toList(growable: false)
+        : const <AssignmentEdgeAiFinding>[];
     final significantEvents = snapshot.openEvents
         .where(
           (item) =>
@@ -138,6 +152,9 @@ List<StateAiReviewCase> buildStateAiReviewCases({
         )
         .toList(growable: false);
 
+    if (!operationalLifecycle && significantEvents.isEmpty) {
+      continue;
+    }
     if (snapshot.enabled &&
         significantFindings.isEmpty &&
         significantEvents.isEmpty &&
