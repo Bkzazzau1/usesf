@@ -57,6 +57,7 @@ void main() {
     meetings = CommandMeetingController(
       persistence: persistence,
       governance: governance,
+      membership: membership,
     );
   });
 
@@ -140,6 +141,7 @@ void main() {
       final restored = CommandMeetingController(
         persistence: persistence,
         governance: governance,
+        membership: membership,
       );
       await restored.hydrateFromOffline();
 
@@ -268,6 +270,7 @@ void main() {
       final restored = CommandMeetingController(
         persistence: persistence,
         governance: governance,
+        membership: membership,
       );
       await restored.hydrateFromOffline();
       final hydrated = restored.meetingById(meeting.id)!;
