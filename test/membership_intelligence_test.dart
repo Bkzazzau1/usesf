@@ -130,6 +130,23 @@ void main() {
       expect(coverage.lgaFilled, 0);
     });
 
+    test('vacancy list exposes all 23 vacant LGA coordinator posts', () {
+      final vacancies = buildLeadershipVacancies(
+        membership: membership,
+        governance: governance,
+      );
+
+      final lgaVacancies = vacancies
+          .where((item) => item.role == TgcgRole.lgaCoordinator)
+          .toList(growable: false);
+
+      expect(lgaVacancies, hasLength(23));
+      expect(
+        lgaVacancies.every((item) => item.scope.level == GeographyLevel.lga),
+        isTrue,
+      );
+    });
+
     test('assigning exact LGA Coordinator increases leadership coverage', () {
       final lga = geography.lga('KD-ZARIA')!;
       final before = buildLeadershipCoverage(
@@ -151,6 +168,15 @@ void main() {
       );
 
       expect(after.lgaFilled, before.lgaFilled + 1);
+
+      final vacancies = buildLeadershipVacancies(
+        membership: membership,
+        governance: governance,
+      );
+      expect(
+        vacancies.where((item) => item.role == TgcgRole.lgaCoordinator),
+        hasLength(22),
+      );
     });
   });
 
