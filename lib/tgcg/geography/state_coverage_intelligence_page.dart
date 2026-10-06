@@ -463,7 +463,7 @@ class _StateCoverageIntelligencePageState
     final registry = membership.geography;
     final scope = _path.last;
 
-    final areas = _operationalChildren(registry, scope);
+    final areas = coverageChildScopes(registry, scope);
     final snapshots = areas
         .map(
           (area) => buildCoverageAreaSnapshot(
@@ -1340,7 +1340,7 @@ class _CoverageBreadcrumb extends StatelessWidget {
       );
 }
 
-List<GeographicScope> _operationalChildren(
+List<GeographicScope> coverageChildScopes(
   GeographyRegistry registry,
   GeographicScope scope,
 ) {
