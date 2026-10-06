@@ -1,7 +1,10 @@
 import 'package:flutter/widgets.dart';
 
+import '../domain/local_id.dart';
 import '../domain/models.dart';
 import '../governance/governance_store.dart';
+import '../offline/offline_payloads.dart';
+import '../offline/offline_persistence.dart';
 
 enum EmergencyAgencyType {
   police,
@@ -86,9 +89,22 @@ class EmergencyResponseController extends ChangeNotifier {
     required GovernanceOperationsController governance,
     required List<EmergencyAgency> agencies,
     required List<EmergencyDispatch> dispatches,
+    OfflinePersistenceController? persistence,
   })  : _governance = governance,
         _agencies = agencies,
-        _dispatches = dispatches;
+        _dispatches = dispatches,
+        _persistence = persistence;
+
+  factory EmergencyResponseController.productionFoundation({
+    required GovernanceOperationsController governance,
+    required OfflinePersistenceController persistence,
+  }) =>
+      EmergencyResponseController._(
+        governance: governance,
+        agencies: <EmergencyAgency>[],
+        dispatches: <EmergencyDispatch>[],
+        persistence: persistence,
+      );
 
   factory EmergencyResponseController.prototypeSeed(
     GovernanceOperationsController governance,
@@ -222,9 +238,108 @@ class EmergencyResponseController extends ChangeNotifier {
   final GovernanceOperationsController _governance;
   final List<EmergencyAgency> _agencies;
   final List<EmergencyDispatch> _dispatches;
+  final OfflinePersistenceController? _persistence;
 
   List<EmergencyAgency> get agencies => List.unmodifiable(_agencies);
   List<EmergencyDispatch> get dispatches => List.unmodifiable(_dispatches);
+
+  Future<void> hydrateFromOffline() async {
+    final persistence = _persistence;
+    if (persistence == null) return;
+
+    final agencyRows =
+        await persistence.readEntities(entityType: 'emergency_agency');
+    final dispatchRows =
+        await persistence.readEntities(entityType: 'emergency_dispatch');
+    var changed = false;
+
+    for (final row in agencyRows) {
+      final agency = _agencyFromJson(row);
+      if (agency == null) continue;
+      final index = _agencies.indexWhere((item) => item.id == agency.id);
+      if (index < 0) {
+        _agencies.add(agency);
+      } else {
+        _agencies[index] = agency;
+      }
+      changed = true;
+    }
+
+    for (final row in dispatchRows) {
+      final dispatch = _dispatchFromJson(row);
+      if (dispatch == null) continue;
+      final index = _dispatches.indexWhere((item) => item.id == dispatch.id);
+      if (index < 0) {
+        _dispatches.add(dispatch);
+      } else {
+        _dispatches[index] = dispatch;
+      }
+      changed = true;
+    }
+
+    if (changed) {
+      _agencies.sort((a, b) => a.shortName.compareTo(b.shortName));
+      _dispatches.sort((a, b) => b.assignedAt.compareTo(a.assignedAt));
+      notifyListeners();
+    }
+  }
+
+  Future<EmergencyAgency> upsertAgency({
+    required String id,
+    required String name,
+    required String shortName,
+    required EmergencyAgencyType type,
+    required GeographicScope coverage,
+    required String commandDesk,
+    required String contactPhone,
+    required String actorId,
+    bool active = true,
+  }) async {
+    final agency = EmergencyAgency(
+      id: id.trim(),
+      name: name.trim(),
+      shortName: shortName.trim(),
+      type: type,
+      coverage: coverage,
+      commandDesk: commandDesk.trim(),
+      contactPhone: contactPhone.trim(),
+      active: active,
+    );
+    if (agency.id.isEmpty ||
+        agency.name.isEmpty ||
+        agency.shortName.isEmpty ||
+        agency.commandDesk.isEmpty ||
+        agency.contactPhone.isEmpty) {
+      throw ArgumentError('Emergency agency details are incomplete.');
+    }
+
+    await _persistence?.persistMutation(
+      entityType: 'emergency_agency',
+      entityId: agency.id,
+      mutationType: SyncMutationType.upsert,
+      payload: _agencyToJson(agency),
+      scopeKey: scopeStorageKey(coverage),
+      ownerId: actorId,
+    );
+
+    final index = _agencies.indexWhere((item) => item.id == agency.id);
+    if (index < 0) {
+      _agencies.add(agency);
+    } else {
+      _agencies[index] = agency;
+    }
+    _agencies.sort((a, b) => a.shortName.compareTo(b.shortName));
+    _governance.recordAudit(
+      actorId: actorId,
+      action: 'emergency_agency_configured',
+      entityType: 'emergency_agency',
+      entityId: agency.id,
+      detail: '${agency.shortName} response agency configuration updated.',
+      scope: coverage,
+    );
+    notifyListeners();
+    return agency;
+  }
 
   List<EmergencyAgency> agenciesForScope(GeographicScope scope) => _agencies
       .where((agency) => agency.active && _overlaps(agency.coverage, scope))
@@ -274,14 +389,14 @@ class EmergencyResponseController extends ChangeNotifier {
       .where((item) => item.status == EmergencyDispatchStatus.assigned)
       .length;
 
-  EmergencyDispatch assign({
+  Future<EmergencyDispatch> assign({
     required String incidentId,
     required String agencyId,
     required GeographicScope scope,
     required EmergencyDispatchPriority priority,
     required String actorId,
     String? instructions,
-  }) {
+  }) async {
     final agency = agencyById(agencyId);
     if (agency == null || !agency.active) {
       throw ArgumentError('Selected response agency is unavailable.');
@@ -290,17 +405,26 @@ class EmergencyResponseController extends ChangeNotifier {
       throw ArgumentError('Selected agency does not cover this incident scope.');
     }
 
+    final assignedAt = DateTime.now().toUtc();
     final dispatch = EmergencyDispatch(
-      id: 'DSP-${(_dispatches.length + 1).toString().padLeft(4, '0')}',
+      id: newLocalId('DSP', assignedAt),
       incidentId: incidentId,
       agencyId: agencyId,
       scope: scope,
       priority: priority,
       status: EmergencyDispatchStatus.assigned,
-      assignedAt: DateTime.now().toUtc(),
+      assignedAt: assignedAt,
       assignedBy: actorId,
       instructions: instructions?.trim().isEmpty == true ? null : instructions?.trim(),
       lastUpdatedBy: actorId,
+    );
+    await _persistence?.persistMutation(
+      entityType: 'emergency_dispatch',
+      entityId: dispatch.id,
+      mutationType: SyncMutationType.create,
+      payload: _dispatchToJson(dispatch),
+      scopeKey: scopeStorageKey(scope),
+      ownerId: actorId,
     );
     _dispatches.insert(0, dispatch);
     _governance.recordAudit(
@@ -340,12 +464,12 @@ class EmergencyResponseController extends ChangeNotifier {
     );
   }
 
-  void updateStatus({
+  Future<void> updateStatus({
     required String dispatchId,
     required EmergencyDispatchStatus status,
     required String actorId,
     String? actingAgencyId,
-  }) {
+  }) async {
     final index = _dispatches.indexWhere((item) => item.id == dispatchId);
     if (index < 0) return;
     final current = _dispatches[index];
@@ -360,7 +484,7 @@ class EmergencyResponseController extends ChangeNotifier {
       );
     }
     final now = DateTime.now().toUtc();
-    _dispatches[index] = EmergencyDispatch(
+    final updated = EmergencyDispatch(
       id: current.id,
       incidentId: current.incidentId,
       agencyId: current.agencyId,
@@ -387,6 +511,15 @@ class EmergencyResponseController extends ChangeNotifier {
           : current.closedAt,
       lastUpdatedBy: actorId,
     );
+    await _persistence?.persistMutation(
+      entityType: 'emergency_dispatch',
+      entityId: updated.id,
+      mutationType: SyncMutationType.update,
+      payload: _dispatchToJson(updated),
+      scopeKey: scopeStorageKey(updated.scope),
+      ownerId: actorId,
+    );
+    _dispatches[index] = updated;
     _governance.recordAudit(
       actorId: actorId,
       action: 'emergency_dispatch_${status.name}',
@@ -396,6 +529,127 @@ class EmergencyResponseController extends ChangeNotifier {
       scope: current.scope,
     );
     notifyListeners();
+  }
+
+  static Map<String, Object?> _agencyToJson(EmergencyAgency agency) => {
+        'id': agency.id,
+        'name': agency.name,
+        'shortName': agency.shortName,
+        'type': agency.type.name,
+        'coverage': geographicScopeToJson(agency.coverage),
+        'commandDesk': agency.commandDesk,
+        'contactPhone': agency.contactPhone,
+        'active': agency.active,
+      };
+
+  static EmergencyAgency? _agencyFromJson(Map<String, Object?> row) {
+    final id = row['id']?.toString();
+    final name = row['name']?.toString();
+    final shortName = row['shortName']?.toString();
+    final type = _enumValue(EmergencyAgencyType.values, row['type']);
+    final coverage = geographicScopeFromJson(row['coverage']);
+    final commandDesk = row['commandDesk']?.toString();
+    final contactPhone = row['contactPhone']?.toString();
+    if (id == null ||
+        name == null ||
+        shortName == null ||
+        type == null ||
+        coverage == null ||
+        commandDesk == null ||
+        contactPhone == null) {
+      return null;
+    }
+    return EmergencyAgency(
+      id: id,
+      name: name,
+      shortName: shortName,
+      type: type,
+      coverage: coverage,
+      commandDesk: commandDesk,
+      contactPhone: contactPhone,
+      active: row['active'] != false,
+    );
+  }
+
+  static Map<String, Object?> _dispatchToJson(
+    EmergencyDispatch dispatch,
+  ) =>
+      {
+        'id': dispatch.id,
+        'incidentId': dispatch.incidentId,
+        'agencyId': dispatch.agencyId,
+        'scope': geographicScopeToJson(dispatch.scope),
+        'priority': dispatch.priority.name,
+        'status': dispatch.status.name,
+        'assignedAt': dispatch.assignedAt.toUtc().toIso8601String(),
+        'assignedBy': dispatch.assignedBy,
+        'instructions': dispatch.instructions,
+        'acknowledgedAt':
+            dispatch.acknowledgedAt?.toUtc().toIso8601String(),
+        'respondingAt': dispatch.respondingAt?.toUtc().toIso8601String(),
+        'onSceneAt': dispatch.onSceneAt?.toUtc().toIso8601String(),
+        'resolvedAt': dispatch.resolvedAt?.toUtc().toIso8601String(),
+        'closedAt': dispatch.closedAt?.toUtc().toIso8601String(),
+        'lastUpdatedBy': dispatch.lastUpdatedBy,
+      };
+
+  static EmergencyDispatch? _dispatchFromJson(Map<String, Object?> row) {
+    final id = row['id']?.toString();
+    final incidentId = row['incidentId']?.toString();
+    final agencyId = row['agencyId']?.toString();
+    final scope = geographicScopeFromJson(row['scope']);
+    final priority =
+        _enumValue(EmergencyDispatchPriority.values, row['priority']);
+    final status = _enumValue(EmergencyDispatchStatus.values, row['status']);
+    final assignedAt =
+        DateTime.tryParse(row['assignedAt']?.toString() ?? '')?.toUtc();
+    final assignedBy = row['assignedBy']?.toString();
+    if (id == null ||
+        incidentId == null ||
+        agencyId == null ||
+        scope == null ||
+        priority == null ||
+        status == null ||
+        assignedAt == null ||
+        assignedBy == null) {
+      return null;
+    }
+    return EmergencyDispatch(
+      id: id,
+      incidentId: incidentId,
+      agencyId: agencyId,
+      scope: scope,
+      priority: priority,
+      status: status,
+      assignedAt: assignedAt,
+      assignedBy: assignedBy,
+      instructions: _clean(row['instructions']),
+      acknowledgedAt: _date(row['acknowledgedAt']),
+      respondingAt: _date(row['respondingAt']),
+      onSceneAt: _date(row['onSceneAt']),
+      resolvedAt: _date(row['resolvedAt']),
+      closedAt: _date(row['closedAt']),
+      lastUpdatedBy: _clean(row['lastUpdatedBy']),
+    );
+  }
+
+  static T? _enumValue<T extends Enum>(List<T> values, Object? raw) {
+    final name = raw?.toString();
+    if (name == null) return null;
+    for (final value in values) {
+      if (value.name == name) return value;
+    }
+    return null;
+  }
+
+  static DateTime? _date(Object? raw) {
+    if (raw == null) return null;
+    return DateTime.tryParse(raw.toString())?.toUtc();
+  }
+
+  static String? _clean(Object? raw) {
+    final value = raw?.toString().trim();
+    return value == null || value.isEmpty ? null : value;
   }
 
   static bool _isValidTransition(
