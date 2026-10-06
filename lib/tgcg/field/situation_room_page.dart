@@ -1000,10 +1000,15 @@ class _IncidentInspector extends StatelessWidget {
                       size: 17,
                     ),
                     label: Text(
-                      currentOwnership == null ? 'Assign owner' : 'Reassign owner',
+                      currentOwnership == null && item.assignedTeam == null
+                          ? 'Assign owner'
+                          : 'Reassign owner',
                     ),
                   ),
-                if (canAssign && currentOwnership != null)
+                if (canAssign &&
+                    (currentOwnership != null || item.assignedTeam != null) &&
+                    item.status != IncidentStatus.resolved &&
+                    item.status != IncidentStatus.closed)
                   OutlinedButton.icon(
                     onPressed: () => _clearIncidentOwner(context, item),
                     icon: const Icon(Icons.person_off_outlined, size: 17),
