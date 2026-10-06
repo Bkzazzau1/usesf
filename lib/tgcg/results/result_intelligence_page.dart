@@ -507,7 +507,7 @@ class _ResultIntelligencePageState extends State<ResultIntelligencePage> {
               item: item,
               assessment: buildResultAiAssessment(
                 item,
-                accountConflict: account?.hasConflict == true,
+                accountConflict: account.hasConflict,
                 canonicalPollingUnitKnown: account != null,
               ),
             );
@@ -1144,7 +1144,7 @@ Future<void> _showPollingUnitAccount(
                         submission: submission,
                         assessment: buildResultAiAssessment(
                           submission,
-                          accountConflict: account?.hasConflict == true,
+                          accountConflict: account.hasConflict,
                         ),
                         onTap: () {
                           Navigator.pop(dialogContext);
@@ -1481,7 +1481,7 @@ class _ResultFactGrid extends StatelessWidget {
             _Fact('Accredited', '${submission.accreditedVoters}'),
             _Fact('Rejected', '${submission.rejectedVotes ?? 0}'),
             _Fact(
-              'OCR confidence',
+              'AI extraction score',
               submission.validation?.ocrConfidence == null
                   ? 'N/A'
                   : '${(submission.validation!.ocrConfidence! * 100).round()}%',
