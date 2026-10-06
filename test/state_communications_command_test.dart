@@ -11,6 +11,7 @@ import 'package:usesf/tgcg/governance/governance_store.dart';
 import 'package:usesf/tgcg/membership/membership_store.dart';
 import 'package:usesf/tgcg/meeting/operational_call_store.dart';
 import 'package:usesf/tgcg/offline/offline_database_memory.dart';
+import 'package:usesf/tgcg/offline/offline_payloads.dart';
 import 'package:usesf/tgcg/offline/offline_persistence.dart';
 
 void main() {
@@ -166,6 +167,102 @@ void main() {
       expect(job.targetMemberIds, isEmpty);
       expect(job.targetContactCount, membership.members.length);
       expect(job.eligibleRecipientCount, 1);
+    });
+  });
+
+  group('Bulk Communications durability', () {
+    test('preferences and queued jobs survive controller restart', () async {
+      await allowSms('MEM-0001');
+
+      final queued = await bulk.queueJob(
+        title: 'Persistent statewide notice',
+        body: 'This delivery plan must survive restart.',
+        purpose: BulkCommunicationPurpose.operations,
+        targetScope: GeographicScope.kaduna,
+        channels: const [BulkCommunicationChannel.sms],
+        actorId: 'STATE-COORD',
+        actorRole: TgcgRole.stateCoordinator,
+        actorScope: GeographicScope.kaduna,
+      );
+      expect(queued, isNotNull);
+
+      final restored = BulkCommunicationsController.productionFoundation(
+        membership: membership,
+        devices: devices,
+        governance: governance,
+        persistence: persistence,
+      );
+      expect(restored.jobs, isEmpty);
+      expect(
+        restored.contacts
+            .firstWhere((item) => item.memberId == 'MEM-0001')
+            .eligibleFor(BulkCommunicationChannel.sms),
+        isFalse,
+      );
+
+      await restored.hydrateFromOffline();
+
+      expect(restored.jobs, hasLength(1));
+      expect(restored.jobs.single.id, queued!.id);
+      expect(restored.jobs.single.title, 'Persistent statewide notice');
+      expect(
+        restored.jobs.single.state,
+        BulkDeliveryJobState.waitingForProvider,
+      );
+      expect(
+        restored.contacts
+            .firstWhere((item) => item.memberId == 'MEM-0001')
+            .eligibleFor(BulkCommunicationChannel.sms),
+        isTrue,
+      );
+    });
+
+    test('legacy compact scope keys still hydrate queued jobs', () async {
+      final zaria = geography.lga('KD-ZARIA')!;
+
+      await persistence.persistMutation(
+        entityType: 'bulk_delivery_job',
+        entityId: 'BULK-LEGACY',
+        mutationType: SyncMutationType.create,
+        payload: {
+          'id': 'BULK-LEGACY',
+          'title': 'Legacy Zaria notice',
+          'body': 'Restore the original compact scope key.',
+          'purpose': BulkCommunicationPurpose.operations.name,
+          'target_scope': scopeStorageKey(zaria.scope),
+          'channels': [BulkCommunicationChannel.sms.name],
+          'created_by': 'STATE-COORD',
+          'created_at': DateTime.utc(2026, 10, 5, 12).toIso8601String(),
+          'scheduled_for': null,
+          'state': BulkDeliveryJobState.waitingForProvider.name,
+          'target_contact_count': 1,
+          'eligible_recipient_count': 1,
+          'suppressed_count': 0,
+          'channel_plan': {
+            BulkCommunicationChannel.push.name: 0,
+            BulkCommunicationChannel.sms.name: 1,
+            BulkCommunicationChannel.email.name: 0,
+            BulkCommunicationChannel.voice.name: 0,
+          },
+          'target_roles': <String>[],
+          'target_member_ids': <String>[],
+        },
+        scopeKey: scopeStorageKey(zaria.scope),
+        ownerId: 'STATE-COORD',
+      );
+
+      final restored = BulkCommunicationsController.productionFoundation(
+        membership: membership,
+        devices: devices,
+        governance: governance,
+        persistence: persistence,
+      );
+      await restored.hydrateFromOffline();
+
+      expect(restored.jobs, hasLength(1));
+      expect(restored.jobs.single.id, 'BULK-LEGACY');
+      expect(restored.jobs.single.targetScope.lgaId, 'KD-ZARIA');
+      expect(restored.jobs.single.targetScope.level, GeographyLevel.lga);
     });
   });
 
