@@ -22,7 +22,6 @@ class RemoteResponderAuthenticationResult {
     this.displayName,
     this.authorizedScope,
     this.sessionToken,
-    this.sessionExpiresAt,
     this.lockedUntil,
     this.message,
   });
@@ -34,7 +33,6 @@ class RemoteResponderAuthenticationResult {
   final String? displayName;
   final GeographicScope? authorizedScope;
   final String? sessionToken;
-  final DateTime? sessionExpiresAt;
   final DateTime? lockedUntil;
   final String? message;
 }
@@ -49,12 +47,10 @@ enum RemoteResponderSessionStatus {
 class RemoteResponderSessionResult {
   const RemoteResponderSessionResult({
     required this.status,
-    this.sessionExpiresAt,
     this.message,
   });
 
   final RemoteResponderSessionStatus status;
-  final DateTime? sessionExpiresAt;
   final String? message;
 }
 
@@ -67,6 +63,10 @@ abstract interface class RemoteResponderAuthGateway {
   });
 
   Future<RemoteResponderSessionResult> validateSession({
+    required String sessionToken,
+  });
+
+  Future<void> revokeSession({
     required String sessionToken,
   });
 }
@@ -125,16 +125,12 @@ class HttpRemoteResponderAuthGateway implements RemoteResponderAuthGateway {
         final authorizedScope =
             geographicScopeFromJson(payload['authorizedScope']);
         final sessionToken = payload['sessionToken']?.toString();
-        final sessionExpiresAt =
-            DateTime.tryParse(payload['sessionExpiresAt']?.toString() ?? '')
-                ?.toUtc();
         if (responderId == null ||
             remoteAgencyId == null ||
             remoteService == null ||
             displayName == null ||
             authorizedScope == null ||
-            sessionToken == null ||
-            sessionExpiresAt == null) {
+            sessionToken == null) {
           return const RemoteResponderAuthenticationResult(
             status: RemoteResponderAuthenticationStatus.serverError,
             message: 'Malformed responder authentication response.',
@@ -148,7 +144,6 @@ class HttpRemoteResponderAuthGateway implements RemoteResponderAuthGateway {
           displayName: displayName,
           authorizedScope: authorizedScope,
           sessionToken: sessionToken,
-          sessionExpiresAt: sessionExpiresAt,
         );
       }
 
@@ -215,12 +210,8 @@ class HttpRemoteResponderAuthGateway implements RemoteResponderAuthGateway {
       );
       final payload = _decodeObject(response.body);
       if (response.statusCode == HttpStatus.ok) {
-        final expiresAt =
-            DateTime.tryParse(payload['sessionExpiresAt']?.toString() ?? '')
-                ?.toUtc();
-        return RemoteResponderSessionResult(
+        return const RemoteResponderSessionResult(
           status: RemoteResponderSessionStatus.active,
-          sessionExpiresAt: expiresAt,
         );
       }
       if (response.statusCode == HttpStatus.unauthorized ||
@@ -258,6 +249,29 @@ class HttpRemoteResponderAuthGateway implements RemoteResponderAuthGateway {
         status: RemoteResponderSessionStatus.serverError,
         message: error.message,
       );
+    }
+  }
+
+  @override
+  Future<void> revokeSession({
+    required String sessionToken,
+  }) async {
+    try {
+      final response = await _postJson(
+        '/v1/security/responders/session/revoke',
+        const <String, Object?>{},
+        bearerToken: sessionToken,
+      );
+      if (response.statusCode != HttpStatus.ok &&
+          response.statusCode != HttpStatus.unauthorized) {
+        throw HttpException(
+          'Responder session revoke returned HTTP ${response.statusCode}.',
+        );
+      }
+    } on SocketException {
+      rethrow;
+    } on TimeoutException {
+      rethrow;
     }
   }
 
