@@ -5,6 +5,57 @@ import '../domain/models.dart';
 import '../domain/permissions.dart';
 import '../offline/offline_payloads.dart';
 import '../offline/offline_persistence.dart';
+import '../membership/membership_store.dart';
+
+enum IncidentOwnershipAction {
+  assigned,
+  reassigned,
+  cleared,
+}
+
+class IncidentOwnershipEvent {
+  const IncidentOwnershipEvent({
+    required this.id,
+    required this.incidentId,
+    required this.action,
+    required this.actorId,
+    required this.actorRole,
+    required this.changedAt,
+    required this.scope,
+    this.responsibleMemberId,
+    this.responsibleMemberName,
+    this.teamName,
+    this.note,
+  });
+
+  final String id;
+  final String incidentId;
+  final IncidentOwnershipAction action;
+  final String actorId;
+  final TgcgRole actorRole;
+  final DateTime changedAt;
+  final GeographicScope scope;
+  final String? responsibleMemberId;
+  final String? responsibleMemberName;
+  final String? teamName;
+  final String? note;
+
+  bool get hasOwner =>
+      action != IncidentOwnershipAction.cleared &&
+      ((responsibleMemberId?.isNotEmpty ?? false) ||
+          (teamName?.isNotEmpty ?? false));
+
+  String get ownerLabel {
+    final member = responsibleMemberName?.trim();
+    final team = teamName?.trim();
+    if (member != null && member.isNotEmpty && team != null && team.isNotEmpty) {
+      return '$member • $team';
+    }
+    if (member != null && member.isNotEmpty) return member;
+    if (team != null && team.isNotEmpty) return team;
+    return 'Unassigned';
+  }
+}
 
 class IncidentStatusTransitionEvent {
   const IncidentStatusTransitionEvent({
@@ -45,21 +96,26 @@ class FieldOperationsController extends ChangeNotifier {
     required List<FieldIncident> incidents,
     required List<FieldReport> reports,
     OfflinePersistenceController? persistence,
+    MembershipOperationsController? membership,
   })  : _incidents = incidents,
         _reports = reports,
-        _persistence = persistence;
+        _persistence = persistence,
+        _membership = membership;
 
   factory FieldOperationsController.productionFoundation({
     required OfflinePersistenceController persistence,
+    MembershipOperationsController? membership,
   }) =>
       FieldOperationsController._(
         incidents: <FieldIncident>[],
         reports: <FieldReport>[],
         persistence: persistence,
+        membership: membership,
       );
 
   factory FieldOperationsController.prototypeSeed({
     OfflinePersistenceController? persistence,
+    MembershipOperationsController? membership,
   }) {
     final now = DateTime.utc(2026, 9, 27, 6, 30);
 
@@ -164,6 +220,7 @@ class FieldOperationsController extends ChangeNotifier {
 
     return FieldOperationsController._(
       persistence: persistence,
+      membership: membership,
       incidents: [
         FieldIncident(
           id: 'INC-0001',
@@ -288,7 +345,9 @@ class FieldOperationsController extends ChangeNotifier {
   final List<FieldIncident> _incidents;
   final List<FieldReport> _reports;
   final OfflinePersistenceController? _persistence;
+  final MembershipOperationsController? _membership;
   final Map<String, List<IncidentStatusTransitionEvent>> _statusHistory = {};
+  final Map<String, List<IncidentOwnershipEvent>> _ownershipHistory = {};
 
   List<FieldIncident> get incidents => List.unmodifiable(_incidents);
   List<FieldReport> get reports => List.unmodifiable(_reports);
@@ -300,6 +359,25 @@ class FieldOperationsController extends ChangeNotifier {
         _statusHistory[incidentId] ??
             const <IncidentStatusTransitionEvent>[],
       );
+
+  List<IncidentOwnershipEvent> ownershipHistoryForIncident(
+    String incidentId,
+  ) =>
+      List.unmodifiable(
+        _ownershipHistory[incidentId] ?? const <IncidentOwnershipEvent>[],
+      );
+
+  IncidentOwnershipEvent? currentOwnershipForIncident(String incidentId) {
+    final history = _ownershipHistory[incidentId];
+    if (history == null || history.isEmpty) return null;
+    final current = history.last;
+    return current.hasOwner ? current : null;
+  }
+
+  String ownershipLabelForIncident(FieldIncident incident) =>
+      currentOwnershipForIncident(incident.id)?.ownerLabel ??
+      incident.assignedTeam ??
+      'Unassigned';
 
   Future<void> hydrateFromOffline() async {
     final persistence = _persistence;
@@ -353,6 +431,21 @@ class FieldOperationsController extends ChangeNotifier {
         restoredEvents.sort((a, b) => a.changedAt.compareTo(b.changedAt));
         if (restoredEvents.isNotEmpty) {
           _statusHistory[id] = restoredEvents;
+        }
+      }
+
+      final rawOwnershipHistory = row['ownershipHistory'];
+      if (rawOwnershipHistory is List) {
+        final restoredOwnership = <IncidentOwnershipEvent>[];
+        for (final value in rawOwnershipHistory) {
+          final event = _ownershipEventFromJson(value);
+          if (event != null && event.incidentId == id) {
+            restoredOwnership.add(event);
+          }
+        }
+        restoredOwnership.sort((a, b) => a.changedAt.compareTo(b.changedAt));
+        if (restoredOwnership.isNotEmpty) {
+          _ownershipHistory[id] = restoredOwnership;
         }
       }
 
@@ -558,6 +651,177 @@ class FieldOperationsController extends ChangeNotifier {
     return report;
   }
 
+  Future<bool> assignIncidentOwnership(
+    String incidentId, {
+    String? responsibleMemberId,
+    String? teamName,
+    String? note,
+    required String actorId,
+    required TgcgRole actorRole,
+    required GeographicScope authorizedScope,
+  }) async {
+    final index = _incidents.indexWhere((item) => item.id == incidentId);
+    if (index < 0) return false;
+    final incident = _incidents[index];
+
+    if (!TgcgPermissionPolicy.may(
+      actorRole,
+      authorizedScope,
+      TgcgCapability.assignIncident,
+      targetScope: incident.scope,
+    )) {
+      throw StateError(
+        'This account cannot assign incident ownership in this scope.',
+      );
+    }
+    if (incident.status == IncidentStatus.resolved ||
+        incident.status == IncidentStatus.closed) {
+      throw StateError('Closed or resolved incidents cannot be reassigned.');
+    }
+
+    final memberId = _clean(responsibleMemberId);
+    final normalizedTeam = _clean(teamName);
+    final normalizedNote = _clean(note);
+    if (memberId == null && normalizedTeam == null) {
+      throw StateError('Select a responsible officer or enter a response team.');
+    }
+
+    String? memberName;
+    if (memberId != null) {
+      final membership = _membership;
+      if (membership == null) {
+        throw StateError(
+          'Member directory is unavailable for incident assignment.',
+        );
+      }
+      final member = membership.memberById(memberId);
+      if (member == null) {
+        throw StateError('The selected responsible officer no longer exists.');
+      }
+      if (member.isBlocked) {
+        throw StateError('Blocked members cannot own incident response.');
+      }
+      final memberScope = membership.registrationScopeForMember(member.id);
+      if (memberScope == null ||
+          !TgcgPermissionPolicy.scopeAllows(memberScope, incident.scope)) {
+        throw StateError(
+          'The selected officer is outside this incident response scope.',
+        );
+      }
+      memberName = member.fullName;
+    }
+
+    final changedAt = DateTime.now().toUtc();
+    final previous = currentOwnershipForIncident(incident.id);
+    final event = IncidentOwnershipEvent(
+      id: newLocalId('INC-OWN', changedAt),
+      incidentId: incident.id,
+      action: previous == null
+          ? IncidentOwnershipAction.assigned
+          : IncidentOwnershipAction.reassigned,
+      actorId: actorId,
+      actorRole: actorRole,
+      changedAt: changedAt,
+      scope: incident.scope,
+      responsibleMemberId: memberId,
+      responsibleMemberName: memberName,
+      teamName: normalizedTeam,
+      note: normalizedNote,
+    );
+    final ownershipHistory = <IncidentOwnershipEvent>[
+      ...?_ownershipHistory[incident.id],
+      event,
+    ];
+    final updated = _copyIncident(
+      incident,
+      assignedTeam: normalizedTeam ?? memberName,
+    );
+
+    await _persistence?.persistMutation(
+      entityType: 'field_incident',
+      entityId: updated.id,
+      mutationType: SyncMutationType.update,
+      payload: {
+        ...fieldIncidentToJson(updated),
+        'statusHistory': (_statusHistory[incident.id] ??
+                const <IncidentStatusTransitionEvent>[])
+            .map(_statusEventToJson)
+            .toList(growable: false),
+        'ownershipHistory':
+            ownershipHistory.map(_ownershipEventToJson).toList(growable: false),
+      },
+      scopeKey: scopeStorageKey(updated.scope),
+      ownerId: actorId,
+    );
+
+    _incidents[index] = updated;
+    _ownershipHistory[incident.id] = ownershipHistory;
+    notifyListeners();
+    return true;
+  }
+
+  Future<bool> clearIncidentOwnership(
+    String incidentId, {
+    String? note,
+    required String actorId,
+    required TgcgRole actorRole,
+    required GeographicScope authorizedScope,
+  }) async {
+    final index = _incidents.indexWhere((item) => item.id == incidentId);
+    if (index < 0) return false;
+    final incident = _incidents[index];
+
+    if (!TgcgPermissionPolicy.may(
+      actorRole,
+      authorizedScope,
+      TgcgCapability.assignIncident,
+      targetScope: incident.scope,
+    )) {
+      throw StateError(
+        'This account cannot clear incident ownership in this scope.',
+      );
+    }
+
+    final changedAt = DateTime.now().toUtc();
+    final event = IncidentOwnershipEvent(
+      id: newLocalId('INC-OWN', changedAt),
+      incidentId: incident.id,
+      action: IncidentOwnershipAction.cleared,
+      actorId: actorId,
+      actorRole: actorRole,
+      changedAt: changedAt,
+      scope: incident.scope,
+      note: _clean(note),
+    );
+    final ownershipHistory = <IncidentOwnershipEvent>[
+      ...?_ownershipHistory[incident.id],
+      event,
+    ];
+    final updated = _copyIncident(incident, clearAssignedTeam: true);
+
+    await _persistence?.persistMutation(
+      entityType: 'field_incident',
+      entityId: updated.id,
+      mutationType: SyncMutationType.update,
+      payload: {
+        ...fieldIncidentToJson(updated),
+        'statusHistory': (_statusHistory[incident.id] ??
+                const <IncidentStatusTransitionEvent>[])
+            .map(_statusEventToJson)
+            .toList(growable: false),
+        'ownershipHistory':
+            ownershipHistory.map(_ownershipEventToJson).toList(growable: false),
+      },
+      scopeKey: scopeStorageKey(updated.scope),
+      ownerId: actorId,
+    );
+
+    _incidents[index] = updated;
+    _ownershipHistory[incident.id] = ownershipHistory;
+    notifyListeners();
+    return true;
+  }
+
   Future<bool> updateIncidentStatus(
     String incidentId,
     IncidentStatus status, {
@@ -626,6 +890,10 @@ class FieldOperationsController extends ChangeNotifier {
       payload: {
         ...fieldIncidentToJson(updated),
         'statusHistory': history.map(_statusEventToJson).toList(growable: false),
+        'ownershipHistory': (_ownershipHistory[incident.id] ??
+                const <IncidentOwnershipEvent>[])
+            .map(_ownershipEventToJson)
+            .toList(growable: false),
       },
       scopeKey: scopeStorageKey(updated.scope),
       ownerId: actorId,
@@ -636,6 +904,92 @@ class FieldOperationsController extends ChangeNotifier {
     notifyListeners();
     return true;
   }
+
+  static Map<String, Object?> _ownershipEventToJson(
+    IncidentOwnershipEvent event,
+  ) =>
+      {
+        'id': event.id,
+        'incidentId': event.incidentId,
+        'action': event.action.name,
+        'actorId': event.actorId,
+        'actorRole': event.actorRole.name,
+        'changedAt': event.changedAt.toUtc().toIso8601String(),
+        'scope': geographicScopeToJson(event.scope),
+        'responsibleMemberId': event.responsibleMemberId,
+        'responsibleMemberName': event.responsibleMemberName,
+        'teamName': event.teamName,
+        'note': event.note,
+      };
+
+  static IncidentOwnershipEvent? _ownershipEventFromJson(Object? value) {
+    if (value is! Map) return null;
+    final map = value.map(
+      (key, item) => MapEntry(key.toString(), item),
+    );
+    final id = map['id']?.toString();
+    final incidentId = map['incidentId']?.toString();
+    final actionName = map['action']?.toString();
+    final action = IncidentOwnershipAction.values
+        .where((item) => item.name == actionName)
+        .firstOrNull;
+    final actorId = map['actorId']?.toString();
+    final actorRoleName = map['actorRole']?.toString();
+    final actorRole = TgcgRole.values
+        .where((item) => item.name == actorRoleName)
+        .firstOrNull;
+    final changedAt =
+        DateTime.tryParse(map['changedAt']?.toString() ?? '')?.toUtc();
+    final scope = geographicScopeFromJson(map['scope']);
+    if (id == null ||
+        incidentId == null ||
+        action == null ||
+        actorId == null ||
+        actorRole == null ||
+        changedAt == null ||
+        scope == null) {
+      return null;
+    }
+    return IncidentOwnershipEvent(
+      id: id,
+      incidentId: incidentId,
+      action: action,
+      actorId: actorId,
+      actorRole: actorRole,
+      changedAt: changedAt,
+      scope: scope,
+      responsibleMemberId: _clean(map['responsibleMemberId']?.toString()),
+      responsibleMemberName:
+          _clean(map['responsibleMemberName']?.toString()),
+      teamName: _clean(map['teamName']?.toString()),
+      note: _clean(map['note']?.toString()),
+    );
+  }
+
+  static FieldIncident _copyIncident(
+    FieldIncident incident, {
+    String? assignedTeam,
+    bool clearAssignedTeam = false,
+  }) =>
+      FieldIncident(
+        id: incident.id,
+        title: incident.title,
+        category: incident.category,
+        severity: incident.severity,
+        status: incident.status,
+        scope: incident.scope,
+        reportedAt: incident.reportedAt,
+        reporterId: incident.reporterId,
+        summary: incident.summary,
+        assignedTeam:
+            clearAssignedTeam ? null : (assignedTeam ?? incident.assignedTeam),
+        assignmentId: incident.assignmentId,
+        deviceId: incident.deviceId,
+        latitude: incident.latitude,
+        longitude: incident.longitude,
+        evidence: incident.evidence,
+        origin: incident.origin,
+      );
 
   static Map<String, Object?> _statusEventToJson(
     IncidentStatusTransitionEvent event,
@@ -688,6 +1042,11 @@ class FieldOperationsController extends ChangeNotifier {
       changedAt: changedAt,
       scope: scope,
     );
+  }
+
+  static String? _clean(String? value) {
+    final normalized = value?.trim();
+    return normalized == null || normalized.isEmpty ? null : normalized;
   }
 
   static double? _double(Object? value) {
