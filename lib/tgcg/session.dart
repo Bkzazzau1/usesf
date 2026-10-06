@@ -32,12 +32,37 @@ enum TgcgModule {
   governance,
 }
 
+enum SessionTerminationReason {
+  explicitSignOut,
+  backgroundLock,
+  inactivityTimeout,
+  absoluteLifetime,
+  remoteSessionExpired,
+  centrallyRevoked,
+}
+
 class TgcgSessionController extends ChangeNotifier {
+  TgcgSessionController({
+    Duration securityInactivityTimeout = const Duration(minutes: 15),
+    Duration securityAbsoluteLifetime = const Duration(hours: 8),
+    DateTime Function()? clock,
+  })  : _securityInactivityTimeout = securityInactivityTimeout,
+        _securityAbsoluteLifetime = securityAbsoluteLifetime,
+        _clock = clock ?? DateTime.now;
+  final Duration _securityInactivityTimeout;
+  final Duration _securityAbsoluteLifetime;
+  final DateTime Function() _clock;
+
   TgcgRole? _role;
   String _operatorName = '';
   String _accessId = '';
   String? _agencyId;
   GeographicScope _scope = GeographicScope.kaduna;
+  DateTime? _signedInAt;
+  DateTime? _lastActivityAt;
+  String? _securitySessionToken;
+  DateTime? _securitySessionExpiresAt;
+  SessionTerminationReason? _lastTerminationReason;
 
   TgcgRole? get role => _role;
   String get operatorName => _operatorName;
@@ -47,6 +72,13 @@ class TgcgSessionController extends ChangeNotifier {
   String? get agencyId => _agencyId;
   GeographicScope get scope => _scope;
   bool get isAuthenticated => _role != null;
+  bool get isSecuritySession => _role == TgcgRole.securityOfficer;
+  DateTime? get signedInAt => _signedInAt;
+  DateTime? get lastActivityAt => _lastActivityAt;
+  String? get securitySessionToken => _securitySessionToken;
+  DateTime? get securitySessionExpiresAt => _securitySessionExpiresAt;
+  SessionTerminationReason? get lastTerminationReason =>
+      _lastTerminationReason;
 
   void signIn({
     required TgcgRole role,
@@ -54,6 +86,8 @@ class TgcgSessionController extends ChangeNotifier {
     required String accessId,
     GeographicScope scope = GeographicScope.kaduna,
     String? agencyId,
+    String? securitySessionToken,
+    DateTime? securitySessionExpiresAt,
   }) {
     if (role == TgcgRole.securityOfficer &&
         (agencyId == null || agencyId.trim().isEmpty)) {
@@ -61,13 +95,57 @@ class TgcgSessionController extends ChangeNotifier {
         'Security Officer access requires an authorized response agency.',
       );
     }
+    final now = _clock().toUtc();
     _role = role;
     _agencyId = agencyId;
     _operatorName =
         operatorName.trim().isEmpty ? roleLabel(role) : operatorName.trim();
     _accessId = accessId.trim();
     _scope = scope;
+    _signedInAt = now;
+    _lastActivityAt = now;
+    _securitySessionToken =
+        role == TgcgRole.securityOfficer ? securitySessionToken : null;
+    _securitySessionExpiresAt = role == TgcgRole.securityOfficer
+        ? securitySessionExpiresAt?.toUtc()
+        : null;
+    _lastTerminationReason = null;
     notifyListeners();
+  }
+
+  void recordActivity() {
+    if (!isSecuritySession || !isAuthenticated) return;
+    _lastActivityAt = _clock().toUtc();
+  }
+
+  bool enforceSecurityExpiry() {
+    if (!isSecuritySession || !isAuthenticated) return false;
+    final now = _clock().toUtc();
+    final signedInAt = _signedInAt;
+    final lastActivityAt = _lastActivityAt;
+    final remoteExpiresAt = _securitySessionExpiresAt;
+
+    if (remoteExpiresAt != null && !now.isBefore(remoteExpiresAt)) {
+      signOut(reason: SessionTerminationReason.remoteSessionExpired);
+      return true;
+    }
+    if (signedInAt != null &&
+        now.difference(signedInAt) >= _securityAbsoluteLifetime) {
+      signOut(reason: SessionTerminationReason.absoluteLifetime);
+      return true;
+    }
+    if (lastActivityAt != null &&
+        now.difference(lastActivityAt) >= _securityInactivityTimeout) {
+      signOut(reason: SessionTerminationReason.inactivityTimeout);
+      return true;
+    }
+    return false;
+  }
+
+  bool lockForBackground() {
+    if (!isSecuritySession || !isAuthenticated) return false;
+    signOut(reason: SessionTerminationReason.backgroundLock);
+    return true;
   }
 
   void updateScope(GeographicScope scope) {
@@ -84,12 +162,19 @@ class TgcgSessionController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void signOut() {
+  void signOut({
+    SessionTerminationReason reason = SessionTerminationReason.explicitSignOut,
+  }) {
     _role = null;
     _operatorName = '';
     _accessId = '';
     _agencyId = null;
     _scope = GeographicScope.kaduna;
+    _signedInAt = null;
+    _lastActivityAt = null;
+    _securitySessionToken = null;
+    _securitySessionExpiresAt = null;
+    _lastTerminationReason = reason;
     notifyListeners();
   }
 }
