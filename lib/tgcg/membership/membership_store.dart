@@ -58,6 +58,18 @@ class MembershipOperationsController extends ChangeNotifier {
         _memberPollingUnits = memberPollingUnits,
         _persistence = persistence;
 
+  factory MembershipOperationsController.productionFoundation(
+    GeographyRegistry geography, {
+    required OfflinePersistenceController persistence,
+  }) =>
+      MembershipOperationsController._(
+        geography: geography,
+        members: <TgcgMember>[],
+        memberScopes: <String, GeographicScope>{},
+        memberPollingUnits: <String, MemberPollingUnitLink>{},
+        persistence: persistence,
+      );
+
   factory MembershipOperationsController.prototypeSeed(
     GeographyRegistry geography, {
     OfflinePersistenceController? persistence,
