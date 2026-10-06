@@ -1,12 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../access/access_policy.dart';
 import '../domain/permissions.dart';
 import '../geography/geography_registry.dart';
 import '../membership/membership_store.dart';
+import '../media/device_media.dart';
 import '../offline/offline_persistence.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
+import 'result_form_capture_service.dart';
 import 'result_operations_store.dart';
 import '../domain/local_id.dart';
 
@@ -269,6 +273,7 @@ class _CaptureWorkspace extends StatefulWidget {
 }
 
 class _CaptureWorkspaceState extends State<_CaptureWorkspace> {
+  final _formCapture = ResultFormCaptureService();
   final p1 = TextEditingController(text: '120');
   final p2 = TextEditingController(text: '80');
   final p3 = TextEditingController(text: '40');
@@ -279,8 +284,9 @@ class _CaptureWorkspaceState extends State<_CaptureWorkspace> {
   final registered = TextEditingController(text: '600');
 
   SubmissionSource source = SubmissionSource.app;
-  _OcrDemo ocrDemo = _OcrDemo.match;
+  CapturedResultForm? capturedForm;
   bool attachForm = true;
+  bool capturingForm = false;
   bool saving = false;
   String? selectedPollingUnitId;
 
@@ -309,6 +315,7 @@ class _CaptureWorkspaceState extends State<_CaptureWorkspace> {
       controller.removeListener(_refresh);
       controller.dispose();
     }
+    unawaited(_formCapture.dispose());
     super.dispose();
   }
 
@@ -327,19 +334,13 @@ class _CaptureWorkspaceState extends State<_CaptureWorkspace> {
       };
 
   Map<String, int>? get _ocrVotes {
-    if (ocrDemo == _OcrDemo.notAvailable) return null;
-    final values = Map<String, int>.of(_votes);
-    if (ocrDemo == _OcrDemo.difference) {
-      values.update('P2', (value) => value > 0 ? value - 1 : 1);
-    }
+    final values = capturedForm?.partyVotes;
+    if (values == null || values.isEmpty) return null;
     return values;
   }
 
-  double? get _ocrConfidence => switch (ocrDemo) {
-        _OcrDemo.notAvailable => null,
-        _OcrDemo.match => .96,
-        _OcrDemo.difference => .84,
-      };
+  double? get _ocrConfidence =>
+      capturedForm?.hasOcr == true ? capturedForm!.extractionConfidence : null;
 
   @override
   Widget build(BuildContext context) {
@@ -384,11 +385,16 @@ class _CaptureWorkspaceState extends State<_CaptureWorkspace> {
             (existing) =>
                 existing.pollingUnitScope.pollingUnitId ==
                     selectedUnit.scope.pollingUnitId &&
+                existing.status != RecordStatus.disputed &&
                 existing.status != RecordStatus.rejected &&
                 existing.status != RecordStatus.archived,
           );
     final requiresReview =
-        !arithmeticValid || !turnoutValid || duplicate || ocrMatches == false;
+        !arithmeticValid ||
+        !turnoutValid ||
+        duplicate ||
+        ocrMatches == false ||
+        (attachForm && capturedForm == null);
 
     return TgcgSectionCard(
       title: 'New result workflow',
@@ -415,8 +421,8 @@ class _CaptureWorkspaceState extends State<_CaptureWorkspace> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _WorkflowRail(
-            hasEvidence: attachForm,
-            ocrAvailable: ocrDemo != _OcrDemo.notAvailable,
+            hasEvidence: attachForm && capturedForm != null,
+            ocrAvailable: _ocrVotes != null,
             checksPassed: arithmeticValid && turnoutValid && !duplicate,
             reviewExpected: requiresReview,
           ),
@@ -427,10 +433,16 @@ class _CaptureWorkspaceState extends State<_CaptureWorkspace> {
                 attachForm: attachForm,
                 source: source,
                 selectedUnit: selectedUnit,
-                onAttachChanged: saving
+                capturedForm: capturedForm,
+                capturing: capturingForm,
+                onAttachChanged: saving || capturingForm
                     ? null
                     : (value) => setState(() => attachForm = value),
-                onSourceChanged: saving
+                onCapture: saving || capturingForm ? null : _captureResultForm,
+                onClearCapture: saving || capturingForm || capturedForm == null
+                    ? null
+                    : () => setState(() => capturedForm = null),
+                onSourceChanged: saving || capturingForm
                     ? null
                     : (value) => setState(() => source = value),
               );
@@ -448,12 +460,8 @@ class _CaptureWorkspaceState extends State<_CaptureWorkspace> {
                 accredited: accredited,
                 rejected: rejected,
                 registered: registered,
-                ocrDemo: ocrDemo,
                 ocrVotes: ocrVotes,
                 ocrConfidence: _ocrConfidence,
-                onOcrChanged: saving
-                    ? null
-                    : (value) => setState(() => ocrDemo = value),
               );
               if (constraints.maxWidth < 980) {
                 return Column(
@@ -498,6 +506,54 @@ class _CaptureWorkspaceState extends State<_CaptureWorkspace> {
     );
   }
 
+  Future<void> _captureResultForm() async {
+    setState(() => capturingForm = true);
+    try {
+      final captured = await _formCapture.capture();
+      if (captured == null || !mounted) return;
+      setState(() {
+        capturedForm = captured;
+        attachForm = true;
+        _applyCapturedFields(captured);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            captured.hasOcr
+                ? 'Result form captured and OCR extraction completed.'
+                : 'Result form captured. OCR is unavailable on this device; confirm figures manually.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Result-form capture failed: ${describeDeviceError(error)}',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => capturingForm = false);
+    }
+  }
+
+  void _applyCapturedFields(CapturedResultForm captured) {
+    void setIfPresent(TextEditingController controller, int? value) {
+      if (value != null) controller.text = value.toString();
+    }
+
+    setIfPresent(p1, captured.partyVotes['P1']);
+    setIfPresent(p2, captured.partyVotes['P2']);
+    setIfPresent(p3, captured.partyVotes['P3']);
+    setIfPresent(p4, captured.partyVotes['P4']);
+    setIfPresent(total, captured.totalVotes);
+    setIfPresent(accredited, captured.accreditedVoters);
+    setIfPresent(rejected, captured.rejectedVotes);
+    setIfPresent(registered, captured.registeredVoters);
+  }
+
   void _selectUnit(String? value, GeographyRegistry geography) {
     setState(() {
       selectedPollingUnitId = value;
@@ -516,19 +572,24 @@ class _CaptureWorkspaceState extends State<_CaptureWorkspace> {
   }) async {
     setState(() => saving = true);
     try {
-      final evidence = attachForm
+      final captured = capturedForm?.evidence;
+      final evidence = attachForm && captured != null
           ? EvidenceAttachment(
               id: newLocalId('FORM-LOCAL'),
               type: EvidenceType.resultForm,
-              fileName: 'result-form.jpg',
-              createdAt: DateTime.now().toUtc(),
+              fileName: captured.fileName,
+              createdAt: captured.createdAt,
               uploaderId: session.accessId.isEmpty
                   ? session.operatorName
                   : session.accessId,
-              contentHash: 'sha256:pending-device-hash',
-              mimeType: 'image/jpeg',
-              caption:
-                  'Metadata placeholder until native image capture and device hashing are connected.',
+              contentHash: captured.contentHash,
+              mimeType: captured.mimeType,
+              caption: capturedForm?.hasOcr == true
+                  ? 'Result form captured on device and processed by on-device OCR.'
+                  : 'Result form captured on device; OCR was unavailable.',
+              sourceReference: captured.path,
+              latitude: captured.latitude,
+              longitude: captured.longitude,
               origin: RecordOrigin.localEntry,
             )
           : null;
@@ -569,7 +630,6 @@ class _CaptureWorkspaceState extends State<_CaptureWorkspace> {
   }
 }
 
-enum _OcrDemo { notAvailable, match, difference }
 
 class _WorkflowRail extends StatelessWidget {
   const _WorkflowRail({
@@ -661,135 +721,204 @@ class _EvidencePanel extends StatelessWidget {
     required this.attachForm,
     required this.source,
     required this.selectedUnit,
+    required this.capturedForm,
+    required this.capturing,
     required this.onAttachChanged,
+    required this.onCapture,
+    required this.onClearCapture,
     required this.onSourceChanged,
   });
 
   final bool attachForm;
   final SubmissionSource source;
   final CanonicalPollingUnit? selectedUnit;
+  final CapturedResultForm? capturedForm;
+  final bool capturing;
   final ValueChanged<bool>? onAttachChanged;
+  final VoidCallback? onCapture;
+  final VoidCallback? onClearCapture;
   final ValueChanged<SubmissionSource>? onSourceChanged;
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [TgcgColors.surface, TgcgColors.navy50],
-          ),
-          borderRadius: BorderRadius.circular(TgcgRadius.lg),
-          border: Border.all(color: TgcgColors.border),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x0706162D),
-              blurRadius: 18,
-              offset: Offset(0, 6),
-            ),
-          ],
+  Widget build(BuildContext context) {
+    final captured = capturedForm;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [TgcgColors.surface, TgcgColors.navy50],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '1. Original evidence',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'The original form remains distinct from OCR and manually entered figures.',
-              style: TextStyle(
-                color: TgcgColors.muted,
-                fontSize: 10.5,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 13),
-            Container(
-              height: 210,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [TgcgColors.gold100, TgcgColors.navy50],
-                ),
-                borderRadius: BorderRadius.circular(TgcgRadius.md),
-                border: Border.all(color: TgcgColors.gold200),
-              ),
-              child: attachForm
-                  ? const Center(child: _FormPlaceholder())
-                  : const TgcgEmptyState(
-                      icon: Icons.image_not_supported_outlined,
-                      title: 'No image evidence selected',
-                      message:
-                          'Alphanumeric fallback submissions can be recorded without media.',
-                    ),
-            ),
-            const SizedBox(height: 12),
-            FilterChip(
-              selected: attachForm,
-              avatar: const Icon(Icons.attach_file_rounded, size: 17),
-              label: const Text('Result-form evidence'),
-              onSelected: onAttachChanged,
-            ),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<SubmissionSource>(
-              initialValue: source,
-              decoration: const InputDecoration(labelText: 'Submission source'),
-              items: SubmissionSource.values
-                  .map(
-                    (value) => DropdownMenuItem(
-                      value: value,
-                      child: Text(value.name.toUpperCase()),
-                    ),
-                  )
-                  .toList(),
-              onChanged: onSourceChanged == null
-                  ? null
-                  : (value) {
-                      if (value != null) onSourceChanged!(value);
-                    },
-            ),
-            if (selectedUnit != null) ...[
-              const SizedBox(height: 10),
-              Text(
-                selectedUnit!.scope.label,
-                style: const TextStyle(
-                  color: TgcgColors.muted,
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ],
-        ),
-      );
-}
-
-class _FormPlaceholder extends StatelessWidget {
-  const _FormPlaceholder();
-
-  @override
-  Widget build(BuildContext context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: const [
-          Icon(Icons.document_scanner_outlined, size: 42, color: TgcgColors.primary),
-          SizedBox(height: 10),
-          Text(
-            'RESULT FORM METADATA',
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900),
-          ),
-          SizedBox(height: 4),
-          Text(
-            'Native camera/file capture is the next device integration.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: TgcgColors.muted, fontSize: 10),
+        borderRadius: BorderRadius.circular(TgcgRadius.lg),
+        border: Border.all(color: TgcgColors.border),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0706162D),
+            blurRadius: 18,
+            offset: Offset(0, 6),
           ),
         ],
-      );
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            '1. Result-form capture',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            minHeight: 170,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [TgcgColors.gold100, TgcgColors.navy50],
+              ),
+              borderRadius: BorderRadius.circular(TgcgRadius.md),
+              border: Border.all(color: TgcgColors.gold200),
+            ),
+            child: !attachForm
+                ? const Center(
+                    child: TgcgStatusPill(
+                      label: 'NO FORM EVIDENCE',
+                      color: TgcgColors.warning,
+                      icon: Icons.image_not_supported_outlined,
+                    ),
+                  )
+                : captured == null
+                    ? const Center(
+                        child: TgcgStatusPill(
+                          label: 'CAPTURE REQUIRED',
+                          color: TgcgColors.warning,
+                          icon: Icons.photo_camera_outlined,
+                        ),
+                      )
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.document_scanner_outlined,
+                            size: 38,
+                            color: TgcgColors.primary,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            captured.evidence.fileName,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: TgcgColors.ink,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            alignment: WrapAlignment.center,
+                            children: [
+                              TgcgStatusPill(
+                                label: captured.evidence.contentHash == null
+                                    ? 'NO HASH'
+                                    : 'HASHED',
+                                color: captured.evidence.contentHash == null
+                                    ? TgcgColors.warning
+                                    : TgcgColors.success,
+                                compact: true,
+                              ),
+                              TgcgStatusPill(
+                                label: captured.evidence.latitude == null
+                                    ? 'NO GPS'
+                                    : 'GPS',
+                                color: captured.evidence.latitude == null
+                                    ? TgcgColors.warning
+                                    : TgcgColors.success,
+                                compact: true,
+                              ),
+                              TgcgStatusPill(
+                                label: captured.hasOcr
+                                    ? 'AI ${(captured.extractionConfidence * 100).round()}%'
+                                    : 'OCR N/A',
+                                color: captured.hasOcr
+                                    ? TgcgColors.ai
+                                    : TgcgColors.warning,
+                                compact: true,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.icon(
+                onPressed: onCapture,
+                icon: capturing
+                    ? const SizedBox(
+                        width: 17,
+                        height: 17,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.photo_camera_outlined),
+                label: Text(
+                  captured == null ? 'Capture result form' : 'Recapture form',
+                ),
+              ),
+              if (captured != null)
+                OutlinedButton.icon(
+                  onPressed: onClearCapture,
+                  icon: const Icon(Icons.delete_outline_rounded),
+                  label: const Text('Clear'),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          FilterChip(
+            selected: attachForm,
+            avatar: const Icon(Icons.attach_file_rounded, size: 17),
+            label: const Text('Attach result form'),
+            onSelected: onAttachChanged,
+          ),
+          const SizedBox(height: 10),
+          DropdownButtonFormField<SubmissionSource>(
+            initialValue: source,
+            decoration: const InputDecoration(labelText: 'Submission source'),
+            items: SubmissionSource.values
+                .map(
+                  (value) => DropdownMenuItem(
+                    value: value,
+                    child: Text(value.name.toUpperCase()),
+                  ),
+                )
+                .toList(),
+            onChanged: onSourceChanged == null
+                ? null
+                : (value) {
+                    if (value != null) onSourceChanged!(value);
+                  },
+          ),
+          if (selectedUnit != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              selectedUnit!.scope.label,
+              style: const TextStyle(
+                color: TgcgColors.muted,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 class _EntryPanel extends StatelessWidget {
@@ -805,10 +934,8 @@ class _EntryPanel extends StatelessWidget {
     required this.accredited,
     required this.rejected,
     required this.registered,
-    required this.ocrDemo,
     required this.ocrVotes,
     required this.ocrConfidence,
-    required this.onOcrChanged,
   });
 
   final List<CanonicalPollingUnit> units;
@@ -822,10 +949,8 @@ class _EntryPanel extends StatelessWidget {
   final TextEditingController accredited;
   final TextEditingController rejected;
   final TextEditingController registered;
-  final _OcrDemo ocrDemo;
   final Map<String, int>? ocrVotes;
   final double? ocrConfidence;
-  final ValueChanged<_OcrDemo>? onOcrChanged;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -881,30 +1006,6 @@ class _EntryPanel extends StatelessWidget {
               onChanged: units.isEmpty ? null : onUnitChanged,
             ),
             const SizedBox(height: 10),
-            DropdownButtonFormField<_OcrDemo>(
-              initialValue: ocrDemo,
-              decoration: const InputDecoration(labelText: 'OCR prototype state'),
-              items: const [
-                DropdownMenuItem(
-                  value: _OcrDemo.notAvailable,
-                  child: Text('Not available'),
-                ),
-                DropdownMenuItem(
-                  value: _OcrDemo.match,
-                  child: Text('Extraction matches manual'),
-                ),
-                DropdownMenuItem(
-                  value: _OcrDemo.difference,
-                  child: Text('Difference detected'),
-                ),
-              ],
-              onChanged: onOcrChanged == null
-                  ? null
-                  : (value) {
-                      if (value != null) onOcrChanged!(value);
-                    },
-            ),
-            const SizedBox(height: 13),
             _VoteRow(label: 'P1', controller: p1, ocrValue: ocrVotes?['P1']),
             _VoteRow(label: 'P2', controller: p2, ocrValue: ocrVotes?['P2']),
             _VoteRow(label: 'P3', controller: p3, ocrValue: ocrVotes?['P3']),
@@ -930,7 +1031,7 @@ class _EntryPanel extends StatelessWidget {
             if (ocrConfidence != null) ...[
               const SizedBox(height: 12),
               Text(
-                'OCR confidence ${(ocrConfidence! * 100).toStringAsFixed(1)}% • AI assistance only',
+                'AI extraction coverage ${(ocrConfidence! * 100).toStringAsFixed(1)}% • confirm before submission',
                 style: const TextStyle(
                   color: TgcgColors.ai,
                   fontSize: 10.5,

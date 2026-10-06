@@ -30,6 +30,7 @@ import 'operations/live_operations_page.dart';
 import 'presentation/presentation_tour_sheet.dart';
 import 'reports/reports_page.dart';
 import 'results/result_capture_page.dart';
+import 'results/result_intelligence_page.dart';
 import 'security/security_response_portal_page.dart';
 import 'session.dart';
 import 'ui/tgcg_design.dart';
@@ -92,18 +93,33 @@ class _TgcgShellState extends State<TgcgShell> {
     final evidenceIntelligence =
         allowed.contains(TgcgModule.evidenceCapture) &&
         evidenceRole == TgcgRole.stateCoordinator;
+    final resultIntelligence =
+        allowed.contains(TgcgModule.resultCapture) &&
+        session.role == TgcgRole.stateCoordinator;
     final destinations = _destinations
         .where((item) => allowed.contains(item.module))
         .map(
-          (item) => item.module == TgcgModule.evidenceCapture &&
-                  evidenceIntelligence
-              ? _Destination(
-                  item.module,
-                  'Evidence Intelligence',
-                  Icons.fact_check_outlined,
-                  item.group,
-                )
-              : item,
+          (item) {
+            if (item.module == TgcgModule.evidenceCapture &&
+                evidenceIntelligence) {
+              return _Destination(
+                item.module,
+                'Evidence Intelligence',
+                Icons.fact_check_outlined,
+                item.group,
+              );
+            }
+            if (item.module == TgcgModule.resultCapture &&
+                resultIntelligence) {
+              return _Destination(
+                item.module,
+                'Result Intelligence',
+                Icons.analytics_outlined,
+                item.group,
+              );
+            }
+            return item;
+          },
         )
         .toList(growable: false);
 
@@ -177,6 +193,7 @@ class _TgcgShellState extends State<TgcgShell> {
                           _CommandBar(
                             selectedModule: selectedModule,
                             evidenceIntelligence: evidenceIntelligence,
+                            resultIntelligence: resultIntelligence,
                             showAlerts: allowed.contains(TgcgModule.alertCenter),
                             onAlerts: () => _select(TgcgModule.alertCenter),
                             onTour: () => _openTour(allowed),
@@ -236,7 +253,10 @@ class _TgcgShellState extends State<TgcgShell> {
           : const EvidenceCapturePage(),
         TgcgModule.situationRoom => const SituationRoomPage(),
         TgcgModule.securityResponse => const SecurityResponsePortalPage(),
-        TgcgModule.resultCapture => const ResultCapturePage(),
+        TgcgModule.resultCapture =>
+          session.role == TgcgRole.stateCoordinator
+              ? const ResultIntelligencePage()
+              : const ResultCapturePage(),
         TgcgModule.collation => const CollationPage(),
         TgcgModule.mediaIntelligence => const MediaIntelligencePage(),
         TgcgModule.communications => const CommunicationsPage(),
@@ -538,6 +558,7 @@ class _CommandBar extends StatelessWidget {
   const _CommandBar({
     required this.selectedModule,
     required this.evidenceIntelligence,
+    required this.resultIntelligence,
     required this.showAlerts,
     required this.onAlerts,
     required this.onTour,
@@ -545,6 +566,7 @@ class _CommandBar extends StatelessWidget {
 
   final TgcgModule selectedModule;
   final bool evidenceIntelligence;
+  final bool resultIntelligence;
   final bool showAlerts;
   final VoidCallback onAlerts;
   final VoidCallback onTour;
@@ -583,6 +605,7 @@ class _CommandBar extends StatelessWidget {
             _moduleLabel(
               selectedModule,
               evidenceIntelligence: evidenceIntelligence,
+              resultIntelligence: resultIntelligence,
             ),
             style: const TextStyle(color: TgcgColors.ink, fontSize: 14, fontWeight: FontWeight.w900),
           ),
@@ -724,6 +747,7 @@ String _groupLabel(_NavGroup group) => switch (group) {
 String _moduleLabel(
   TgcgModule module, {
   bool evidenceIntelligence = false,
+  bool resultIntelligence = false,
 }) => switch (module) {
       TgcgModule.overview => 'Command Overview',
       TgcgModule.memberEnrollment => 'Member Enrolment',
@@ -740,7 +764,8 @@ String _moduleLabel(
         evidenceIntelligence ? 'Evidence Intelligence' : 'Evidence Capture',
       TgcgModule.situationRoom => 'Situation Room',
       TgcgModule.securityResponse => 'Security & Emergency Response',
-      TgcgModule.resultCapture => 'Result Capture',
+      TgcgModule.resultCapture =>
+        resultIntelligence ? 'Result Intelligence' : 'Result Capture',
       TgcgModule.collation => 'Collation',
       TgcgModule.mediaIntelligence => 'Media Intelligence',
       TgcgModule.communications => 'Communications',

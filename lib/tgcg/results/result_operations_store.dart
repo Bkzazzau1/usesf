@@ -132,6 +132,7 @@ class ResultOperationsController extends ChangeNotifier {
         accreditedVoters: accredited,
         rejectedVotes: rejected,
         resultForm: evidence,
+        ocrPartyVotes: ocrVotes == null ? null : Map.unmodifiable(ocrVotes),
         origin: RecordOrigin.systemDerived,
       );
       final validation = ResultIntegrityPolicy.validate(
@@ -249,6 +250,17 @@ class ResultOperationsController extends ChangeNotifier {
         }
       }
 
+      Map<String, int>? ocrPartyVotes;
+      final rawOcrVotes = row['ocrPartyVotes'];
+      if (rawOcrVotes is Map) {
+        final values = <String, int>{};
+        for (final entry in rawOcrVotes.entries) {
+          final value = _int(entry.value);
+          if (value != null) values[entry.key.toString()] = value;
+        }
+        ocrPartyVotes = Map.unmodifiable(values);
+      }
+
       ResultValidationSummary? validation;
       final rawValidation = row['validation'];
       if (rawValidation is Map) {
@@ -260,6 +272,8 @@ class ResultOperationsController extends ChangeNotifier {
           duplicateSuspected: map['duplicateSuspected'] == true,
           pollingUnitMatched: map['pollingUnitMatched'] != false,
           agentScopeMatched: map['agentScopeMatched'] != false,
+          formEvidencePresent: map['formEvidencePresent'] != false,
+          ocrProcessed: map['ocrProcessed'] != false,
           ocrConfidence: _double(map['ocrConfidence']),
           ocrMatchedManualEntry: map['ocrMatchedManualEntry'] is bool
               ? map['ocrMatchedManualEntry'] as bool
@@ -285,6 +299,7 @@ class ResultOperationsController extends ChangeNotifier {
         rejectedVotes: _int(row['rejectedVotes']),
         registeredVoters: _int(row['registeredVoters']),
         resultForm: evidenceFromJson(row['resultForm']),
+        ocrPartyVotes: ocrPartyVotes,
         validation: validation,
         verifiedBy: row['verifiedBy']?.toString(),
         verifiedAt:
@@ -337,6 +352,7 @@ class ResultOperationsController extends ChangeNotifier {
   }) async {
     final duplicate = _submissions.any((existing) =>
         existing.pollingUnitScope.pollingUnitId == pollingUnitScope.pollingUnitId &&
+        existing.status != RecordStatus.disputed &&
         existing.status != RecordStatus.rejected &&
         existing.status != RecordStatus.archived);
 
@@ -353,6 +369,8 @@ class ResultOperationsController extends ChangeNotifier {
       rejectedVotes: rejectedVotes,
       registeredVoters: registeredVoters,
       resultForm: resultForm,
+      ocrPartyVotes:
+          ocrPartyVotes == null ? null : Map.unmodifiable(ocrPartyVotes),
       origin: RecordOrigin.localEntry,
     );
 
@@ -522,6 +540,7 @@ class ResultOperationsController extends ChangeNotifier {
         rejectedVotes: current.rejectedVotes,
         registeredVoters: current.registeredVoters,
         resultForm: current.resultForm,
+        ocrPartyVotes: current.ocrPartyVotes,
         validation: validation ?? current.validation,
         verifiedBy: verifiedBy ?? current.verifiedBy,
         verifiedAt: verifiedAt ?? current.verifiedAt,

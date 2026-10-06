@@ -173,6 +173,7 @@ Map<String, Object?> resultSubmissionToJson(
       'resultForm': submission.resultForm == null
           ? null
           : evidenceToJson(submission.resultForm!),
+      'ocrPartyVotes': submission.ocrPartyVotes,
       'validation': submission.validation == null
           ? null
           : {
@@ -180,6 +181,9 @@ Map<String, Object?> resultSubmissionToJson(
               'duplicateSuspected': submission.validation!.duplicateSuspected,
               'pollingUnitMatched': submission.validation!.pollingUnitMatched,
               'agentScopeMatched': submission.validation!.agentScopeMatched,
+              'formEvidencePresent':
+                  submission.validation!.formEvidencePresent,
+              'ocrProcessed': submission.validation!.ocrProcessed,
               'ocrConfidence': submission.validation!.ocrConfidence,
               'ocrMatchedManualEntry':
                   submission.validation!.ocrMatchedManualEntry,
