@@ -33,28 +33,33 @@ Widget _harness(TgcgSessionController session, Widget home) {
 
 void main() {
   for (final size in const [Size(1440, 900), Size(400, 860)]) {
-    testWidgets('portal sign-in renders and validates at ${size.width.toInt()}px', (tester) async {
-      tester.view.physicalSize = size;
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
+    testWidgets(
+      'portal sign-in renders and validates at ${size.width.toInt()}px',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
 
-      final session = TgcgSessionController();
-      await tester.pumpWidget(_harness(session, const SecurityPortalLoginPage()));
+        final session = TgcgSessionController();
+        await tester.pumpWidget(
+          _harness(session, const SecurityPortalLoginPage()),
+        );
 
-      expect(find.text('Security Agency Sign-in'), findsOneWidget);
-      expect(find.text('Police'), findsOneWidget);
+        expect(find.text('Security Agency Sign-in'), findsOneWidget);
+        expect(find.text('Police'), findsOneWidget);
+        expect(find.text('Demo access'), findsNothing);
 
-      // Without an agency, sign-in is refused.
-      await tester.ensureVisible(find.text('Enter Security Portal'));
-      await tester.pump();
-      await tester.tap(find.text('Enter Security Portal'));
-      await tester.pump();
-      expect(session.isAuthenticated, isFalse);
-      expect(find.text('Select your agency to continue.'), findsOneWidget);
-    });
+        await tester.ensureVisible(find.text('Enter Security Portal'));
+        await tester.pump();
+        await tester.tap(find.text('Enter Security Portal'));
+        await tester.pump();
+        expect(session.isAuthenticated, isFalse);
+        expect(find.text('Select your agency to continue.'), findsOneWidget);
+      },
+    );
   }
 
-  testWidgets('demo officer profile signs in to the Security Portal', (tester) async {
+  testWidgets('configured agency officer can sign in manually', (tester) async {
     tester.view.physicalSize = const Size(1440, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -67,7 +72,9 @@ void main() {
           builder: (context) => Scaffold(
             body: TextButton(
               onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(builder: (_) => const SecurityPortalLoginPage()),
+                MaterialPageRoute<void>(
+                  builder: (_) => const SecurityPortalLoginPage(),
+                ),
               ),
               child: const Text('open portal'),
             ),
@@ -78,12 +85,20 @@ void main() {
     await tester.tap(find.text('open portal'));
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('Police • Kaduna State Command'));
-    await tester.pump();
-    await tester.tap(find.text('Police • Kaduna State Command'));
-    await tester.pump();
+    await tester.tap(find.text('Police'));
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Officer name and rank'),
+      'Insp. Musa Bello',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Service / force number'),
+      'AP/12345',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Portal access code'),
+      'secure-access',
+    );
     await tester.ensureVisible(find.text('Enter Security Portal'));
-    await tester.pump();
     await tester.tap(find.text('Enter Security Portal'));
     await tester.pumpAndSettle();
 
@@ -94,7 +109,8 @@ void main() {
     expect(session.scope.level, GeographyLevel.state);
   });
 
-  testWidgets('Security Portal demo sign-in opens the agency response workspace', (tester) async {
+  testWidgets('production Security Portal has no synthetic agency access',
+      (tester) async {
     tester.view.physicalSize = const Size(1600, 1000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -103,16 +119,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Security Portal'));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Police • Kaduna State Command'));
-    await tester.pump();
-    await tester.tap(find.text('Police • Kaduna State Command'));
-    await tester.pump();
-    await tester.ensureVisible(find.text('Enter Security Portal'));
-    await tester.pump();
-    await tester.tap(find.text('Enter Security Portal'));
-    await tester.pumpAndSettle();
 
-    expect(find.text('AUTHORIZED AGENCY RESPONSE'), findsOneWidget);
-    expect(find.text('AGENCY-ONLY ACCESS'), findsOneWidget);
+    expect(find.text('Security Agency Sign-in'), findsOneWidget);
+    expect(find.text('Demo access'), findsNothing);
+    expect(find.text('Police • Kaduna State Command'), findsNothing);
   });
 }
