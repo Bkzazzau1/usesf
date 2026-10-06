@@ -122,12 +122,21 @@ class _TgcgAppState extends State<TgcgApp> {
       });
       unawaited(_enforceSecuritySession());
     } catch (error) {
+      debugPrint('USESF startup restore failed: $error');
       if (!mounted) return;
       setState(() {
         _startupReadiness = _StartupReadiness.failed;
-        _startupError = error.toString();
+        _startupError = _startupFailureMessage();
       });
     }
+  }
+
+  String _startupFailureMessage() {
+    if (offlinePersistenceController.state ==
+        OfflinePersistenceState.failed) {
+      return 'Encrypted local storage could not be opened on this device.';
+    }
+    return 'One or more local operational records could not be restored safely.';
   }
 
   void _retryStartup() {
