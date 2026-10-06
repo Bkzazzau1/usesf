@@ -3,7 +3,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from security_responder_auth_server import (
+from server.security_responder_auth_server import (
     ResponderAuthService,
 )
 
