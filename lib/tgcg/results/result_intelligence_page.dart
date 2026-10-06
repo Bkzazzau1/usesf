@@ -111,11 +111,23 @@ class ResultLgaAccounting {
 ResultAiAssessment buildResultAiAssessment(
   ElectionResultSubmission submission, {
   bool accountConflict = false,
+  bool canonicalPollingUnitKnown = true,
 }) {
   var score = 100;
   final findings = <ResultAiFinding>[];
   final validation = submission.validation;
   final form = submission.resultForm;
+
+  if (!canonicalPollingUnitKnown) {
+    score -= 25;
+    findings.add(
+      const ResultAiFinding(
+        label: 'Polling unit not in catalogue',
+        detail: 'The submitted polling unit is not present in the loaded canonical registry.',
+        severity: ResultAiFindingSeverity.critical,
+      ),
+    );
+  }
 
   if (form == null) {
     score -= 18;
@@ -496,6 +508,7 @@ class _ResultIntelligencePageState extends State<ResultIntelligencePage> {
               assessment: buildResultAiAssessment(
                 item,
                 accountConflict: account?.hasConflict == true,
+                canonicalPollingUnitKnown: account != null,
               ),
             );
           },
@@ -1235,6 +1248,7 @@ Future<void> _showSubmissionReport(
   final assessment = buildResultAiAssessment(
     submission,
     accountConflict: account?.hasConflict == true,
+    canonicalPollingUnitKnown: account != null,
   );
   final member = membership.memberById(submission.submittedBy);
   final callReady =
