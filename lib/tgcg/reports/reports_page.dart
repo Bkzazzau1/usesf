@@ -1257,6 +1257,7 @@ IconData _jobIcon(ExportJobStatus status) => switch (status) {
     };
 
 String _kindLabel(ReportKind kind) => switch (kind) {
+      ReportKind.executiveBrief => 'Executive Brief',
       ReportKind.incidentSummary => 'Incident Summary',
       ReportKind.fieldActivity => 'Field Activity',
       ReportKind.membershipDeployment => 'Membership & Deployment',
