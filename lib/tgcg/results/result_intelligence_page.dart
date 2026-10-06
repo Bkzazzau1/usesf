@@ -332,14 +332,14 @@ List<PollingUnitResultAccount> buildPollingUnitResultAccounts({
         ? ResultAccountingState.missing
         : unresolvedList.length > 1
             ? ResultAccountingState.conflict
-            : records.any(
-                (item) =>
-                    item.status == RecordStatus.underReview ||
-                    item.validation?.requiresHumanReview == true,
-              )
-                ? ResultAccountingState.aiReview
-                : records.any((item) => item.status == RecordStatus.verified)
-                    ? ResultAccountingState.verified
+            : records.any((item) => item.status == RecordStatus.verified)
+                ? ResultAccountingState.verified
+                : records.any(
+                    (item) =>
+                        item.status == RecordStatus.underReview ||
+                        item.validation?.requiresHumanReview == true,
+                  )
+                    ? ResultAccountingState.aiReview
                     : records.any(
                         (item) => item.status == RecordStatus.disputed,
                       )
@@ -1277,7 +1277,19 @@ Future<void> _showSubmissionReport(
                                 other,
                                 accountConflict: true,
                               ),
-                              onTap: () {},
+                              onTap: () {
+                                Navigator.pop(dialogContext);
+                                _showSubmissionReport(
+                                  context,
+                                  submission: other,
+                                  account: account,
+                                  membership: membership,
+                                  results: results,
+                                  calls: calls,
+                                  session: session,
+                                  stateScope: stateScope,
+                                );
+                              },
                             ),
                       ],
                     ),
