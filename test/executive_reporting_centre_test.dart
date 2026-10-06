@@ -144,10 +144,10 @@ void main() {
   });
 
   group('Executive Brief export authority', () {
-    test('State Coordinator can queue a statewide Executive Brief', () {
+    test('State Coordinator can queue a statewide Executive Brief', () async {
       final beforeAudit = governance.auditEvents.length;
 
-      final job = reports.requestExport(
+      final job = await reports.requestExport(
         kind: ReportKind.executiveBrief,
         format: ExportFormat.pdf,
         targetScope: GeographicScope.kaduna,
@@ -167,10 +167,10 @@ void main() {
       expect(governance.auditEvents.first.action, 'report_export_requested');
     });
 
-    test('Executive Brief cannot target an LGA', () {
+    test('Executive Brief cannot target an LGA', () async {
       final lga = geography.lga('KD-ZARIA')!;
 
-      final job = reports.requestExport(
+      final job = await reports.requestExport(
         kind: ReportKind.executiveBrief,
         format: ExportFormat.pdf,
         targetScope: lga.scope,
@@ -185,8 +185,8 @@ void main() {
       expect(job, isNull);
     });
 
-    test('Senatorial Coordinator cannot export the State Executive Brief', () {
-      final job = reports.requestExport(
+    test('Senatorial Coordinator cannot export the State Executive Brief', () async {
+      final job = await reports.requestExport(
         kind: ReportKind.executiveBrief,
         format: ExportFormat.pdf,
         targetScope: GeographicScope.kaduna,
@@ -201,8 +201,8 @@ void main() {
       expect(job, isNull);
     });
 
-    test('ordinary State Coordinator report permissions remain unchanged', () {
-      final incident = reports.requestExport(
+    test('ordinary State Coordinator report permissions remain unchanged', () async {
+      final incident = await reports.requestExport(
         kind: ReportKind.incidentSummary,
         format: ExportFormat.pdf,
         targetScope: GeographicScope.kaduna,
@@ -213,7 +213,7 @@ void main() {
           TgcgRole.stateCoordinator,
         ),
       );
-      final audit = reports.requestExport(
+      final audit = await reports.requestExport(
         kind: ReportKind.auditTrail,
         format: ExportFormat.csv,
         targetScope: GeographicScope.kaduna,
