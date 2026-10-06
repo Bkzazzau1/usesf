@@ -227,6 +227,49 @@ void main() {
       );
     });
 
+    test('State Coordinator cannot provision responder credentials',
+        () async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final persistence = OfflinePersistenceController(
+        openDatabase: () async => InMemoryOfflineDatabase(),
+      );
+      await persistence.initialize();
+      final governance = GovernanceOperationsController.productionFoundation(
+        persistence: persistence,
+      );
+      final emergency = EmergencyResponseController.productionFoundation(
+        governance: governance,
+        persistence: persistence,
+      );
+
+      final agency = await emergency.upsertAgency(
+        id: 'AGENCY-KD-FRSC',
+        name: 'Kaduna Road Safety Response Desk',
+        shortName: 'Road Safety',
+        type: EmergencyAgencyType.roadSafety,
+        coverage: GeographicScope.kaduna,
+        commandDesk: 'Kaduna State Operations Desk',
+        contactPhone: '+2348000000103',
+        actorId: 'SYSTEM-ADMIN',
+        actorRole: TgcgRole.stateAdministrator,
+        authorizedScope: GeographicScope.kaduna,
+      );
+
+      expect(
+        () => emergency.provisionResponder(
+          agencyId: agency.id,
+          serviceNumber: 'FRSC/12345',
+          displayName: 'Responder Officer',
+          accessCode: 'SecureAccess123!',
+          responderScope: GeographicScope.kaduna,
+          actorId: 'STATE-COORD',
+          actorRole: TgcgRole.stateCoordinator,
+          authorizedScope: GeographicScope.kaduna,
+        ),
+        throwsA(isA<StateError>()),
+      );
+    });
+
     test('responder credential cannot escalate beyond provisioned scope',
         () async {
       FlutterSecureStorage.setMockInitialValues({});
