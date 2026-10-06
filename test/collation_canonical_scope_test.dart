@@ -1,18 +1,22 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:usesf/tgcg/collation/collation_engine.dart';
 import 'package:usesf/tgcg/domain/models.dart';
+import 'package:usesf/tgcg/geography/geography_registry.dart';
 
 void main() {
-  test('canonical PU registry supplies missing parent geography during drill-down', () {
-    final engine = CollationEngine.prototypeSeed();
-    const state = GeographicScope(
-      level: GeographyLevel.state,
-      country: 'Nigeria',
-      zoneId: 'NW',
-      zoneName: 'North West',
-      stateId: 'KD',
-      stateName: 'Kaduna',
-    );
+  const state = GeographicScope(
+    level: GeographyLevel.state,
+    country: 'Nigeria',
+    zoneId: 'NW',
+    zoneName: 'North West',
+    stateId: 'KD',
+    stateName: 'Kaduna',
+  );
+
+  test('canonical PU registry supplies missing parent geography during drill-down',
+      () {
+    final geography = GeographyRegistry.prototypeSeed();
+    final engine = CollationEngine.fromGeography(geography);
     final district = engine
         .childScopes(state)
         .singleWhere((scope) => scope.senatorialDistrictId == 'SD/053/KD');
@@ -49,5 +53,46 @@ void main() {
     expect(summary.verifiedPollingUnitCount, 1);
     expect(summary.includedSubmissionIds, ['R-LEGACY']);
     expect(summary.partyVotes, {'P1': 12, 'P2': 8});
+  });
+
+  test('collation expectations follow the live canonical polling-unit registry',
+      () {
+    final geography = GeographyRegistry.prototypeSeed();
+    final engine = CollationEngine.fromGeography(geography);
+
+    expect(
+      engine.summarize(state, const []).expectedPollingUnitCount,
+      geography.pollingUnits.length,
+    );
+
+    final source = geography.pollingUnits.first;
+    final extraScope = GeographicScope(
+      level: GeographyLevel.pollingUnit,
+      country: source.scope.country,
+      zoneId: source.scope.zoneId,
+      zoneName: source.scope.zoneName,
+      stateId: source.scope.stateId,
+      stateName: source.scope.stateName,
+      senatorialDistrictId: source.scope.senatorialDistrictId,
+      senatorialDistrictName: source.scope.senatorialDistrictName,
+      lgaId: source.scope.lgaId,
+      lgaName: source.scope.lgaName,
+      wardId: source.scope.wardId,
+      wardName: source.scope.wardName,
+      pollingUnitId: 'KD-KN-W01-PU999',
+      pollingUnitName: 'PU 999',
+    );
+    geography.replacePollingUnits([
+      ...geography.pollingUnits,
+      CanonicalPollingUnit(
+        code: 'KD-KN-W01-PU999',
+        scope: extraScope,
+      ),
+    ]);
+
+    final updated = engine.summarize(state, const []);
+
+    expect(updated.expectedPollingUnitCount, geography.pollingUnits.length);
+    expect(updated.missingPollingUnitIds, contains('KD-KN-W01-PU999'));
   });
 }
