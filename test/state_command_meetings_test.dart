@@ -153,8 +153,8 @@ void main() {
     });
 
     test('lower coordinator cannot schedule a State command meeting', () async {
-      expect(
-        () => meetings.scheduleMeeting(
+      await expectLater(
+        meetings.scheduleMeeting(
           title: 'Unauthorized meeting',
           scope: GeographicScope.kaduna,
           inviteeMemberIds: const ['MEM-0001'],
@@ -178,8 +178,8 @@ void main() {
         scheduledAt: DateTime.utc(2026, 10, 7, 9),
       );
 
-      expect(
-        () => calls.startConference(
+      await expectLater(
+        calls.startConference(
           recipientMemberIds: meeting.inviteeMemberIds,
           callerId: 'STATE-COORD',
           callerName: 'State Coordinator',
