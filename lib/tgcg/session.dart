@@ -39,6 +39,7 @@ enum SessionTerminationReason {
   absoluteLifetime,
   remoteSessionExpired,
   centrallyRevoked,
+  centralValidationFailed,
 }
 
 class TgcgSessionController extends ChangeNotifier {
