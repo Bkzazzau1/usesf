@@ -965,7 +965,7 @@ class EmergencyResponseController extends ChangeNotifier {
   }
 
   static String _normalizeServiceNumber(String value) =>
-      value.trim().toUpperCase().replaceAll(RegExp(r'\\s+'), '');
+      value.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '');
 
   static String _responderCredentialKey(String responderId) =>
       'usesf.security.responder.$responderId.access_code';
