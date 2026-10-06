@@ -32,6 +32,12 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
   }
 
   Future<void> _signIn() async {
+    if (accessIdController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter your Access ID to continue.')),
+      );
+      return;
+    }
     final membership = MembershipOperations.of(context, listen: false);
     var scope = GeographicScope.kaduna;
     if (selectedRole == TgcgRole.senatorialCoordinator) {
