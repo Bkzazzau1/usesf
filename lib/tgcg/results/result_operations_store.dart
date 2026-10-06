@@ -17,7 +17,7 @@ class ResultOperationsController extends ChangeNotifier {
     required OfflinePersistenceController persistence,
   }) =>
       ResultOperationsController._(
-        submissions: const [],
+        submissions: <ElectionResultSubmission>[],
         persistence: persistence,
       );
 
