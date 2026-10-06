@@ -346,6 +346,7 @@ class ElectionResultSubmission {
     this.rejectedVotes,
     this.registeredVoters,
     this.resultForm,
+    this.ocrPartyVotes,
     this.validation,
     this.verifiedBy,
     this.verifiedAt,
@@ -366,6 +367,7 @@ class ElectionResultSubmission {
   final int? rejectedVotes;
   final int? registeredVoters;
   final EvidenceAttachment? resultForm;
+  final Map<String, int>? ocrPartyVotes;
   final ResultValidationSummary? validation;
   final String? verifiedBy;
   final DateTime? verifiedAt;
