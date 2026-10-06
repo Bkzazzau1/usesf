@@ -276,9 +276,12 @@ class _StateCommunicationsCommandPageState
     );
     final exceptions = buildStateCommunicationExceptions(snapshot);
     final scopes = _targetScopes(membership);
-    if (!scopes.any((item) => _sameScope(item, _targetScope))) {
-      _targetScope = GeographicScope.kaduna;
-    }
+    final matchingScope = scopes.where(
+      (item) => _sameScope(item, _targetScope),
+    );
+    _targetScope = matchingScope.isEmpty
+        ? scopes.first
+        : matchingScope.first;
 
     final activeGroups = assignments.groupAssignments
         .where((item) => !item.isTerminal)
