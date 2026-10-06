@@ -117,14 +117,13 @@ class _SecurityPortalLoginPageState extends State<SecurityPortalLoginPage> {
       );
 
       Navigator.of(context).pop();
-      TgcgSession.of(context, listen: false).signIn(
+      await TgcgSession.of(context, listen: false).signIn(
         role: TgcgRole.securityOfficer,
         operatorName: responder.displayName,
         accessId: responder.serviceNumber,
         scope: scope,
         agencyId: agency.id,
         securitySessionToken: authentication.remoteSessionToken,
-        securitySessionExpiresAt: authentication.remoteSessionExpiresAt,
       );
     } finally {
       if (mounted) setState(() => _signingIn = false);
