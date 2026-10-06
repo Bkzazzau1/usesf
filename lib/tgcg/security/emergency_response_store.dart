@@ -267,7 +267,10 @@ class EmergencyResponseController extends ChangeNotifier {
 
     for (final row in dispatchRows) {
       final dispatch = _dispatchFromJson(row);
-      if (dispatch == null) continue;
+      if (dispatch == null ||
+          !_agencies.any((agency) => agency.id == dispatch.agencyId)) {
+        continue;
+      }
       final index = _dispatches.indexWhere((item) => item.id == dispatch.id);
       if (index < 0) {
         _dispatches.add(dispatch);
