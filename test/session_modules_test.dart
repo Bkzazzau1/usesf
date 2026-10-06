@@ -2,6 +2,90 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:usesf/tgcg/session.dart';
 
 void main() {
+  group('Security responder session lifetime', () {
+    test('inactivity expires a security session', () {
+      var now = DateTime.utc(2026, 10, 6, 17);
+      final session = TgcgSessionController(clock: () => now)
+        ..signIn(
+          role: TgcgRole.securityOfficer,
+          operatorName: 'Responder',
+          accessId: 'AP/100',
+          agencyId: 'AGENCY-POLICE',
+        );
+
+      now = now.add(const Duration(minutes: 15));
+      expect(session.enforceSecurityExpiry(), isTrue);
+      expect(session.isAuthenticated, isFalse);
+      expect(
+        session.lastTerminationReason,
+        SessionTerminationReason.inactivityTimeout,
+      );
+    });
+
+    test('activity cannot extend a security session beyond eight hours', () {
+      var now = DateTime.utc(2026, 10, 6, 8);
+      final session = TgcgSessionController(clock: () => now)
+        ..signIn(
+          role: TgcgRole.securityOfficer,
+          operatorName: 'Responder',
+          accessId: 'AP/101',
+          agencyId: 'AGENCY-POLICE',
+        );
+
+      for (var hour = 1; hour < 8; hour++) {
+        now = DateTime.utc(2026, 10, 6, 8 + hour);
+        session.recordActivity();
+        expect(session.enforceSecurityExpiry(), isFalse);
+      }
+      now = DateTime.utc(2026, 10, 6, 16);
+      expect(session.enforceSecurityExpiry(), isTrue);
+      expect(
+        session.lastTerminationReason,
+        SessionTerminationReason.absoluteLifetime,
+      );
+    });
+
+    test('backgrounding immediately locks a security session', () {
+      final session = TgcgSessionController()
+        ..signIn(
+          role: TgcgRole.securityOfficer,
+          operatorName: 'Responder',
+          accessId: 'AP/102',
+          agencyId: 'AGENCY-POLICE',
+          securitySessionToken: 'ephemeral-token',
+        );
+
+      expect(session.lockForBackground(), isTrue);
+      expect(session.isAuthenticated, isFalse);
+      expect(session.securitySessionToken, isNull);
+      expect(
+        session.lastTerminationReason,
+        SessionTerminationReason.backgroundLock,
+      );
+    });
+
+    test('server token expiry terminates the local session', () {
+      var now = DateTime.utc(2026, 10, 6, 17);
+      final session = TgcgSessionController(clock: () => now)
+        ..signIn(
+          role: TgcgRole.securityOfficer,
+          operatorName: 'Responder',
+          accessId: 'AP/103',
+          agencyId: 'AGENCY-POLICE',
+          securitySessionToken: 'ephemeral-token',
+          securitySessionExpiresAt:
+              now.add(const Duration(minutes: 10)),
+        );
+
+      now = now.add(const Duration(minutes: 10));
+      expect(session.enforceSecurityExpiry(), isTrue);
+      expect(
+        session.lastTerminationReason,
+        SessionTerminationReason.remoteSessionExpired,
+      );
+    });
+  });
+
   group('USESF role-aware modules', () {
     test('polling unit agent sees operational submission modules only', () {
       final modules = allowedModules(TgcgRole.pollingUnitAgent);
