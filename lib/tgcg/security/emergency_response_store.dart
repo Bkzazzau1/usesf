@@ -534,18 +534,6 @@ class EmergencyResponseController extends ChangeNotifier {
       active: active,
     );
 
-    final remoteAuth = _remoteAuth;
-    if (remoteAuth != null) {
-      await remoteAuth.provisionCredential(
-        responderId: responder.id,
-        agencyId: responder.agencyId,
-        serviceNumber: responder.serviceNumber,
-        displayName: responder.displayName,
-        accessCode: accessCode,
-        authorizedScope: responder.authorizedScope,
-      );
-    }
-
     final credential = await _newResponderCredential(accessCode);
     final credentialKey = _responderCredentialKey(responder.id);
     final previousCredential = await _credentialStorage.read(key: credentialKey);
@@ -681,6 +669,8 @@ class EmergencyResponseController extends ChangeNotifier {
               : ResponderAuthenticationResult.locked(localLockedUntil);
         case RemoteResponderAuthenticationStatus.unavailable:
           break;
+        case RemoteResponderAuthenticationStatus.serverError:
+          return const ResponderAuthenticationResult.rejected();
       }
     }
 
