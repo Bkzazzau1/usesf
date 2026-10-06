@@ -5,7 +5,6 @@ import '../assignments/assignment_store.dart';
 import '../devices/managed_device_store.dart';
 import '../domain/models.dart';
 import '../domain/permissions.dart';
-import '../geography/kaduna_geography.dart';
 import '../governance/governance_store.dart';
 import '../meeting/operational_call_store.dart';
 import '../results/result_operations_store.dart';
@@ -182,7 +181,7 @@ MemberIntelligenceSnapshot buildMemberIntelligenceSnapshot({
   if (device != null) score += 10;
   if (homePollingUnit != null) score += 10;
   if (activeAssignments.isEmpty || gps != null) score += 15;
-  score = score.clamp(0, 100).toInt();
+  score = member.isBlocked ? 0 : score.clamp(0, 100).toInt();
 
   final operationalAttention = attention.any(
     (item) =>
@@ -465,10 +464,16 @@ class _MembershipIntelligencePageState
             .firstOrNull;
 
     final activeCount = snapshots
-        .where((item) => item.member.accountStatus == MemberAccountStatus.active)
+        .where(
+          (item) =>
+              item.member.accountStatus == MemberAccountStatus.active &&
+              !item.member.isBlocked,
+        )
         .length;
     final pendingActivation = snapshots
-        .where((item) => item.member.isPendingActivation)
+        .where(
+          (item) => item.member.isPendingActivation && !item.member.isBlocked,
+        )
         .length;
     final blocked = snapshots.where((item) => item.member.isBlocked).length;
     final noRole = snapshots.where((item) => item.roles.isEmpty).length;
