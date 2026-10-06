@@ -163,7 +163,8 @@ class ResultFormParser {
         [total, accredited, rejected, registered]
             .where((value) => value != null)
             .length;
-    final confidence = (extractedFields / expectedFields).clamp(0.0, 1.0);
+    final confidence =
+        (extractedFields / expectedFields).clamp(0.0, 1.0).toDouble();
 
     return CapturedResultForm(
       evidence: evidence,
