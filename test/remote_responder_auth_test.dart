@@ -175,6 +175,8 @@ void main() {
 
     final result = await fixture.emergency.validateConnectedSession(
       sessionToken: 'server-session-token',
+      agencyId: fixture.agency.id,
+      serviceNumber: fixture.responder.serviceNumber,
     );
 
     expect(result, ResponderSessionValidationStatus.revoked);
@@ -191,9 +193,42 @@ void main() {
 
     final result = await fixture.emergency.validateConnectedSession(
       sessionToken: 'server-session-token',
+      agencyId: fixture.agency.id,
+      serviceNumber: fixture.responder.serviceNumber,
     );
 
     expect(result, ResponderSessionValidationStatus.unavailable);
+  });
+
+  test('confirmed central revocation blocks later offline reauthentication',
+      () async {
+    final fixture = await buildFixture();
+    fixture.remote.validationResult =
+        const RemoteResponderSessionResult(
+      status: RemoteResponderSessionStatus.revoked,
+    );
+
+    final validation = await fixture.emergency.validateConnectedSession(
+      sessionToken: 'server-session-token',
+      agencyId: fixture.agency.id,
+      serviceNumber: fixture.responder.serviceNumber,
+    );
+    expect(validation, ResponderSessionValidationStatus.revoked);
+
+    fixture.remote.authenticationResult =
+        const RemoteResponderAuthenticationResult(
+      status: RemoteResponderAuthenticationStatus.unavailable,
+    );
+
+    final offlineAttempt =
+        await fixture.emergency.authenticateResponderCredential(
+      agencyId: fixture.agency.id,
+      serviceNumber: fixture.responder.serviceNumber,
+      accessCode: 'CentralAccess123!',
+      requestedScope: GeographicScope.kaduna,
+    );
+
+    expect(offlineAttempt.status, ResponderAuthenticationStatus.rejected);
   });
 
   test('central rejection is never overridden by a valid local secret',
