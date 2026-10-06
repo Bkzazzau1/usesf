@@ -81,6 +81,7 @@ class _TgcgAppState extends State<TgcgApp> {
       await fieldOperationsController.hydrateFromOffline();
       await resultOperationsController.hydrateFromOffline();
       await communicationsController.hydrateFromOffline();
+      await bulkCommunicationsController.hydrateFromOffline();
       await operationalCallController.hydrateFromOffline();
       await commandMeetingController.hydrateFromOffline();
     } catch (_) {
