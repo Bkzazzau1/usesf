@@ -19,7 +19,7 @@ remote service is reachable its decision is authoritative across devices.
 - connected responder session tokens persist until explicit sign-out or administrative revocation and are stored only as SHA-256 hashes
 - re-provisioning or disabling a responder revokes all of that responder's active sessions
 
-For a horizontally scaled deployment, move the two tables in
+For a horizontally scaled deployment, move the responder auth tables in
 `security_responder_auth_server.py` to a shared transactional database such as
 PostgreSQL. Do not run independent SQLite files behind a load balancer.
 
