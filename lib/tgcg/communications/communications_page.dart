@@ -156,13 +156,13 @@ class _CommunicationsPageState extends State<CommunicationsPage> {
     );
   }
 
-  void _sendMessage(
+  Future<void> _sendMessage(
     BuildContext context, {
     required CommunicationsController store,
     required TgcgSessionController session,
     required OperationalRoom room,
-  }) {
-    final ok = store.sendMessage(
+  }) async {
+    final ok = await store.sendMessage(
       roomId: room.id,
       senderId: session.accessId.isEmpty
           ? session.operatorName
@@ -183,7 +183,7 @@ class _CommunicationsPageState extends State<CommunicationsPage> {
         listen: false,
       ),
     );
-    if (!ok) return;
+    if (!ok || !context.mounted) return;
     messageController.clear();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -192,18 +192,18 @@ class _CommunicationsPageState extends State<CommunicationsPage> {
     );
   }
 
-  void _sendBroadcast(
+  Future<void> _sendBroadcast(
     BuildContext context, {
     required CommunicationsController store,
     required TgcgSessionController session,
-  }) {
+  }) async {
     final authority = TgcgAccessPolicy.authorizingScope(
       context,
       TgcgCapability.sendBroadcast,
       listen: false,
     );
     if (authority == null) return;
-    final ok = store.sendBroadcast(
+    final ok = await store.sendBroadcast(
       title: broadcastTitleController.text,
       body: broadcastBodyController.text,
       targetScope: authority,
@@ -214,7 +214,7 @@ class _CommunicationsPageState extends State<CommunicationsPage> {
       userScope: authority,
       capabilityAuthorized: true,
     );
-    if (!ok) return;
+    if (!ok || !context.mounted) return;
     broadcastTitleController.clear();
     broadcastBodyController.clear();
     ScaffoldMessenger.of(context).showSnackBar(
