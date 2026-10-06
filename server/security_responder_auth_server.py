@@ -25,7 +25,6 @@ PBKDF2_ITERATIONS = 120_000
 MAX_FAILURES = 5
 FAILURE_WINDOW = timedelta(minutes=15)
 LOCKOUT_DURATION = timedelta(minutes=15)
-SESSION_LIFETIME = timedelta(hours=8)
 DUMMY_SALT = b"USESF-SECURITY-1"
 DUMMY_HASH = hashlib.pbkdf2_hmac(
     "sha256",
@@ -335,7 +334,6 @@ class ResponderAuthService:
             )
             session_token = secrets.token_urlsafe(32)
             session_token_hash = self._hash_session_token(session_token)
-            expires_at = current_time + SESSION_LIFETIME
             connection.execute(
                 """
                 INSERT INTO security_responder_sessions (
@@ -349,7 +347,7 @@ class ResponderAuthService:
                     responder["agency_id"],
                     responder["service_number"],
                     _iso(current_time),
-                    _iso(expires_at),
+                    "persistent",
                     _iso(current_time),
                 ),
             )
@@ -363,7 +361,6 @@ class ResponderAuthService:
                     "displayName": responder["display_name"],
                     "authorizedScope": authorized_scope,
                     "sessionToken": session_token,
-                    "sessionExpiresAt": _iso(expires_at),
                 },
             )
 
@@ -398,14 +395,8 @@ class ResponderAuthService:
                 connection.commit()
                 return SessionValidationResult(status="revoked")
 
-            expires_at = _parse_time(row["expires_at"])
             revoked_at = _parse_time(row["revoked_at"])
-            if (
-                revoked_at is not None
-                or not row["active"]
-                or expires_at is None
-                or current_time >= expires_at
-            ):
+            if revoked_at is not None or not row["active"]:
                 if revoked_at is None:
                     connection.execute(
                         """
@@ -418,7 +409,6 @@ class ResponderAuthService:
                 connection.commit()
                 return SessionValidationResult(
                     status="revoked",
-                    expires_at=expires_at,
                 )
 
             connection.execute(
@@ -433,7 +423,6 @@ class ResponderAuthService:
             connection.commit()
             return SessionValidationResult(
                 status="active",
-                expires_at=expires_at,
                 responder={
                     "responderId": row["responder_id"],
                     "agencyId": row["agency_id"],
@@ -470,6 +459,23 @@ class ResponderAuthService:
                 """,
                 (_iso(now), agency_id.strip(), normalized_service),
             )
+            connection.commit()
+            return updated > 0
+
+    def revoke_session(self, session_token: str) -> bool:
+        token_hash = self._hash_session_token(session_token)
+        now = _utcnow()
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            updated = connection.execute(
+                """
+                UPDATE security_responder_sessions
+                SET revoked_at = ?
+                WHERE session_token_hash = ?
+                  AND revoked_at IS NULL
+                """,
+                (_iso(now), token_hash),
+            ).rowcount
             connection.commit()
             return updated > 0
 
@@ -541,6 +547,9 @@ class ResponderAuthHttpHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/v1/security/responders/session/validate":
             self._handle_session_validate()
+            return
+        if self.path == "/v1/security/responders/session/revoke":
+            self._handle_session_revoke()
             return
         if self.path == "/v1/security/responders/disable":
             self._handle_disable()
@@ -615,14 +624,28 @@ class ResponderAuthHttpHandler(BaseHTTPRequestHandler):
 
         result = self.service.validate_session(token)
         if result.status == "active":
-            payload = dict(result.responder or {})
-            payload["sessionExpiresAt"] = _iso(result.expires_at)
-            self._json(HTTPStatus.OK, payload)
+            self._json(HTTPStatus.OK, dict(result.responder or {}))
         else:
             self._json(
                 HTTPStatus.UNAUTHORIZED,
                 {"message": "Responder session is no longer active."},
             )
+
+    def _handle_session_revoke(self) -> None:
+        authorization = self.headers.get("Authorization", "")
+        prefix = "Bearer "
+        if not authorization.startswith(prefix):
+            self._json(HTTPStatus.UNAUTHORIZED, {"message": "Session unavailable."})
+            return
+        token = authorization[len(prefix):].strip()
+        if not token:
+            self._json(HTTPStatus.UNAUTHORIZED, {"message": "Session unavailable."})
+            return
+        revoked = self.service.revoke_session(token)
+        self._json(
+            HTTPStatus.OK if revoked else HTTPStatus.UNAUTHORIZED,
+            {"revoked": revoked},
+        )
 
     def _handle_disable(self) -> None:
         authorization = self.headers.get("Authorization", "")
