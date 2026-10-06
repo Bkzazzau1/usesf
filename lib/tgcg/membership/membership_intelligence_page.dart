@@ -551,7 +551,7 @@ class _MembershipMetrics extends StatelessWidget {
               TgcgMetricCard(
                 width: width,
                 label: 'Members',
-                value: '§total',
+                value: '$total',
                 detail: 'State registry',
                 icon: Icons.groups_2_outlined,
                 tone: TgcgMetricTone.info,
@@ -559,7 +559,7 @@ class _MembershipMetrics extends StatelessWidget {
               TgcgMetricCard(
                 width: width,
                 label: 'Active',
-                value: '§active',
+                value: '$active',
                 detail: 'Account active',
                 icon: Icons.verified_user_outlined,
                 tone: TgcgMetricTone.success,
@@ -567,7 +567,7 @@ class _MembershipMetrics extends StatelessWidget {
               TgcgMetricCard(
                 width: width,
                 label: 'Pending activation',
-                value: '§pendingActivation',
+                value: '$pendingActivation',
                 detail: 'First password pending',
                 icon: Icons.schedule_rounded,
                 tone: pendingActivation == 0
@@ -577,7 +577,7 @@ class _MembershipMetrics extends StatelessWidget {
               TgcgMetricCard(
                 width: width,
                 label: 'Blocked',
-                value: '§blocked',
+                value: '$blocked',
                 detail: 'Access restricted',
                 icon: Icons.block_outlined,
                 tone: blocked == 0
@@ -587,7 +587,7 @@ class _MembershipMetrics extends StatelessWidget {
               TgcgMetricCard(
                 width: width,
                 label: 'Without role',
-                value: '§noRole',
+                value: '$noRole',
                 detail: 'No active role',
                 icon: Icons.badge_outlined,
                 tone: noRole == 0
@@ -597,7 +597,7 @@ class _MembershipMetrics extends StatelessWidget {
               TgcgMetricCard(
                 width: width,
                 label: 'Deployed',
-                value: '§deployed',
+                value: '$deployed',
                 detail: 'Active assignment',
                 icon: Icons.assignment_ind_outlined,
                 tone: TgcgMetricTone.ai,
@@ -605,7 +605,7 @@ class _MembershipMetrics extends StatelessWidget {
               TgcgMetricCard(
                 width: width,
                 label: 'GPS active',
-                value: '§gpsActive/§deployed',
+                value: '$gpsActive/$deployed',
                 detail: 'Deployed & reachable',
                 icon: Icons.gps_fixed_rounded,
                 tone: deployed > 0 && gpsActive == deployed
@@ -708,7 +708,7 @@ class _LeadershipStat extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '§filled/§expected',
+            '$filled/$expected',
             style: TextStyle(
               color: complete ? TgcgColors.success : TgcgColors.warning,
               fontSize: 20,
