@@ -22,6 +22,7 @@ import 'governance/role_assignment_page.dart';
 import 'media/media_intelligence_page.dart';
 import 'meeting/meeting_room_page.dart';
 import 'membership/member_operations_page.dart';
+import 'membership/membership_intelligence_page.dart';
 import 'membership/member_shell.dart';
 import 'membership/pvc_enrollment_page.dart';
 import 'membership/state_member_enrollment_page.dart';
@@ -100,6 +101,9 @@ class _TgcgShellState extends State<TgcgShell> {
     final coverageIntelligence =
         allowed.contains(TgcgModule.geography) &&
         session.role == TgcgRole.stateCoordinator;
+    final membershipIntelligence =
+        allowed.contains(TgcgModule.membershipNetwork) &&
+        session.role == TgcgRole.stateCoordinator;
     final destinations = _destinations
         .where((item) => allowed.contains(item.module))
         .map(
@@ -128,6 +132,15 @@ class _TgcgShellState extends State<TgcgShell> {
                 item.module,
                 'State Coverage Intelligence',
                 Icons.public_rounded,
+                item.group,
+              );
+            }
+            if (item.module == TgcgModule.membershipNetwork &&
+                membershipIntelligence) {
+              return _Destination(
+                item.module,
+                'Membership Intelligence',
+                Icons.groups_2_outlined,
                 item.group,
               );
             }
@@ -208,6 +221,7 @@ class _TgcgShellState extends State<TgcgShell> {
                             evidenceIntelligence: evidenceIntelligence,
                             resultIntelligence: resultIntelligence,
                             coverageIntelligence: coverageIntelligence,
+                            membershipIntelligence: membershipIntelligence,
                             showAlerts: allowed.contains(TgcgModule.alertCenter),
                             onAlerts: () => _select(TgcgModule.alertCenter),
                             onTour: () => _openTour(allowed),
@@ -243,9 +257,15 @@ class _TgcgShellState extends State<TgcgShell> {
           : PvcEnrollmentPage(
               onOpenAssignments: () => _select(TgcgModule.assignmentControl),
             ),
-        TgcgModule.membershipNetwork => MemberOperationsPage(
-            onOpenModule: _select,
-          ),
+        TgcgModule.membershipNetwork =>
+          session.role == TgcgRole.stateCoordinator
+              ? MembershipIntelligencePage(
+                  onOpenModule: _select,
+                  onAssignRole: _openRoleAssignmentFor,
+                )
+              : MemberOperationsPage(
+                  onOpenModule: _select,
+                ),
         TgcgModule.roleAssignment => RoleAssignmentPage(
             initialMemberId: _preferredRoleMemberId,
           ),
@@ -577,6 +597,7 @@ class _CommandBar extends StatelessWidget {
     required this.evidenceIntelligence,
     required this.resultIntelligence,
     required this.coverageIntelligence,
+    required this.membershipIntelligence,
     required this.showAlerts,
     required this.onAlerts,
     required this.onTour,
@@ -586,6 +607,7 @@ class _CommandBar extends StatelessWidget {
   final bool evidenceIntelligence;
   final bool resultIntelligence;
   final bool coverageIntelligence;
+  final bool membershipIntelligence;
   final bool showAlerts;
   final VoidCallback onAlerts;
   final VoidCallback onTour;
@@ -626,6 +648,7 @@ class _CommandBar extends StatelessWidget {
               evidenceIntelligence: evidenceIntelligence,
               resultIntelligence: resultIntelligence,
               coverageIntelligence: coverageIntelligence,
+              membershipIntelligence: membershipIntelligence,
             ),
             style: const TextStyle(color: TgcgColors.ink, fontSize: 14, fontWeight: FontWeight.w900),
           ),
@@ -769,10 +792,12 @@ String _moduleLabel(
   bool evidenceIntelligence = false,
   bool resultIntelligence = false,
   bool coverageIntelligence = false,
+  bool membershipIntelligence = false,
 }) => switch (module) {
       TgcgModule.overview => 'Command Overview',
       TgcgModule.memberEnrollment => 'Member Enrolment',
-      TgcgModule.membershipNetwork => 'Registered Members',
+      TgcgModule.membershipNetwork =>
+        membershipIntelligence ? 'Membership Intelligence' : 'Registered Members',
       TgcgModule.roleAssignment => 'Role Assignment',
       TgcgModule.geography =>
         coverageIntelligence
