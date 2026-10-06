@@ -1,7 +1,12 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'domain/models.dart';
 import 'domain/permissions.dart';
+import 'offline/offline_payloads.dart';
 
 export 'domain/models.dart';
 
@@ -34,36 +39,29 @@ enum TgcgModule {
 
 enum SessionTerminationReason {
   explicitSignOut,
-  backgroundLock,
-  inactivityTimeout,
-  absoluteLifetime,
-  remoteSessionExpired,
   centrallyRevoked,
   centralValidationFailed,
+  accountUnavailable,
 }
 
 class TgcgSessionController extends ChangeNotifier {
   TgcgSessionController({
-    Duration securityInactivityTimeout = const Duration(minutes: 15),
-    Duration securityAbsoluteLifetime = const Duration(hours: 8),
-    DateTime Function()? clock,
-  })  : _securityInactivityTimeout = securityInactivityTimeout,
-        _securityAbsoluteLifetime = securityAbsoluteLifetime,
-        _clock = clock ?? DateTime.now;
-  final Duration _securityInactivityTimeout;
-  final Duration _securityAbsoluteLifetime;
-  final DateTime Function() _clock;
+    FlutterSecureStorage? secureStorage,
+  }) : _secureStorage = secureStorage ?? const FlutterSecureStorage();
+
+  static const _persistedSessionKey = 'usesf.session.v2';
+
+  final FlutterSecureStorage _secureStorage;
 
   TgcgRole? _role;
   String _operatorName = '';
   String _accessId = '';
   String? _agencyId;
   GeographicScope _scope = GeographicScope.kaduna;
-  DateTime? _signedInAt;
-  DateTime? _lastActivityAt;
   String? _securitySessionToken;
-  DateTime? _securitySessionExpiresAt;
   SessionTerminationReason? _lastTerminationReason;
+
+  Future<void> Function(String sessionToken)? onSecuritySessionSignOut;
 
   TgcgRole? get role => _role;
   String get operatorName => _operatorName;
@@ -74,21 +72,59 @@ class TgcgSessionController extends ChangeNotifier {
   GeographicScope get scope => _scope;
   bool get isAuthenticated => _role != null;
   bool get isSecuritySession => _role == TgcgRole.securityOfficer;
-  DateTime? get signedInAt => _signedInAt;
-  DateTime? get lastActivityAt => _lastActivityAt;
   String? get securitySessionToken => _securitySessionToken;
-  DateTime? get securitySessionExpiresAt => _securitySessionExpiresAt;
   SessionTerminationReason? get lastTerminationReason =>
       _lastTerminationReason;
 
-  void signIn({
+  Future<void> restorePersistedSession() async {
+    final raw = await _secureStorage.read(key: _persistedSessionKey);
+    if (raw == null || raw.isEmpty) return;
+
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) {
+        await clearPersistedSession();
+        return;
+      }
+      final roleName = decoded['role']?.toString();
+      final role = _enumByName(TgcgRole.values, roleName);
+      final operatorName = decoded['operatorName']?.toString() ?? '';
+      final accessId = decoded['accessId']?.toString() ?? '';
+      final agencyId = _clean(decoded['agencyId']);
+      final scope = geographicScopeFromJson(decoded['scope']);
+      final securitySessionToken = _clean(decoded['securitySessionToken']);
+
+      if (role == null ||
+          accessId.trim().isEmpty ||
+          scope == null ||
+          (role == TgcgRole.securityOfficer &&
+              (agencyId == null || agencyId.isEmpty))) {
+        await clearPersistedSession();
+        return;
+      }
+
+      _role = role;
+      _operatorName =
+          operatorName.trim().isEmpty ? roleLabel(role) : operatorName.trim();
+      _accessId = accessId.trim();
+      _agencyId = role == TgcgRole.securityOfficer ? agencyId : null;
+      _scope = scope;
+      _securitySessionToken =
+          role == TgcgRole.securityOfficer ? securitySessionToken : null;
+      _lastTerminationReason = null;
+      notifyListeners();
+    } catch (_) {
+      await clearPersistedSession();
+    }
+  }
+
+  Future<void> signIn({
     required TgcgRole role,
     required String operatorName,
     required String accessId,
     GeographicScope scope = GeographicScope.kaduna,
     String? agencyId,
     String? securitySessionToken,
-    DateTime? securitySessionExpiresAt,
   }) {
     if (role == TgcgRole.securityOfficer &&
         (agencyId == null || agencyId.trim().isEmpty)) {
@@ -96,58 +132,22 @@ class TgcgSessionController extends ChangeNotifier {
         'Security Officer access requires an authorized response agency.',
       );
     }
-    final now = _clock().toUtc();
+    if (accessId.trim().isEmpty) {
+      throw ArgumentError('Authenticated access requires an account ID.');
+    }
+
     _role = role;
-    _agencyId = agencyId;
+    _agencyId =
+        role == TgcgRole.securityOfficer ? agencyId?.trim() : null;
     _operatorName =
         operatorName.trim().isEmpty ? roleLabel(role) : operatorName.trim();
     _accessId = accessId.trim();
     _scope = scope;
-    _signedInAt = now;
-    _lastActivityAt = now;
     _securitySessionToken =
         role == TgcgRole.securityOfficer ? securitySessionToken : null;
-    _securitySessionExpiresAt = role == TgcgRole.securityOfficer
-        ? securitySessionExpiresAt?.toUtc()
-        : null;
     _lastTerminationReason = null;
     notifyListeners();
-  }
-
-  void recordActivity() {
-    if (!isSecuritySession || !isAuthenticated) return;
-    if (enforceSecurityExpiry()) return;
-    _lastActivityAt = _clock().toUtc();
-  }
-
-  bool enforceSecurityExpiry() {
-    if (!isSecuritySession || !isAuthenticated) return false;
-    final now = _clock().toUtc();
-    final signedInAt = _signedInAt;
-    final lastActivityAt = _lastActivityAt;
-    final remoteExpiresAt = _securitySessionExpiresAt;
-
-    if (remoteExpiresAt != null && !now.isBefore(remoteExpiresAt)) {
-      signOut(reason: SessionTerminationReason.remoteSessionExpired);
-      return true;
-    }
-    if (signedInAt != null &&
-        now.difference(signedInAt) >= _securityAbsoluteLifetime) {
-      signOut(reason: SessionTerminationReason.absoluteLifetime);
-      return true;
-    }
-    if (lastActivityAt != null &&
-        now.difference(lastActivityAt) >= _securityInactivityTimeout) {
-      signOut(reason: SessionTerminationReason.inactivityTimeout);
-      return true;
-    }
-    return false;
-  }
-
-  bool lockForBackground() {
-    if (!isSecuritySession || !isAuthenticated) return false;
-    signOut(reason: SessionTerminationReason.backgroundLock);
-    return true;
+    return _persistSession();
   }
 
   void updateScope(GeographicScope scope) {
@@ -162,22 +162,73 @@ class TgcgSessionController extends ChangeNotifier {
     if (unchanged) return;
     _scope = scope;
     notifyListeners();
+    unawaited(_persistSession());
   }
 
-  void signOut({
+  Future<void> signOut({
     SessionTerminationReason reason = SessionTerminationReason.explicitSignOut,
-  }) {
+  }) async {
+    final securityToken = _securitySessionToken;
+    _clearInMemory(reason);
+    await clearPersistedSession();
+
+    if (reason == SessionTerminationReason.explicitSignOut &&
+        securityToken != null &&
+        securityToken.isNotEmpty) {
+      try {
+        await onSecuritySessionSignOut?.call(securityToken);
+      } catch (_) {
+        // Local sign-out remains authoritative for this device even when
+        // central session revocation cannot be delivered immediately.
+      }
+    }
+  }
+
+  Future<void> clearPersistedSession() =>
+      _secureStorage.delete(key: _persistedSessionKey);
+
+  Future<void> _persistSession() async {
+    final role = _role;
+    if (role == null) {
+      await clearPersistedSession();
+      return;
+    }
+    await _secureStorage.write(
+      key: _persistedSessionKey,
+      value: jsonEncode({
+        'version': 2,
+        'role': role.name,
+        'operatorName': _operatorName,
+        'accessId': _accessId,
+        'agencyId': _agencyId,
+        'scope': geographicScopeToJson(_scope),
+        'securitySessionToken': _securitySessionToken,
+      }),
+    );
+  }
+
+  void _clearInMemory(SessionTerminationReason reason) {
     _role = null;
     _operatorName = '';
     _accessId = '';
     _agencyId = null;
     _scope = GeographicScope.kaduna;
-    _signedInAt = null;
-    _lastActivityAt = null;
     _securitySessionToken = null;
-    _securitySessionExpiresAt = null;
     _lastTerminationReason = reason;
     notifyListeners();
+  }
+
+  static T? _enumByName<T extends Enum>(List<T> values, String? name) {
+    if (name == null) return null;
+    for (final value in values) {
+      if (value.name == name) return value;
+    }
+    return null;
+  }
+
+  static String? _clean(Object? value) {
+    final text = value?.toString().trim();
+    return text == null || text.isEmpty ? null : text;
   }
 }
 
