@@ -40,7 +40,6 @@ enum TgcgModule {
 enum SessionTerminationReason {
   explicitSignOut,
   centrallyRevoked,
-  centralValidationFailed,
   accountUnavailable,
 }
 
@@ -77,7 +76,12 @@ class TgcgSessionController extends ChangeNotifier {
       _lastTerminationReason;
 
   Future<void> restorePersistedSession() async {
-    final raw = await _secureStorage.read(key: _persistedSessionKey);
+    String? raw;
+    try {
+      raw = await _secureStorage.read(key: _persistedSessionKey);
+    } catch (_) {
+      return;
+    }
     if (raw == null || raw.isEmpty) return;
 
     try {
