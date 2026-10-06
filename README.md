@@ -110,10 +110,18 @@ Assignments are separate from roles.
 - Multiple unresolved submissions for one polling unit remain a Conflict until competing records are disputed/rejected/archived or otherwise resolved. Rejected/archived submissions do not satisfy polling-unit result accounting.
 - Result Intelligence may call a registered submitter through the existing GPS-bound operational-call workflow when that member has active GPS.
 - Result Intelligence verifies individual polling-unit records; Collation aggregates verified records upward. A USESF Verified result remains an internally verified unofficial field result and is not an official electoral declaration.
+- The State Coordinator's geography module is rendered as State Coverage Intelligence rather than the shared field Geographic Operations workspace.
+- State Coverage Intelligence compares all 23 LGAs directly from the State view, then drills down LGA → Ward → Polling Unit while preserving the canonical Kaduna hierarchy.
+- Coverage readiness is a transparent operational score, not a hidden AI score: polling-unit staffing contributes 30%, fresh GPS coverage among deployed members 25%, coordinate readiness 15%, expected coordinator-role coverage 15% and unresolved-incident health 15%.
+- Areas with no loaded polling-unit catalogue are marked Catalogue Pending and do not receive a fabricated readiness score.
+- The State coverage exception queue surfaces vacant coordinator roles, PU staffing gaps, stale/mismatched GPS, missing/review coordinates, unresolved incidents and—after result activity begins—missing or conflicting PU results.
+- State Coverage Intelligence is review/intervention only: it does not expose field coordinate capture, evidence capture, incident submission or result submission controls.
+- GPS-active area coordinators and deployed PU members may be contacted through the existing GPS-bound operational-call workflow, and PU drill-down links back to Assignment Control, Evidence Intelligence and Result Intelligence.
 - Role and assignment history remain auditable after deactivation.
 
 ## Product principles
 
+- State Coordinator workspaces are command/intelligence surfaces: statewide visibility, accounting, exceptions, review and intervention. Field/coordinator/member workspaces remain execution surfaces: assigned work, capture, submission and local operations. Shared modules must reuse the same authoritative stores while presenting role-appropriate actions.
 - One person, one permanent member identity.
 - Offline-first field operations with a durable synchronization outbox.
 - Scope-aware authorization; UI visibility is never treated as authorization.
@@ -131,7 +139,7 @@ Assignments are separate from roles.
 2. Member Operations
 3. Roles & Authorization
 4. Jobs & Assignment Control
-5. Kaduna geography and polling-unit registry
+5. Geographic Operations / State Coverage Intelligence
 6. Field Monitoring / State Field Command Monitoring
 7. Evidence Capture / State Evidence Intelligence
 8. Result Capture / State Result Intelligence
