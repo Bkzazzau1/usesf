@@ -145,6 +145,16 @@ Assignments are separate from roles.
 - Executive report packages reuse the audited export queue for Executive Brief, Incident Summary, Membership & Deployment, Verified Result Accounting and Evidence Package. Artifact generation/download still depends on the backend export worker.
 - State Coordinator report visibility does not grant Audit Trail or Sync Outbox access unless the underlying audit capability exists.
 - Executive result figures remain USESF internal/unofficial operational accounting and do not constitute an official election declaration.
+- The State Coordinator's Communications module is rendered as State Communications Command and moved into the command/intelligence surface; lower authorized roles retain the scoped Communications Hub.
+- State Communications Command combines operational-room/broadcast state, consent-aware bulk-delivery jobs, provider readiness and GPS-bound operational-call accounting without creating a second communication store.
+- Operational broadcasts are immediate in-app/scoped command notices and remain separate from consent-aware Push/SMS/Email/Voice bulk delivery.
+- Bulk delivery audiences are evaluated as geographic scope ∩ selected active role(s) ∩ selected explicit member/group IDs. Empty role/member filters are ignored, preserving the existing geography-only workflow.
+- Assignment-group targeting uses the group's member IDs as an explicit audience filter; communication delivery does not grant the group access to restricted GPS, AI or system-intelligence records.
+- Communication preference, suppression and channel eligibility remain authoritative. State targeting cannot bypass an opted-out/suppressed member or manufacture a phone, email or approved app-device route.
+- State Communications Command accounts for Push/SMS reachability, queued/failed operational messages, broadcast delivery state, bulk job state, provider readiness and open operational calls, and shows all 23 LGAs for communication reachability.
+- Provider states marked not configured, degraded or unavailable are treated as delivery-readiness gaps. Bulk jobs may remain Waiting for Provider until an eligible provider is actually ready.
+- State Communications Command hands detailed consent/provider administration to Bulk Communications, collaboration to Discussion Forum/Meeting Room and people investigation to Membership Intelligence.
+- Operational broadcasts and bulk jobs retain their existing governance audit trails and geographic authorization checks.
 - Role and assignment history remain auditable after deactivation.
 
 ## Product principles
@@ -174,7 +184,7 @@ Assignments are separate from roles.
 9. Result Capture / State Result Intelligence
 10. Collation
 11. Situation Room and Live Operations
-12. Communications, discussion and meeting rooms
+12. Communications / State Communications Command, discussion and meeting rooms
 13. Media Intelligence
 14. Reports & Exports / State Executive Reporting Centre
 15. System Monitoring
