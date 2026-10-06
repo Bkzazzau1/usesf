@@ -94,5 +94,7 @@ void main() {
 
     expect(updated.expectedPollingUnitCount, geography.pollingUnits.length);
     expect(updated.missingPollingUnitIds, contains('KD-KN-W01-PU999'));
+    expect(updated.catalogueComplete, isFalse);
+    expect(updated.catalogueGapAreaIds, isNotEmpty);
   });
 }
