@@ -716,7 +716,7 @@ class FieldOperationsController extends ChangeNotifier {
     final event = IncidentOwnershipEvent(
       id: newLocalId('INC-OWN', changedAt),
       incidentId: incident.id,
-      action: previous == null
+      action: previous == null && incident.assignedTeam == null
           ? IncidentOwnershipAction.assigned
           : IncidentOwnershipAction.reassigned,
       actorId: actorId,
@@ -779,6 +779,12 @@ class FieldOperationsController extends ChangeNotifier {
     )) {
       throw StateError(
         'This account cannot clear incident ownership in this scope.',
+      );
+    }
+    if (incident.status == IncidentStatus.resolved ||
+        incident.status == IncidentStatus.closed) {
+      throw StateError(
+        'Closed or resolved incidents cannot have ownership cleared.',
       );
     }
 
