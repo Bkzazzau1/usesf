@@ -227,6 +227,167 @@ void main() {
       );
     });
 
+    test('five failed attempts trigger persistent responder lockout',
+        () async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final persistence = OfflinePersistenceController(
+        openDatabase: () async => InMemoryOfflineDatabase(),
+      );
+      await persistence.initialize();
+      final governance = GovernanceOperationsController.productionFoundation(
+        persistence: persistence,
+      );
+      final emergency = EmergencyResponseController.productionFoundation(
+        governance: governance,
+        persistence: persistence,
+      );
+
+      final agency = await emergency.upsertAgency(
+        id: 'AGENCY-KD-POLICE-LOCK',
+        name: 'Kaduna Police Lockout Desk',
+        shortName: 'Police',
+        type: EmergencyAgencyType.police,
+        coverage: GeographicScope.kaduna,
+        commandDesk: 'Kaduna State Operations Desk',
+        contactPhone: '+2348000000199',
+        actorId: 'SYSTEM-ADMIN',
+        actorRole: TgcgRole.stateAdministrator,
+        authorizedScope: GeographicScope.kaduna,
+      );
+      final responder = await emergency.provisionResponder(
+        agencyId: agency.id,
+        serviceNumber: 'AP/LOCK-001',
+        displayName: 'Insp. Lock Test',
+        accessCode: 'CorrectAccess123!',
+        responderScope: GeographicScope.kaduna,
+        actorId: 'SYSTEM-ADMIN',
+        actorRole: TgcgRole.stateAdministrator,
+        authorizedScope: GeographicScope.kaduna,
+      );
+
+      for (var attempt = 1; attempt <= 4; attempt++) {
+        final result = await emergency.authenticateResponderCredential(
+          agencyId: agency.id,
+          serviceNumber: responder.serviceNumber,
+          accessCode: 'WrongAccess123!',
+          requestedScope: GeographicScope.kaduna,
+        );
+        expect(result.status, ResponderAuthenticationStatus.rejected);
+      }
+
+      final fifth = await emergency.authenticateResponderCredential(
+        agencyId: agency.id,
+        serviceNumber: responder.serviceNumber,
+        accessCode: 'WrongAccess123!',
+        requestedScope: GeographicScope.kaduna,
+      );
+      expect(fifth.status, ResponderAuthenticationStatus.locked);
+      expect(fifth.lockedUntil, isNotNull);
+
+      final correctWhileLocked =
+          await emergency.authenticateResponderCredential(
+        agencyId: agency.id,
+        serviceNumber: responder.serviceNumber,
+        accessCode: 'CorrectAccess123!',
+        requestedScope: GeographicScope.kaduna,
+      );
+      expect(
+        correctWhileLocked.status,
+        ResponderAuthenticationStatus.locked,
+      );
+
+      final restored = EmergencyResponseController.productionFoundation(
+        governance: governance,
+        persistence: persistence,
+      );
+      await restored.hydrateFromOffline();
+      final afterRestart = await restored.authenticateResponderCredential(
+        agencyId: agency.id,
+        serviceNumber: responder.serviceNumber,
+        accessCode: 'CorrectAccess123!',
+        requestedScope: GeographicScope.kaduna,
+      );
+      expect(afterRestart.status, ResponderAuthenticationStatus.locked);
+    });
+
+    test('authorized credential reset clears responder lockout', () async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final persistence = OfflinePersistenceController(
+        openDatabase: () async => InMemoryOfflineDatabase(),
+      );
+      await persistence.initialize();
+      final governance = GovernanceOperationsController.productionFoundation(
+        persistence: persistence,
+      );
+      final emergency = EmergencyResponseController.productionFoundation(
+        governance: governance,
+        persistence: persistence,
+      );
+
+      final agency = await emergency.upsertAgency(
+        id: 'AGENCY-KD-NSCDC-RESET',
+        name: 'Kaduna Civil Defence Reset Desk',
+        shortName: 'Civil Defence',
+        type: EmergencyAgencyType.civilDefence,
+        coverage: GeographicScope.kaduna,
+        commandDesk: 'Kaduna State Operations Desk',
+        contactPhone: '+2348000000198',
+        actorId: 'SYSTEM-ADMIN',
+        actorRole: TgcgRole.stateAdministrator,
+        authorizedScope: GeographicScope.kaduna,
+      );
+      await emergency.provisionResponder(
+        agencyId: agency.id,
+        serviceNumber: 'NSCDC/LOCK-001',
+        displayName: 'ASC Reset Test',
+        accessCode: 'OldAccess123!',
+        responderScope: GeographicScope.kaduna,
+        actorId: 'SYSTEM-ADMIN',
+        actorRole: TgcgRole.stateAdministrator,
+        authorizedScope: GeographicScope.kaduna,
+      );
+
+      for (var attempt = 0; attempt < 5; attempt++) {
+        await emergency.authenticateResponderCredential(
+          agencyId: agency.id,
+          serviceNumber: 'NSCDC/LOCK-001',
+          accessCode: 'WrongAccess123!',
+          requestedScope: GeographicScope.kaduna,
+        );
+      }
+
+      final locked = await emergency.authenticateResponderCredential(
+        agencyId: agency.id,
+        serviceNumber: 'NSCDC/LOCK-001',
+        accessCode: 'OldAccess123!',
+        requestedScope: GeographicScope.kaduna,
+      );
+      expect(locked.status, ResponderAuthenticationStatus.locked);
+
+      await emergency.provisionResponder(
+        agencyId: agency.id,
+        serviceNumber: 'NSCDC/LOCK-001',
+        displayName: 'ASC Reset Test',
+        accessCode: 'NewAccess123!',
+        responderScope: GeographicScope.kaduna,
+        actorId: 'SYSTEM-ADMIN',
+        actorRole: TgcgRole.stateAdministrator,
+        authorizedScope: GeographicScope.kaduna,
+      );
+
+      final recovered = await emergency.authenticateResponderCredential(
+        agencyId: agency.id,
+        serviceNumber: 'NSCDC/LOCK-001',
+        accessCode: 'NewAccess123!',
+        requestedScope: GeographicScope.kaduna,
+      );
+      expect(
+        recovered.status,
+        ResponderAuthenticationStatus.authenticated,
+      );
+      expect(recovered.responder?.displayName, 'ASC Reset Test');
+    });
+
     test('State Coordinator cannot provision responder credentials',
         () async {
       FlutterSecureStorage.setMockInitialValues({});
