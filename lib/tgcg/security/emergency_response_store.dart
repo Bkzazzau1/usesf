@@ -93,6 +93,12 @@ enum ResponderAuthenticationStatus {
   locked,
 }
 
+enum ResponderSessionValidationStatus {
+  active,
+  revoked,
+  unavailable,
+}
+
 class ResponderAuthenticationResult {
   const ResponderAuthenticationResult._({
     required this.status,
@@ -742,12 +748,6 @@ class EmergencyResponseController extends ChangeNotifier {
 
     return ResponderAuthenticationResult.authenticated(responder);
   }
-
-enum ResponderSessionValidationStatus {
-  active,
-  revoked,
-  unavailable,
-}
 
   Future<ResponderSessionValidationStatus> validateConnectedSession({
     required String sessionToken,
