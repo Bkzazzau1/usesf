@@ -42,6 +42,12 @@ class TgcgApp extends StatefulWidget {
   State<TgcgApp> createState() => _TgcgAppState();
 }
 
+enum _StartupReadiness {
+  loading,
+  ready,
+  failed,
+}
+
 class _TgcgAppState extends State<TgcgApp> {
   late TgcgSessionController sessionController;
   late OfflinePersistenceController offlinePersistenceController;
@@ -62,7 +68,8 @@ class _TgcgAppState extends State<TgcgApp> {
   late EmergencyResponseController emergencyResponseController;
   Timer? _securitySessionWatchdog;
   bool _validatingSecuritySession = false;
-  bool _sessionRestoreComplete = false;
+  _StartupReadiness _startupReadiness = _StartupReadiness.loading;
+  String? _startupError;
 
   @override
   void initState() {
@@ -72,22 +79,65 @@ class _TgcgAppState extends State<TgcgApp> {
       const Duration(seconds: 30),
       (_) => unawaited(_enforceSecuritySession()),
     );
-    unawaited(_restoreSession());
-    unawaited(_initializePersistenceAndHydrate());
+    unawaited(_initializeApplication());
   }
 
-  Future<void> _restoreSession() async {
+  Future<void> _initializeApplication() async {
+    if (mounted) {
+      setState(() {
+        _startupReadiness = _StartupReadiness.loading;
+        _startupError = null;
+      });
+    }
+
     try {
       await sessionController.restorePersistedSession();
-    } finally {
+      await offlinePersistenceController.initialize();
+      if (!offlinePersistenceController.isReady) {
+        throw StateError(
+          offlinePersistenceController.lastError ??
+              'Local operational storage is unavailable.',
+        );
+      }
+
+      await membershipOperationsController.hydrateFromOffline();
+      await managedDeviceController.hydrateFromOffline();
+      await assignmentController.hydrateFromOffline();
+      await governanceOperationsController.hydrateFromOffline();
+      await assignmentEdgeAiController.hydrateFromOffline();
+      await evidenceOperationsController.hydrateFromOffline();
+      await fieldOperationsController.hydrateFromOffline();
+      await resultOperationsController.hydrateFromOffline();
+      await communicationsController.hydrateFromOffline();
+      await bulkCommunicationsController.hydrateFromOffline();
+      await reportOperationsController.hydrateFromOffline();
+      await emergencyResponseController.hydrateFromOffline();
+      await operationalCallController.hydrateFromOffline();
+      await commandMeetingController.hydrateFromOffline();
+
       if (!mounted) return;
-      setState(() => _sessionRestoreComplete = true);
+      setState(() {
+        _startupReadiness = _StartupReadiness.ready;
+        _startupError = null;
+      });
       unawaited(_enforceSecuritySession());
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _startupReadiness = _StartupReadiness.failed;
+        _startupError = error.toString();
+      });
     }
   }
 
+  void _retryStartup() {
+    if (_startupReadiness == _StartupReadiness.loading) return;
+    unawaited(_initializeApplication());
+  }
+
   Future<void> _enforceSecuritySession() async {
-    if (!sessionController.isSecuritySession ||
+    if (_startupReadiness != _StartupReadiness.ready ||
+        !sessionController.isSecuritySession ||
         !sessionController.isAuthenticated) {
       return;
     }
@@ -124,31 +174,6 @@ class _TgcgAppState extends State<TgcgApp> {
       }
     } finally {
       _validatingSecuritySession = false;
-    }
-  }
-
-  Future<void> _initializePersistenceAndHydrate() async {
-    await offlinePersistenceController.initialize();
-    if (!offlinePersistenceController.isReady) return;
-
-    try {
-      await membershipOperationsController.hydrateFromOffline();
-      await managedDeviceController.hydrateFromOffline();
-      await assignmentController.hydrateFromOffline();
-      await governanceOperationsController.hydrateFromOffline();
-      await assignmentEdgeAiController.hydrateFromOffline();
-      await evidenceOperationsController.hydrateFromOffline();
-      await fieldOperationsController.hydrateFromOffline();
-      await resultOperationsController.hydrateFromOffline();
-      await communicationsController.hydrateFromOffline();
-      await bulkCommunicationsController.hydrateFromOffline();
-      await reportOperationsController.hydrateFromOffline();
-      await emergencyResponseController.hydrateFromOffline();
-      await operationalCallController.hydrateFromOffline();
-      await commandMeetingController.hydrateFromOffline();
-    } catch (_) {
-      // Keep the currently loaded in-memory state available if a persisted
-      // record is corrupt or from an incompatible development build.
     }
   }
 
@@ -262,9 +287,10 @@ class _TgcgAppState extends State<TgcgApp> {
 
     setState(() {
       _createControllers();
-      _sessionRestoreComplete = true;
+      _startupReadiness = _StartupReadiness.loading;
+      _startupError = null;
     });
-    unawaited(_initializePersistenceAndHydrate());
+    unawaited(_initializeApplication());
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       oldSession.dispose();
@@ -352,12 +378,20 @@ class _TgcgAppState extends State<TgcgApp> {
                                           title: 'USESF',
                                           theme: _theme(),
                                           home: OperationalCallOverlay(
-                                            child: _sessionRestoreComplete
-                                                ? _AuthenticationGate(
-                                                    onResetPresentation:
-                                                        _resetPresentation,
-                                                  )
-                                                : const _SessionRestoreView(),
+                                            child: switch (_startupReadiness) {
+                                              _StartupReadiness.loading =>
+                                                const _StartupLoadingView(),
+                                              _StartupReadiness.failed =>
+                                                _StartupFailureView(
+                                                  error: _startupError,
+                                                  onRetry: _retryStartup,
+                                                ),
+                                              _StartupReadiness.ready =>
+                                                _AuthenticationGate(
+                                                  onResetPresentation:
+                                                      _resetPresentation,
+                                                ),
+                                            },
                                           ),
                                         ),
                                       ),
@@ -630,8 +664,8 @@ class _TgcgAppState extends State<TgcgApp> {
   }
 }
 
-class _SessionRestoreView extends StatelessWidget {
-  const _SessionRestoreView();
+class _StartupLoadingView extends StatelessWidget {
+  const _StartupLoadingView();
 
   @override
   Widget build(BuildContext context) => const Scaffold(
@@ -643,7 +677,64 @@ class _SessionRestoreView extends StatelessWidget {
               TgcgLogo(size: 72),
               SizedBox(height: 18),
               CircularProgressIndicator(),
+              SizedBox(height: 14),
+              Text(
+                'Preparing your workspace...',
+                style: TextStyle(
+                  color: TgcgColors.muted,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ],
+          ),
+        ),
+      );
+}
+
+class _StartupFailureView extends StatelessWidget {
+  const _StartupFailureView({
+    required this.error,
+    required this.onRetry,
+  });
+
+  final String? error;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        backgroundColor: TgcgColors.canvas,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: TgcgSectionCard(
+                title: 'Workspace unavailable',
+                subtitle:
+                    'USESF could not safely restore the local operational workspace.',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (error != null && error!.trim().isNotEmpty)
+                      Text(
+                        error!,
+                        style: const TextStyle(
+                          color: TgcgColors.muted,
+                          fontSize: 11,
+                          height: 1.45,
+                        ),
+                      ),
+                    if (error != null && error!.trim().isNotEmpty)
+                      const SizedBox(height: 14),
+                    FilledButton.icon(
+                      onPressed: onRetry,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('Retry workspace'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       );
