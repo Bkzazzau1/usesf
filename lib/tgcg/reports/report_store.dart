@@ -6,6 +6,7 @@ import '../geography/geography_registry.dart';
 import '../governance/governance_store.dart';
 
 enum ReportKind {
+  executiveBrief,
   incidentSummary,
   fieldActivity,
   membershipDeployment,
@@ -153,6 +154,11 @@ class ReportOperationsController extends ChangeNotifier {
         : TgcgPermissionPolicy.allows(role, capability);
 
     return switch (kind) {
+      ReportKind.executiveBrief =>
+        targetScope.level == GeographyLevel.state &&
+            (role == TgcgRole.stateCoordinator ||
+                role == TgcgRole.stateAdministrator ||
+                role == TgcgRole.situationRoomDirector),
       ReportKind.incidentSummary => allows(TgcgCapability.viewIncidents),
       ReportKind.fieldActivity => allows(TgcgCapability.viewIncidents),
       ReportKind.membershipDeployment =>

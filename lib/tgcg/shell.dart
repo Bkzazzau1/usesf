@@ -31,6 +31,7 @@ import 'monitoring/system_monitoring_page.dart';
 import 'offline/offline_persistence.dart';
 import 'operations/live_operations_page.dart';
 import 'presentation/presentation_tour_sheet.dart';
+import 'reports/executive_reporting_centre_page.dart';
 import 'reports/reports_page.dart';
 import 'results/result_capture_page.dart';
 import 'results/result_intelligence_page.dart';
@@ -108,6 +109,9 @@ class _TgcgShellState extends State<TgcgShell> {
     final stateAiReview =
         allowed.contains(TgcgModule.aiVerification) &&
         session.role == TgcgRole.stateCoordinator;
+    final executiveReporting =
+        allowed.contains(TgcgModule.reports) &&
+        session.role == TgcgRole.stateCoordinator;
     final destinations = _destinations
         .where((item) => allowed.contains(item.module))
         .map(
@@ -154,6 +158,15 @@ class _TgcgShellState extends State<TgcgShell> {
                 item.module,
                 'State AI Review Centre',
                 Icons.auto_awesome_rounded,
+                _NavGroup.command,
+              );
+            }
+            if (item.module == TgcgModule.reports &&
+                executiveReporting) {
+              return _Destination(
+                item.module,
+                'Executive Reporting Centre',
+                Icons.summarize_outlined,
                 _NavGroup.command,
               );
             }
@@ -236,6 +249,7 @@ class _TgcgShellState extends State<TgcgShell> {
                             coverageIntelligence: coverageIntelligence,
                             membershipIntelligence: membershipIntelligence,
                             stateAiReview: stateAiReview,
+                            executiveReporting: executiveReporting,
                             showAlerts: allowed.contains(TgcgModule.alertCenter),
                             onAlerts: () => _select(TgcgModule.alertCenter),
                             onTour: () => _openTour(allowed),
@@ -318,7 +332,10 @@ class _TgcgShellState extends State<TgcgShell> {
         TgcgModule.discussionRoom => const DiscussionRoomPage(),
         TgcgModule.meetingRoom => const MeetingRoomPage(),
         TgcgModule.systemMonitoring => const SystemMonitoringPage(),
-        TgcgModule.reports => const ReportsPage(),
+        TgcgModule.reports =>
+          session.role == TgcgRole.stateCoordinator
+              ? ExecutiveReportingCentrePage(onOpenModule: _select)
+              : const ReportsPage(),
         TgcgModule.governance => const GovernancePage(),
       };
   }
@@ -616,6 +633,7 @@ class _CommandBar extends StatelessWidget {
     required this.coverageIntelligence,
     required this.membershipIntelligence,
     required this.stateAiReview,
+    required this.executiveReporting,
     required this.showAlerts,
     required this.onAlerts,
     required this.onTour,
@@ -627,6 +645,7 @@ class _CommandBar extends StatelessWidget {
   final bool coverageIntelligence;
   final bool membershipIntelligence;
   final bool stateAiReview;
+  final bool executiveReporting;
   final bool showAlerts;
   final VoidCallback onAlerts;
   final VoidCallback onTour;
@@ -669,6 +688,7 @@ class _CommandBar extends StatelessWidget {
               coverageIntelligence: coverageIntelligence,
               membershipIntelligence: membershipIntelligence,
               stateAiReview: stateAiReview,
+              executiveReporting: executiveReporting,
             ),
             style: const TextStyle(color: TgcgColors.ink, fontSize: 14, fontWeight: FontWeight.w900),
           ),
@@ -814,6 +834,7 @@ String _moduleLabel(
   bool coverageIntelligence = false,
   bool membershipIntelligence = false,
   bool stateAiReview = false,
+  bool executiveReporting = false,
 }) => switch (module) {
       TgcgModule.overview => 'Command Overview',
       TgcgModule.memberEnrollment => 'Member Enrolment',
@@ -844,6 +865,7 @@ String _moduleLabel(
       TgcgModule.discussionRoom => 'Discussion Forum',
       TgcgModule.meetingRoom => 'Meeting Room',
       TgcgModule.systemMonitoring => 'System Monitoring',
-      TgcgModule.reports => 'Reports & Exports',
+      TgcgModule.reports =>
+        executiveReporting ? 'Executive Reporting Centre' : 'Reports & Exports',
       TgcgModule.governance => 'Data & Governance',
     };
