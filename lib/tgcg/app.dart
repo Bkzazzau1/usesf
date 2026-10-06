@@ -124,6 +124,7 @@ class _TgcgAppState extends State<TgcgApp> {
     commandMeetingController = CommandMeetingController(
       persistence: offlinePersistenceController,
       governance: governanceOperationsController,
+      membership: membershipOperationsController,
     );
     fieldOperationsController = FieldOperationsController.prototypeSeed(
       persistence: offlinePersistenceController,
