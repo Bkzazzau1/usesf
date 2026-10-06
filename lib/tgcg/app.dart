@@ -24,6 +24,7 @@ import 'presentation_access_login.dart';
 import 'reports/report_store.dart';
 import 'results/result_operations_store.dart';
 import 'security/emergency_response_store.dart';
+import 'security/remote_responder_auth.dart';
 import 'session.dart';
 import 'shell.dart';
 import 'ui/tgcg_design.dart';
@@ -159,9 +160,11 @@ class _TgcgAppState extends State<TgcgApp> {
       governance: governanceOperationsController,
       persistence: offlinePersistenceController,
     );
-    emergencyResponseController = EmergencyResponseController.productionFoundation(
+    emergencyResponseController =
+        EmergencyResponseController.productionFoundation(
       governance: governanceOperationsController,
       persistence: offlinePersistenceController,
+      remoteAuth: HttpRemoteResponderAuthGateway.fromEnvironmentOrNull(),
     );
   }
 
