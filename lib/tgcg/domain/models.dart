@@ -311,6 +311,8 @@ class ResultValidationSummary {
     required this.duplicateSuspected,
     required this.pollingUnitMatched,
     required this.agentScopeMatched,
+    this.formEvidencePresent = true,
+    this.ocrProcessed = true,
     this.ocrConfidence,
     this.ocrMatchedManualEntry,
     this.notes = const [],
@@ -320,6 +322,8 @@ class ResultValidationSummary {
   final bool duplicateSuspected;
   final bool pollingUnitMatched;
   final bool agentScopeMatched;
+  final bool formEvidencePresent;
+  final bool ocrProcessed;
   final double? ocrConfidence;
   final bool? ocrMatchedManualEntry;
   final List<String> notes;
@@ -329,6 +333,9 @@ class ResultValidationSummary {
       duplicateSuspected ||
       !pollingUnitMatched ||
       !agentScopeMatched ||
+      !formEvidencePresent ||
+      !ocrProcessed ||
+      (ocrConfidence != null && ocrConfidence! < .85) ||
       ocrMatchedManualEntry == false;
 }
 
