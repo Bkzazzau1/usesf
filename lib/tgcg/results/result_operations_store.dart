@@ -352,6 +352,7 @@ class ResultOperationsController extends ChangeNotifier {
   }) async {
     final duplicate = _submissions.any((existing) =>
         existing.pollingUnitScope.pollingUnitId == pollingUnitScope.pollingUnitId &&
+        existing.status != RecordStatus.disputed &&
         existing.status != RecordStatus.rejected &&
         existing.status != RecordStatus.archived);
 
