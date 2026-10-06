@@ -10,6 +10,7 @@ enum RemoteResponderAuthenticationStatus {
   rejected,
   locked,
   unavailable,
+  serverError,
 }
 
 class RemoteResponderAuthenticationResult {
@@ -35,15 +36,6 @@ class RemoteResponderAuthenticationResult {
 }
 
 abstract interface class RemoteResponderAuthGateway {
-  Future<void> provisionCredential({
-    required String responderId,
-    required String agencyId,
-    required String serviceNumber,
-    required String displayName,
-    required String accessCode,
-    required GeographicScope authorizedScope,
-  });
-
   Future<RemoteResponderAuthenticationResult> authenticate({
     required String agencyId,
     required String serviceNumber,
@@ -55,7 +47,6 @@ abstract interface class RemoteResponderAuthGateway {
 class HttpRemoteResponderAuthGateway implements RemoteResponderAuthGateway {
   HttpRemoteResponderAuthGateway({
     required String baseUrl,
-    this.adminProvisionToken,
     this.timeout = const Duration(seconds: 8),
   }) : baseUri = Uri.parse(baseUrl.trim()) {
     if (!baseUri.hasScheme || baseUri.host.isEmpty) {
@@ -74,52 +65,11 @@ class HttpRemoteResponderAuthGateway implements RemoteResponderAuthGateway {
   static HttpRemoteResponderAuthGateway? fromEnvironmentOrNull() {
     const baseUrl = String.fromEnvironment('USESF_API_BASE_URL');
     if (baseUrl.trim().isEmpty) return null;
-    const adminToken = String.fromEnvironment('USESF_ADMIN_API_TOKEN');
-    return HttpRemoteResponderAuthGateway(
-      baseUrl: baseUrl,
-      adminProvisionToken:
-          adminToken.trim().isEmpty ? null : adminToken.trim(),
-    );
+    return HttpRemoteResponderAuthGateway(baseUrl: baseUrl);
   }
 
   final Uri baseUri;
-  final String? adminProvisionToken;
   final Duration timeout;
-
-  @override
-  Future<void> provisionCredential({
-    required String responderId,
-    required String agencyId,
-    required String serviceNumber,
-    required String displayName,
-    required String accessCode,
-    required GeographicScope authorizedScope,
-  }) async {
-    final token = adminProvisionToken;
-    if (token == null || token.isEmpty) {
-      throw StateError(
-        'Central responder provisioning requires USESF_ADMIN_API_TOKEN.',
-      );
-    }
-    final response = await _postJson(
-      '/v1/security/responders/provision',
-      {
-        'responderId': responderId,
-        'agencyId': agencyId,
-        'serviceNumber': serviceNumber,
-        'displayName': displayName,
-        'accessCode': accessCode,
-        'authorizedScope': geographicScopeToJson(authorizedScope),
-      },
-      bearerToken: token,
-    );
-    if (response.statusCode != HttpStatus.ok &&
-        response.statusCode != HttpStatus.created) {
-      throw StateError(
-        'Central responder provisioning failed with HTTP ${response.statusCode}.',
-      );
-    }
-  }
 
   @override
   Future<RemoteResponderAuthenticationResult> authenticate({
@@ -187,7 +137,7 @@ class HttpRemoteResponderAuthGateway implements RemoteResponderAuthGateway {
       }
 
       return RemoteResponderAuthenticationResult(
-        status: RemoteResponderAuthenticationStatus.unavailable,
+        status: RemoteResponderAuthenticationStatus.serverError,
         message: 'Responder authentication returned HTTP ${response.statusCode}.',
       );
     } on SocketException catch (error) {
@@ -200,14 +150,19 @@ class HttpRemoteResponderAuthGateway implements RemoteResponderAuthGateway {
         status: RemoteResponderAuthenticationStatus.unavailable,
         message: 'Responder authentication request timed out.',
       );
+    } on HandshakeException catch (error) {
+      return RemoteResponderAuthenticationResult(
+        status: RemoteResponderAuthenticationStatus.serverError,
+        message: error.message,
+      );
     } on HttpException catch (error) {
       return RemoteResponderAuthenticationResult(
-        status: RemoteResponderAuthenticationStatus.unavailable,
+        status: RemoteResponderAuthenticationStatus.serverError,
         message: error.message,
       );
     } on FormatException catch (error) {
       return RemoteResponderAuthenticationResult(
-        status: RemoteResponderAuthenticationStatus.unavailable,
+        status: RemoteResponderAuthenticationStatus.serverError,
         message: error.message,
       );
     }
@@ -215,21 +170,14 @@ class HttpRemoteResponderAuthGateway implements RemoteResponderAuthGateway {
 
   Future<_HttpJsonResponse> _postJson(
     String path,
-    Map<String, Object?> payload, {
-    String? bearerToken,
-  }) async {
+    Map<String, Object?> payload,
+  ) async {
     final client = HttpClient();
     try {
       final target = baseUri.resolve(path);
       final request = await client.postUrl(target).timeout(timeout);
       request.headers.contentType = ContentType.json;
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      if (bearerToken != null && bearerToken.isNotEmpty) {
-        request.headers.set(
-          HttpHeaders.authorizationHeader,
-          'Bearer $bearerToken',
-        );
-      }
       request.write(jsonEncode(payload));
       final response = await request.close().timeout(timeout);
       final body = await utf8.decoder.bind(response).join().timeout(timeout);
