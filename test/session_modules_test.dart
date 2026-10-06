@@ -22,6 +22,26 @@ void main() {
       );
     });
 
+    test('late activity cannot revive an already idle session', () {
+      var now = DateTime.utc(2026, 10, 6, 17);
+      final session = TgcgSessionController(clock: () => now)
+        ..signIn(
+          role: TgcgRole.securityOfficer,
+          operatorName: 'Responder',
+          accessId: 'AP/100B',
+          agencyId: 'AGENCY-POLICE',
+        );
+
+      now = now.add(const Duration(minutes: 16));
+      session.recordActivity();
+
+      expect(session.isAuthenticated, isFalse);
+      expect(
+        session.lastTerminationReason,
+        SessionTerminationReason.inactivityTimeout,
+      );
+    });
+
     test('activity cannot extend a security session beyond eight hours', () {
       var now = DateTime.utc(2026, 10, 6, 8);
       final session = TgcgSessionController(clock: () => now)
