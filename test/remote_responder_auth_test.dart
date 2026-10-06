@@ -14,20 +14,7 @@ class _FakeRemoteResponderAuth implements RemoteResponderAuthGateway {
     status: RemoteResponderAuthenticationStatus.unavailable,
   );
 
-  int provisionCalls = 0;
   int authenticationCalls = 0;
-
-  @override
-  Future<void> provisionCredential({
-    required String responderId,
-    required String agencyId,
-    required String serviceNumber,
-    required String displayName,
-    required String accessCode,
-    required GeographicScope authorizedScope,
-  }) async {
-    provisionCalls += 1;
-  }
 
   @override
   Future<RemoteResponderAuthenticationResult> authenticate({
@@ -99,13 +86,6 @@ void main() {
     );
   }
 
-  test('configured deployment provisions responder in central auth', () async {
-    final fixture = await buildFixture();
-
-    expect(fixture.remote.provisionCalls, 1);
-    expect(fixture.emergency.responders.single.id, fixture.responder.id);
-  });
-
   test('central lockout overrides a correct local credential', () async {
     final fixture = await buildFixture();
     final lockedUntil =
@@ -126,6 +106,27 @@ void main() {
 
     expect(result.status, ResponderAuthenticationStatus.locked);
     expect(result.lockedUntil, isNotNull);
+    expect(fixture.remote.authenticationCalls, 1);
+  });
+
+  test('central server errors fail closed instead of falling back',
+      () async {
+    final fixture = await buildFixture();
+    fixture.remote.authenticationResult =
+        const RemoteResponderAuthenticationResult(
+      status: RemoteResponderAuthenticationStatus.serverError,
+      message: 'HTTP 500',
+    );
+
+    final result =
+        await fixture.emergency.authenticateResponderCredential(
+      agencyId: fixture.agency.id,
+      serviceNumber: fixture.responder.serviceNumber,
+      accessCode: 'CentralAccess123!',
+      requestedScope: GeographicScope.kaduna,
+    );
+
+    expect(result.status, ResponderAuthenticationStatus.rejected);
     expect(fixture.remote.authenticationCalls, 1);
   });
 
