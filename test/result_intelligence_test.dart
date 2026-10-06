@@ -130,6 +130,22 @@ void main() {
       );
     });
 
+    test('off-catalogue polling unit is AI-flagged', () {
+      final results = ResultOperationsController.prototypeSeed();
+      final item = results.submissions.first;
+
+      final assessment = buildResultAiAssessment(
+        item,
+        canonicalPollingUnitKnown: false,
+      );
+
+      expect(assessment.score, lessThan(90));
+      expect(
+        assessment.findings.map((finding) => finding.label),
+        contains('Polling unit not in catalogue'),
+      );
+    });
+
     test('duplicate result with no form becomes AI risk', () {
       final results = ResultOperationsController.prototypeSeed();
       final item = results.submissions.firstWhere(
@@ -199,6 +215,58 @@ REGISTERED VOTERS 600
       expect(captured.partyVotes['P2'], 80);
       expect(captured.partyVotes.containsKey('P3'), isFalse);
       expect(captured.extractionConfidence, lessThan(1));
+    });
+  });
+
+  group('Conflict resolution', () {
+    test('replacement after disputed result is not marked duplicate', () async {
+      final persistence = OfflinePersistenceController(
+        openDatabase: () async => InMemoryOfflineDatabase(),
+      );
+      await persistence.initialize();
+
+      final geography = GeographyRegistry.prototypeSeed();
+      final controller = ResultOperationsController.prototypeSeed(
+        persistence: persistence,
+      );
+      final original = controller.submissions.firstWhere(
+        (item) => item.id == 'RES-0002',
+      );
+
+      final disputed = await controller.dispute(
+        submissionId: original.id,
+        reviewerId: 'STATE-COORD',
+        reason: 'Field correction requested',
+        role: TgcgRole.stateCoordinator,
+        userScope: GeographicScope.kaduna,
+      );
+      expect(disputed, isTrue);
+
+      final replacement = await controller.submit(
+        pollingUnitScope: original.pollingUnitScope,
+        submittedBy: 'MEM-0001',
+        source: SubmissionSource.app,
+        partyVotes: const {'P1': 96, 'P2': 101, 'P3': 41, 'P4': 12},
+        totalVotesRecorded: 250,
+        accreditedVoters: 268,
+        rejectedVotes: 18,
+        registeredVoters: geography
+            .pollingUnit(original.pollingUnitScope.pollingUnitId!)!
+            .registeredVoters,
+        resultForm: EvidenceAttachment(
+          id: 'FORM-REPLACEMENT',
+          type: EvidenceType.resultForm,
+          fileName: 'replacement.jpg',
+          createdAt: DateTime.utc(2026, 10, 6),
+          uploaderId: 'MEM-0001',
+          contentHash: 'sha256:replacement',
+          mimeType: 'image/jpeg',
+        ),
+        ocrPartyVotes: const {'P1': 96, 'P2': 101, 'P3': 41, 'P4': 12},
+        ocrConfidence: 1,
+      );
+
+      expect(replacement.validation?.duplicateSuspected, isFalse);
     });
   });
 
