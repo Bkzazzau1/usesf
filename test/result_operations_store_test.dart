@@ -1,8 +1,78 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:usesf/tgcg/domain/models.dart';
+import 'package:usesf/tgcg/offline/offline_database_memory.dart';
+import 'package:usesf/tgcg/offline/offline_persistence.dart';
 import 'package:usesf/tgcg/results/result_operations_store.dart';
 
 void main() {
+  setUpAll(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    FlutterSecureStorage.setMockInitialValues({});
+  });
+
+  test('production foundation starts empty and hydrates only persisted results',
+      () async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final persistence = OfflinePersistenceController(
+      openDatabase: () async => InMemoryOfflineDatabase(),
+    );
+    await persistence.initialize();
+
+    final store = ResultOperationsController.productionFoundation(
+      persistence: persistence,
+    );
+    expect(store.submissions, isEmpty);
+    expect(store.pendingReviewCount, 0);
+    expect(store.verifiedCount, 0);
+
+    const scope = GeographicScope(
+      level: GeographyLevel.pollingUnit,
+      country: 'Nigeria',
+      zoneId: 'NW',
+      zoneName: 'North West',
+      stateId: 'KD',
+      stateName: 'Kaduna',
+      senatorialDistrictId: 'SD/053/KD',
+      senatorialDistrictName: 'Kaduna Central',
+      lgaId: 'KD-KADUNA-NORTH',
+      lgaName: 'Kaduna North',
+      wardId: 'KD-KN-W01',
+      wardName: 'Ward 01',
+      pollingUnitId: 'KD-KN-W01-PU001',
+      pollingUnitName: 'PU 001',
+    );
+
+    final saved = await store.submit(
+      pollingUnitScope: scope,
+      submittedBy: 'MEM-TEST',
+      source: SubmissionSource.sms,
+      partyVotes: const {'P1': 12, 'P2': 8},
+      totalVotesRecorded: 20,
+      accreditedVoters: 22,
+      rejectedVotes: 2,
+    );
+
+    final restored = ResultOperationsController.productionFoundation(
+      persistence: persistence,
+    );
+    expect(restored.submissions, isEmpty);
+
+    await restored.hydrateFromOffline();
+
+    expect(restored.submissions, hasLength(1));
+    expect(restored.submissions.single.id, saved.id);
+    expect(restored.submissions.single.submittedBy, 'MEM-TEST');
+    expect(
+      restored.submissions.any(
+        (item) => const {'RES-0001', 'RES-0002', 'RES-0003', 'RES-0004'}
+            .contains(item.id) &&
+            item.id != saved.id,
+      ),
+      isFalse,
+    );
+  });
+
   test('prototype review queue contains flagged submissions only', () {
     final store = ResultOperationsController.prototypeSeed();
 
