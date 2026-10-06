@@ -105,19 +105,16 @@ class ResponderAuthenticationResult {
     required this.status,
     this.responder,
     this.remoteSessionToken,
-    this.remoteSessionExpiresAt,
     this.lockedUntil,
   });
 
   const ResponderAuthenticationResult.authenticated(
     EmergencyResponderProfile responder, {
     String? remoteSessionToken,
-    DateTime? remoteSessionExpiresAt,
   }) : this._(
           status: ResponderAuthenticationStatus.authenticated,
           responder: responder,
           remoteSessionToken: remoteSessionToken,
-          remoteSessionExpiresAt: remoteSessionExpiresAt,
         );
 
   const ResponderAuthenticationResult.rejected()
@@ -132,7 +129,6 @@ class ResponderAuthenticationResult {
   final ResponderAuthenticationStatus status;
   final EmergencyResponderProfile? responder;
   final String? remoteSessionToken;
-  final DateTime? remoteSessionExpiresAt;
   final DateTime? lockedUntil;
 }
 
@@ -667,7 +663,6 @@ class EmergencyResponseController extends ChangeNotifier {
           return ResponderAuthenticationResult.authenticated(
             responder,
             remoteSessionToken: remote.sessionToken,
-            remoteSessionExpiresAt: remote.sessionExpiresAt,
           );
         case RemoteResponderAuthenticationStatus.locked:
           final lockedUntil =
@@ -787,6 +782,12 @@ class EmergencyResponseController extends ChangeNotifier {
       case RemoteResponderSessionStatus.serverError:
         return ResponderSessionValidationStatus.serverError;
     }
+  }
+
+  Future<void> revokeConnectedSession(String sessionToken) async {
+    final remoteAuth = _remoteAuth;
+    if (remoteAuth == null || sessionToken.isEmpty) return;
+    await remoteAuth.revokeSession(sessionToken: sessionToken);
   }
 
   Future<EmergencyResponderProfile?> verifyResponderCredential({
