@@ -23,6 +23,8 @@ class CollationSummary {
     required this.missingPollingUnitIds,
     required this.conflictingPollingUnitIds,
     required this.excludedSubmissionIds,
+    this.catalogueComplete = true,
+    this.catalogueGapAreaIds = const [],
   });
 
   final GeographicScope scope;
@@ -33,12 +35,15 @@ class CollationSummary {
   final List<String> missingPollingUnitIds;
   final List<String> conflictingPollingUnitIds;
   final List<String> excludedSubmissionIds;
+  final bool catalogueComplete;
+  final List<String> catalogueGapAreaIds;
 
   double get completionPercent => expectedPollingUnitCount == 0
       ? 0
       : verifiedPollingUnitCount / expectedPollingUnitCount;
 
   bool get complete =>
+      catalogueComplete &&
       expectedPollingUnitCount > 0 &&
       verifiedPollingUnitCount == expectedPollingUnitCount &&
       conflictingPollingUnitIds.isEmpty;
@@ -147,6 +152,8 @@ class CollationEngine {
         .toList(growable: false)
       ..sort();
 
+    final catalogueGaps = _catalogueGapAreaIds(scope);
+
     return CollationSummary(
       scope: scope,
       expectedPollingUnitCount: expected.length,
@@ -156,6 +163,8 @@ class CollationEngine {
       missingPollingUnitIds: List.unmodifiable(missing),
       conflictingPollingUnitIds: List.unmodifiable(conflicts),
       excludedSubmissionIds: List.unmodifiable(excludedIds),
+      catalogueComplete: catalogueGaps.isEmpty,
+      catalogueGapAreaIds: List.unmodifiable(catalogueGaps),
     );
   }
 
@@ -186,6 +195,30 @@ class CollationEngine {
       if (unit.id == id) return unit;
     }
     return null;
+  }
+
+  List<String> _catalogueGapAreaIds(GeographicScope scope) {
+    final geography = _geography;
+    if (geography == null) return const [];
+
+    if (scope.level == GeographyLevel.ward ||
+        scope.level == GeographyLevel.pollingUnit) {
+      if (geography.pollingUnitsWithin(scope).isNotEmpty) return const [];
+      final id = scope.level == GeographyLevel.ward
+          ? scope.wardId
+          : scope.pollingUnitId;
+      return id == null ? const [] : [id];
+    }
+
+    final lgas = geography.lgas
+        .where((lga) => GeographyRegistry.scopeContains(scope, lga.scope))
+        .toList(growable: false);
+    final gaps = lgas
+        .where((lga) => geography.pollingUnitsWithin(lga.scope).isEmpty)
+        .map((lga) => lga.id)
+        .toList(growable: false)
+      ..sort();
+    return gaps;
   }
 
   String? _canonicalPollingUnitId(String? id) {
