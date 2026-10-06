@@ -355,6 +355,17 @@ class AssignmentController extends ChangeNotifier {
          minimumStaffingByPollingUnit,
        );
 
+  factory AssignmentController.productionFoundation({
+    required MembershipOperationsController membership,
+    required ManagedDeviceController devices,
+    required OfflinePersistenceController persistence,
+  }) =>
+      AssignmentController(
+        membership: membership,
+        devices: devices,
+        persistence: persistence,
+      );
+
   /// Presentation seed: open work starts empty, and a few already-completed
   /// individual duties plus one chairman-submitted group populate the
   /// Submitted register. Completed work is terminal, so it grants no access.
