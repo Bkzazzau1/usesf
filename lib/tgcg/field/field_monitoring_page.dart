@@ -190,6 +190,9 @@ class _FieldMonitoringPageState extends State<FieldMonitoringPage> {
             );
             final inspector = _IncidentInspector(
               incident: selected,
+              statusHistory: selected == null
+                  ? const <IncidentStatusTransitionEvent>[]
+                  : store.statusHistoryForIncident(selected.id),
               canAcknowledge: canAcknowledge,
               canAssign: canAssign,
               canClose: canClose,
@@ -1098,6 +1101,7 @@ class _IncidentRow extends StatelessWidget {
 class _IncidentInspector extends StatelessWidget {
   const _IncidentInspector({
     required this.incident,
+    required this.statusHistory,
     required this.canAcknowledge,
     required this.canAssign,
     required this.canClose,
@@ -1105,6 +1109,7 @@ class _IncidentInspector extends StatelessWidget {
   });
 
   final FieldIncident? incident;
+  final List<IncidentStatusTransitionEvent> statusHistory;
   final bool canAcknowledge;
   final bool canAssign;
   final bool canClose;
@@ -1126,6 +1131,7 @@ class _IncidentInspector extends StatelessWidget {
     }
 
     final severityColor = _severityColor(current.severity);
+    final lastCommand = statusHistory.isEmpty ? null : statusHistory.last;
     return TgcgSectionCard(
       title: 'Incident inspector',
       subtitle: 'Field evidence and response workflow remain traceable to the source record.',
@@ -1173,6 +1179,13 @@ class _IncidentInspector extends StatelessWidget {
           if (current.deviceId != null)
             _Detail('Managed device', current.deviceId!),
           _Detail('Reported', _fullTime(current.reportedAt)),
+          if (lastCommand != null)
+            _Detail(
+              'Last command',
+              '${_label(lastCommand.toStatus.name)} • '
+                  '${lastCommand.actorId} • '
+                  '${_fullTime(lastCommand.changedAt)}',
+            ),
           _Detail('Response owner', current.assignedTeam ?? 'Unassigned'),
           _Detail(
             'GPS',
