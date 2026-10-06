@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../assignments/assignment_store.dart';
-import '../domain/models.dart';
-import '../domain/permissions.dart';
 import '../geography/geography_registry.dart';
 import '../governance/governance_store.dart';
 import '../membership/membership_store.dart';
@@ -452,7 +450,7 @@ class _StateCommandMeetingsPageState extends State<StateCommandMeetingsPage> {
         builder: (_) => OperationalCallStage(callId: callId),
       ),
     );
-    if (!mounted) return;
+    if (!context.mounted) return;
     final session = TgcgSession.of(context, listen: false);
     final meetings = CommandMeetings.of(context, listen: false);
     await _syncAfterCall(
@@ -655,9 +653,11 @@ class _StateCommandMeetingsPageState extends State<StateCommandMeetingsPage> {
           dueAt: dueAt,
         );
       } on StateError catch (error) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error.message)));
+        // No early return: the title controller must still be disposed.
+        if (context.mounted) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(error.message)));
+        }
       }
     }
     title.dispose();
