@@ -76,6 +76,16 @@ class MemberIntelligenceSnapshot {
       .length;
 }
 
+class LeadershipVacancy {
+  const LeadershipVacancy({
+    required this.scope,
+    required this.role,
+  });
+
+  final GeographicScope scope;
+  final TgcgRole role;
+}
+
 class LeadershipCoverageSummary {
   const LeadershipCoverageSummary({
     required this.senatorialExpected,
@@ -277,6 +287,68 @@ LeadershipCoverageSummary buildLeadershipCoverage({
   );
 }
 
+List<LeadershipVacancy> buildLeadershipVacancies({
+  required MembershipOperationsController membership,
+  required GovernanceOperationsController governance,
+}) {
+  final geography = membership.geography;
+  final targets = <(GeographicScope, TgcgRole)>[
+    for (final district in geography.districts)
+      (district.scope, TgcgRole.senatorialCoordinator),
+    for (final lga in geography.lgas)
+      (lga.scope, TgcgRole.lgaCoordinator),
+  ];
+
+  final wardScopes = <String, GeographicScope>{};
+  for (final unit in geography.pollingUnits) {
+    final wardId = unit.scope.wardId;
+    if (wardId == null) continue;
+    wardScopes[wardId] = GeographicScope(
+      level: GeographyLevel.ward,
+      country: unit.scope.country,
+      zoneId: unit.scope.zoneId,
+      zoneName: unit.scope.zoneName,
+      stateId: unit.scope.stateId,
+      stateName: unit.scope.stateName,
+      senatorialDistrictId: unit.scope.senatorialDistrictId,
+      senatorialDistrictName: unit.scope.senatorialDistrictName,
+      lgaId: unit.scope.lgaId,
+      lgaName: unit.scope.lgaName,
+      wardId: unit.scope.wardId,
+      wardName: unit.scope.wardName,
+    );
+  }
+  targets.addAll(
+    wardScopes.values.map((scope) => (scope, TgcgRole.wardCoordinator)),
+  );
+  targets.addAll(
+    geography.pollingUnits.map(
+      (unit) => (unit.scope, TgcgRole.pollingUnitCoordinator),
+    ),
+  );
+
+  final vacancies = <LeadershipVacancy>[];
+  for (final target in targets) {
+    final filled = governance.roleAssignments.any(
+      (record) =>
+          record.active &&
+          record.role == target.$2 &&
+          _sameScope(record.scope, target.$1),
+    );
+    if (!filled) {
+      vacancies.add(
+        LeadershipVacancy(scope: target.$1, role: target.$2),
+      );
+    }
+  }
+  vacancies.sort((a, b) {
+    final level = a.scope.level.index.compareTo(b.scope.level.index);
+    if (level != 0) return level;
+    return a.scope.label.compareTo(b.scope.label);
+  });
+  return List.unmodifiable(vacancies);
+}
+
 class MembershipIntelligencePage extends StatefulWidget {
   const MembershipIntelligencePage({
     super.key,
@@ -341,6 +413,10 @@ class _MembershipIntelligencePageState
       ..sort(_snapshotSort);
 
     final leadership = buildLeadershipCoverage(
+      membership: membership,
+      governance: governance,
+    );
+    final leadershipVacancies = buildLeadershipVacancies(
       membership: membership,
       governance: governance,
     );
@@ -428,8 +504,11 @@ class _MembershipIntelligencePageState
           gpsActive: gpsActive,
         ),
         const SizedBox(height: 16),
+        _PeopleCommandActions(onOpen: widget.onOpenModule),
+        const SizedBox(height: 16),
         _LeadershipCoveragePanel(
           coverage: leadership,
+          vacancies: leadershipVacancies,
           onOpenRoles: () => widget.onOpenModule(TgcgModule.roleAssignment),
         ),
         const SizedBox(height: 16),
@@ -618,13 +697,52 @@ class _MembershipMetrics extends StatelessWidget {
       );
 }
 
+class _PeopleCommandActions extends StatelessWidget {
+  const _PeopleCommandActions({required this.onOpen});
+
+  final ValueChanged<TgcgModule> onOpen;
+
+  @override
+  Widget build(BuildContext context) => TgcgSectionCard(
+        title: 'People command actions',
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            OutlinedButton.icon(
+              onPressed: () => onOpen(TgcgModule.memberEnrollment),
+              icon: const Icon(Icons.person_add_alt_1_rounded),
+              label: const Text('Enrol member'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () => onOpen(TgcgModule.roleAssignment),
+              icon: const Icon(Icons.manage_accounts_outlined),
+              label: const Text('Roles & Authorization'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () => onOpen(TgcgModule.assignmentControl),
+              icon: const Icon(Icons.assignment_ind_outlined),
+              label: const Text('Assignment Control'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () => onOpen(TgcgModule.geography),
+              icon: const Icon(Icons.public_outlined),
+              label: const Text('State Coverage'),
+            ),
+          ],
+        ),
+      );
+}
+
 class _LeadershipCoveragePanel extends StatelessWidget {
   const _LeadershipCoveragePanel({
     required this.coverage,
+    required this.vacancies,
     required this.onOpenRoles,
   });
 
   final LeadershipCoverageSummary coverage;
+  final List<LeadershipVacancy> vacancies;
   final VoidCallback onOpenRoles;
 
   @override
@@ -635,44 +753,113 @@ class _LeadershipCoveragePanel extends StatelessWidget {
           icon: const Icon(Icons.manage_accounts_outlined),
           label: const Text('Roles & Authorization'),
         ),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final cards = [
-              _LeadershipStat(
-                label: 'Senatorial',
-                filled: coverage.senatorialFilled,
-                expected: coverage.senatorialExpected,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final cards = [
+                  _LeadershipStat(
+                    label: 'Senatorial',
+                    filled: coverage.senatorialFilled,
+                    expected: coverage.senatorialExpected,
+                  ),
+                  _LeadershipStat(
+                    label: 'LGA',
+                    filled: coverage.lgaFilled,
+                    expected: coverage.lgaExpected,
+                  ),
+                  _LeadershipStat(
+                    label: 'Loaded wards',
+                    filled: coverage.loadedWardFilled,
+                    expected: coverage.loadedWardExpected,
+                  ),
+                  _LeadershipStat(
+                    label: 'Loaded PUs',
+                    filled: coverage.loadedPollingUnitFilled,
+                    expected: coverage.loadedPollingUnitExpected,
+                  ),
+                ];
+                final width = constraints.maxWidth >= 800
+                    ? (constraints.maxWidth - 30) / 4
+                    : constraints.maxWidth >= 420
+                        ? (constraints.maxWidth - 10) / 2
+                        : constraints.maxWidth;
+                return Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    for (final item in cards)
+                      SizedBox(width: width, child: item),
+                  ],
+                );
+              },
+            ),
+            if (vacancies.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'VACANT LEADERSHIP POSTS',
+                      style: TextStyle(
+                        color: TgcgColors.muted,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: .7,
+                      ),
+                    ),
+                  ),
+                  TgcgStatusPill(
+                    label: '${vacancies.length} OPEN',
+                    color: TgcgColors.warning,
+                    compact: true,
+                  ),
+                ],
               ),
-              _LeadershipStat(
-                label: 'LGA',
-                filled: coverage.lgaFilled,
-                expected: coverage.lgaExpected,
-              ),
-              _LeadershipStat(
-                label: 'Loaded wards',
-                filled: coverage.loadedWardFilled,
-                expected: coverage.loadedWardExpected,
-              ),
-              _LeadershipStat(
-                label: 'Loaded PUs',
-                filled: coverage.loadedPollingUnitFilled,
-                expected: coverage.loadedPollingUnitExpected,
-              ),
-            ];
-            final width = constraints.maxWidth >= 800
-                ? (constraints.maxWidth - 30) / 4
-                : constraints.maxWidth >= 420
-                    ? (constraints.maxWidth - 10) / 2
-                    : constraints.maxWidth;
-            return Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                for (final item in cards)
-                  SizedBox(width: width, child: item),
-              ],
-            );
-          },
+              const SizedBox(height: 8),
+              for (final vacancy in vacancies.take(10))
+                Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.all(9),
+                  decoration: BoxDecoration(
+                    color: TgcgColors.warning.withValues(alpha: .04),
+                    borderRadius: BorderRadius.circular(TgcgRadius.sm),
+                    border: Border.all(
+                      color: TgcgColors.warning.withValues(alpha: .14),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.person_off_outlined,
+                        color: TgcgColors.warning,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          vacancy.scope.label,
+                          style: const TextStyle(
+                            color: TgcgColors.ink,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        _roleLabel(vacancy.role),
+                        style: const TextStyle(
+                          color: TgcgColors.muted,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ],
         ),
       );
 }
