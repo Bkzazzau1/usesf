@@ -545,14 +545,15 @@ class _ExecutiveReportingCentrePageState
     );
   }
 
-  void _requestExport(
+  Future<void> _requestExport(
     BuildContext context, {
     required _ExecutiveReportPackage package,
     required ExportFormat format,
-  }) {
+  }) async {
     final session = TgcgSession.of(context, listen: false);
     final store = ReportOperations.of(context, listen: false);
-    final job = store.requestExport(
+    try {
+      final job = await store.requestExport(
       kind: package.kind,
       format: format,
       targetScope: GeographicScope.kaduna,
@@ -565,18 +566,27 @@ class _ExecutiveReportingCentrePageState
         GeographicScope.kaduna,
         listen: false,
       ),
-      recordCount: package.recordCount,
-    );
+        recordCount: package.recordCount,
+      );
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          job == null
-              ? 'This executive export is not authorized.'
-              : '${job.id} queued for the export worker.',
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            job == null
+                ? 'This executive export is not authorized.'
+                : '${job.id} queued for the export worker.',
+          ),
         ),
-      ),
-    );
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Export could not be queued securely on this device.'),
+        ),
+      );
+    }
   }
 }
 
