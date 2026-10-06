@@ -1085,7 +1085,7 @@ class _PollingUnitAccountRow extends StatelessWidget {
 
 Future<void> _showPollingUnitAccount(
   BuildContext context, {
-  required PollingUnitResultAccount? account,
+  required PollingUnitResultAccount account,
   required MembershipOperationsController membership,
   required ResultOperationsController results,
   required OperationalCallController calls,
@@ -1225,7 +1225,7 @@ class _SubmissionAccountCard extends StatelessWidget {
 Future<void> _showSubmissionReport(
   BuildContext context, {
   required ElectionResultSubmission submission,
-  required PollingUnitResultAccount account,
+  required PollingUnitResultAccount? account,
   required MembershipOperationsController membership,
   required ResultOperationsController results,
   required OperationalCallController calls,
