@@ -1309,6 +1309,13 @@ class _MeetingDetailPanel extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             _AttendanceList(
+              title: 'Declined',
+              ids: item.declinedMemberIds,
+              membership: membership,
+              color: TgcgColors.warning,
+            ),
+            const SizedBox(height: 8),
+            _AttendanceList(
               title: 'No-show',
               ids: item.inviteeMemberIds
                   .where(
