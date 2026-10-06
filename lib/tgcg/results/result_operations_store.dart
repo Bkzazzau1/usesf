@@ -272,6 +272,8 @@ class ResultOperationsController extends ChangeNotifier {
           duplicateSuspected: map['duplicateSuspected'] == true,
           pollingUnitMatched: map['pollingUnitMatched'] != false,
           agentScopeMatched: map['agentScopeMatched'] != false,
+          formEvidencePresent: map['formEvidencePresent'] != false,
+          ocrProcessed: map['ocrProcessed'] != false,
           ocrConfidence: _double(map['ocrConfidence']),
           ocrMatchedManualEntry: map['ocrMatchedManualEntry'] is bool
               ? map['ocrMatchedManualEntry'] as bool
