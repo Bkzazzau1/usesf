@@ -69,7 +69,11 @@ class PollingUnitResultAccount {
       .toList(growable: false);
 
   bool get hasConflict => unresolvedCandidates.length > 1;
-  bool get hasSubmission => submissions.isNotEmpty;
+  bool get hasSubmission => submissions.any(
+        (item) =>
+            item.status != RecordStatus.rejected &&
+            item.status != RecordStatus.archived,
+      );
   bool get hasVerified =>
       submissions.any((item) => item.status == RecordStatus.verified);
 }
@@ -320,27 +324,30 @@ List<PollingUnitResultAccount> buildPollingUnitResultAccounts({
       byPollingUnit[id] ?? const [],
     )..sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
 
-    final unresolved = records.where(
-      (item) =>
-          item.status != RecordStatus.disputed &&
-          item.status != RecordStatus.rejected &&
-          item.status != RecordStatus.archived,
-    );
-    final unresolvedList = unresolved.toList(growable: false);
+    final accountable = records
+        .where(
+          (item) =>
+              item.status != RecordStatus.rejected &&
+              item.status != RecordStatus.archived,
+        )
+        .toList(growable: false);
+    final unresolvedList = accountable
+        .where((item) => item.status != RecordStatus.disputed)
+        .toList(growable: false);
 
-    final state = records.isEmpty
+    final state = accountable.isEmpty
         ? ResultAccountingState.missing
         : unresolvedList.length > 1
             ? ResultAccountingState.conflict
-            : records.any((item) => item.status == RecordStatus.verified)
+            : accountable.any((item) => item.status == RecordStatus.verified)
                 ? ResultAccountingState.verified
-                : records.any(
+                : accountable.any(
                     (item) =>
                         item.status == RecordStatus.underReview ||
                         item.validation?.requiresHumanReview == true,
                   )
                     ? ResultAccountingState.aiReview
-                    : records.any(
+                    : accountable.any(
                         (item) => item.status == RecordStatus.disputed,
                       )
                         ? ResultAccountingState.disputed
@@ -420,6 +427,19 @@ class _ResultIntelligencePageState extends State<ResultIntelligencePage> {
       submissions: submissions,
     );
     final lgaAccounting = buildResultLgaAccounting(accounts);
+    final knownPollingUnitIds = accounts
+        .map((item) => item.unit.scope.pollingUnitId)
+        .whereType<String>()
+        .toSet();
+    final unmatched = submissions
+        .where(
+          (item) =>
+              item.pollingUnitScope.pollingUnitId == null ||
+              !knownPollingUnitIds.contains(
+                item.pollingUnitScope.pollingUnitId,
+              ),
+        )
+        .length;
 
     final received = accounts.where((item) => item.hasSubmission).length;
     final missing = accounts
@@ -498,10 +518,22 @@ class _ResultIntelligencePageState extends State<ResultIntelligencePage> {
           eyebrow: 'STATE RESULT INTEGRITY',
           title: 'Result Intelligence',
           subtitle: scope.label,
-          trailing: const TgcgStatusPill(
-            label: 'UNOFFICIAL FIELD RESULTS',
-            color: TgcgColors.warning,
-            icon: Icons.info_outline_rounded,
+          trailing: Wrap(
+            spacing: 7,
+            runSpacing: 7,
+            children: [
+              const TgcgStatusPill(
+                label: 'UNOFFICIAL FIELD RESULTS',
+                color: TgcgColors.warning,
+                icon: Icons.info_outline_rounded,
+              ),
+              if (unmatched > 0)
+                TgcgStatusPill(
+                  label: '$unmatched UNMATCHED PU',
+                  color: TgcgColors.danger,
+                  icon: Icons.location_off_outlined,
+                ),
+            ],
           ),
         ),
         const SizedBox(height: 18),
@@ -520,11 +552,13 @@ class _ResultIntelligencePageState extends State<ResultIntelligencePage> {
           _AiReviewPanel(
             entries: aiQueue.take(10).toList(growable: false),
             onOpen: (item) {
-              final account = accounts.firstWhere(
-                (value) =>
-                    value.unit.scope.pollingUnitId ==
-                    item.pollingUnitScope.pollingUnitId,
-              );
+              final account = accounts
+                  .where(
+                    (value) =>
+                        value.unit.scope.pollingUnitId ==
+                        item.pollingUnitScope.pollingUnitId,
+                  )
+                  .firstOrNull;
               _showSubmissionReport(
                 context,
                 submission: item,
@@ -1051,7 +1085,7 @@ class _PollingUnitAccountRow extends StatelessWidget {
 
 Future<void> _showPollingUnitAccount(
   BuildContext context, {
-  required PollingUnitResultAccount account,
+  required PollingUnitResultAccount? account,
   required MembershipOperationsController membership,
   required ResultOperationsController results,
   required OperationalCallController calls,
@@ -1097,7 +1131,7 @@ Future<void> _showPollingUnitAccount(
                         submission: submission,
                         assessment: buildResultAiAssessment(
                           submission,
-                          accountConflict: account.hasConflict,
+                          accountConflict: account?.hasConflict == true,
                         ),
                         onTap: () {
                           Navigator.pop(dialogContext);
@@ -1200,7 +1234,7 @@ Future<void> _showSubmissionReport(
 }) async {
   final assessment = buildResultAiAssessment(
     submission,
-    accountConflict: account.hasConflict,
+    accountConflict: account?.hasConflict == true,
   );
   final member = membership.memberById(submission.submittedBy);
   final callReady =
@@ -1236,7 +1270,7 @@ Future<void> _showSubmissionReport(
                       label: submission.status.name.toUpperCase(),
                       color: _recordStatusColor(submission.status),
                     ),
-                    if (account.hasConflict)
+                    if (account?.hasConflict == true)
                       const TgcgStatusPill(
                         label: 'PU CONFLICT',
                         color: TgcgColors.danger,
@@ -1263,13 +1297,13 @@ Future<void> _showSubmissionReport(
                 _ManualVsAiTable(submission: submission),
                 const SizedBox(height: 14),
                 _ResultEvidenceCard(submission: submission),
-                if (account.hasConflict) ...[
+                if (account?.hasConflict == true) ...[
                   const SizedBox(height: 14),
                   TgcgSectionCard(
                     title: 'Conflicting submissions',
                     child: Column(
                       children: [
-                        for (final other in account.submissions)
+                        for (final other in account!.submissions)
                           if (other.id != submission.id)
                             _SubmissionAccountCard(
                               submission: other,
@@ -1371,7 +1405,7 @@ Future<void> _showSubmissionReport(
             onPressed: busy || submission.status == RecordStatus.verified
                 ? null
                 : () async {
-                    final confirmed = account.hasConflict
+                    final confirmed = account?.hasConflict == true
                         ? await _confirmConflictVerification(dialogContext)
                         : true;
                     if (confirmed != true || !dialogContext.mounted) return;
