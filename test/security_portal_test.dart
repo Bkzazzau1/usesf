@@ -110,6 +110,8 @@ void main() {
         commandDesk: 'Kaduna State Operations Desk',
         contactPhone: '+2348000000101',
         actorId: 'SYSTEM-ADMIN',
+        actorRole: TgcgRole.stateAdministrator,
+        authorizedScope: GeographicScope.kaduna,
       );
       final dispatch = await emergency.assign(
         incidentId: 'INC-REAL-001',
