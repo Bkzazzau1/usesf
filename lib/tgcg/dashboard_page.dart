@@ -56,12 +56,11 @@ class TgcgDashboardPage extends StatelessWidget {
         )
         .length;
 
-    final collationEngine = CollationEngine.prototypeSeed();
+    final collationEngine = CollationEngine.fromGeography(membership.geography);
     final collation = collationEngine.summarize(scope, results.submissions);
 
-    // Geography navigation comes from the canonical Kaduna registry, not
-    // from the small result-collation seed. At state level this therefore
-    // always exposes all three senatorial zones.
+    // Geography navigation and collation expectations share the same
+    // authoritative registry, so command metrics cannot drift from coverage.
     final childScopes = membership.geography.childScopes(scope);
     final coverage = childScopes
         .map(
@@ -604,6 +603,12 @@ class _OperationsProgressPanel extends StatelessWidget {
             '${collation.conflictingPollingUnitIds.length}',
             warning: collation.conflictingPollingUnitIds.isNotEmpty,
           ),
+          if (!collation.catalogueComplete)
+            _ProgressRow(
+              'PU catalogue gaps',
+              '${collation.catalogueGapAreaIds.length}',
+              warning: true,
+            ),
           const SizedBox(height: 10),
           const TgcgStatusPill(
             label: 'UNOFFICIAL FIELD DATA',

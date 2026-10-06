@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../membership/membership_store.dart';
 import '../results/result_operations_store.dart';
 import '../session.dart';
 import '../ui/tgcg_design.dart';
@@ -13,7 +14,6 @@ class CollationPage extends StatefulWidget {
 }
 
 class _CollationPageState extends State<CollationPage> {
-  final engine = CollationEngine.prototypeSeed();
   final List<GeographicScope> path = [];
 
   @override
@@ -26,7 +26,9 @@ class _CollationPageState extends State<CollationPage> {
 
   @override
   Widget build(BuildContext context) {
+    final membership = MembershipOperations.of(context);
     final resultStore = ResultOperations.of(context);
+    final engine = CollationEngine.fromGeography(membership.geography);
     final scope = path.last;
     final summary = engine.summarize(scope, resultStore.submissions);
     final children = engine.childScopes(scope);
@@ -170,7 +172,9 @@ class _CollationMetrics extends StatelessWidget {
                 width: width,
                 label: 'Expected PUs',
                 value: '${summary.expectedPollingUnitCount}',
-                detail: 'Canonical polling units in scope',
+                detail: summary.catalogueComplete
+                    ? 'Canonical polling units in scope'
+                    : 'Loaded catalogue • ${summary.catalogueGapAreaIds.length} area gaps',
                 icon: Icons.location_on_outlined,
                 tone: TgcgMetricTone.neutral,
               ),
@@ -221,7 +225,8 @@ class _CompletionHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final progress = summary.completionPercent.clamp(0.0, 1.0).toDouble();
     final percent = progress * 100;
-    final healthy = summary.conflictingPollingUnitIds.isEmpty;
+    final healthy = summary.catalogueComplete &&
+        summary.conflictingPollingUnitIds.isEmpty;
 
     return Container(
       padding: const EdgeInsets.all(22),
@@ -259,7 +264,9 @@ class _CompletionHero extends StatelessWidget {
               ),
               const SizedBox(height: 5),
               Text(
-                '${summary.verifiedPollingUnitCount} of ${summary.expectedPollingUnitCount} canonical polling units are included in this verified-only snapshot.',
+                summary.catalogueComplete
+                    ? '${summary.verifiedPollingUnitCount} of ${summary.expectedPollingUnitCount} canonical polling units are included in this verified-only snapshot.'
+                    : '${summary.verifiedPollingUnitCount} of ${summary.expectedPollingUnitCount} loaded canonical polling units are included. Catalogue coverage is still missing in ${summary.catalogueGapAreaIds.length} area${summary.catalogueGapAreaIds.length == 1 ? '' : 's'}.',
                 style: const TextStyle(
                   color: TgcgColors.gold200,
                   fontSize: 12,
@@ -303,9 +310,11 @@ class _CompletionHero extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        healthy
-                            ? 'No verified-record conflict in this scope'
-                            : '${summary.conflictingPollingUnitIds.length} verified conflict${summary.conflictingPollingUnitIds.length == 1 ? '' : 's'} require reconciliation',
+                        !summary.catalogueComplete
+                            ? 'Polling-unit catalogue incomplete in ${summary.catalogueGapAreaIds.length} area${summary.catalogueGapAreaIds.length == 1 ? '' : 's'}'
+                            : healthy
+                                ? 'No verified-record conflict in this scope'
+                                : '${summary.conflictingPollingUnitIds.length} verified conflict${summary.conflictingPollingUnitIds.length == 1 ? '' : 's'} require reconciliation',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 11,

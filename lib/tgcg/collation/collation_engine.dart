@@ -1,4 +1,5 @@
 import '../domain/models.dart';
+import '../geography/geography_registry.dart';
 
 class ExpectedPollingUnit {
   const ExpectedPollingUnit({
@@ -22,6 +23,8 @@ class CollationSummary {
     required this.missingPollingUnitIds,
     required this.conflictingPollingUnitIds,
     required this.excludedSubmissionIds,
+    this.catalogueComplete = true,
+    this.catalogueGapAreaIds = const [],
   });
 
   final GeographicScope scope;
@@ -32,145 +35,54 @@ class CollationSummary {
   final List<String> missingPollingUnitIds;
   final List<String> conflictingPollingUnitIds;
   final List<String> excludedSubmissionIds;
+  final bool catalogueComplete;
+  final List<String> catalogueGapAreaIds;
 
   double get completionPercent => expectedPollingUnitCount == 0
       ? 0
       : verifiedPollingUnitCount / expectedPollingUnitCount;
 
   bool get complete =>
+      catalogueComplete &&
       expectedPollingUnitCount > 0 &&
       verifiedPollingUnitCount == expectedPollingUnitCount &&
       conflictingPollingUnitIds.isEmpty;
 }
 
 class CollationEngine {
-  const CollationEngine({required this.expectedPollingUnits});
+  const CollationEngine({
+    required List<ExpectedPollingUnit> expectedPollingUnits,
+  })  : _geography = null,
+        _expectedPollingUnits = expectedPollingUnits;
 
-  final List<ExpectedPollingUnit> expectedPollingUnits;
+  CollationEngine.fromGeography(GeographyRegistry geography)
+      : _geography = geography,
+        _expectedPollingUnits = const [];
 
-  factory CollationEngine.prototypeSeed() => CollationEngine(
-        expectedPollingUnits: const [
-          ExpectedPollingUnit(
-            id: 'KD-KN-W01-PU001',
-            name: 'PU 001',
-            scope: GeographicScope(
-              level: GeographyLevel.pollingUnit,
-              country: 'Nigeria',
-              zoneId: 'NW',
-              zoneName: 'North West',
-              stateId: 'KD',
-              stateName: 'Kaduna',
-              senatorialDistrictId: 'SD/053/KD',
-              senatorialDistrictName: 'Kaduna Central',
-              lgaId: 'KD-KADUNA-NORTH',
-              lgaName: 'Kaduna North',
-              wardId: 'KD-KN-W01',
-              wardName: 'Ward 01',
-              pollingUnitId: 'KD-KN-W01-PU001',
-              pollingUnitName: 'PU 001',
-            ),
-          ),
-          ExpectedPollingUnit(
-            id: 'KD-KN-W01-PU002',
-            name: 'PU 002',
-            scope: GeographicScope(
-              level: GeographyLevel.pollingUnit,
-              country: 'Nigeria',
-              zoneId: 'NW',
-              zoneName: 'North West',
-              stateId: 'KD',
-              stateName: 'Kaduna',
-              senatorialDistrictId: 'SD/053/KD',
-              senatorialDistrictName: 'Kaduna Central',
-              lgaId: 'KD-KADUNA-NORTH',
-              lgaName: 'Kaduna North',
-              wardId: 'KD-KN-W01',
-              wardName: 'Ward 01',
-              pollingUnitId: 'KD-KN-W01-PU002',
-              pollingUnitName: 'PU 002',
-            ),
-          ),
-          ExpectedPollingUnit(
-            id: 'KD-ZA-W01-PU004',
-            name: 'PU 004',
-            scope: GeographicScope(
-              level: GeographyLevel.pollingUnit,
-              country: 'Nigeria',
-              zoneId: 'NW',
-              zoneName: 'North West',
-              stateId: 'KD',
-              stateName: 'Kaduna',
-              senatorialDistrictId: 'SD/052/KD',
-              senatorialDistrictName: 'Kaduna North',
-              lgaId: 'KD-ZARIA',
-              lgaName: 'Zaria',
-              wardId: 'KD-ZA-W01',
-              wardName: 'Ward 01',
-              pollingUnitId: 'KD-ZA-W01-PU004',
-              pollingUnitName: 'PU 004',
-            ),
-          ),
-          ExpectedPollingUnit(
-            id: 'KD-ZA-W01-PU005',
-            name: 'PU 005',
-            scope: GeographicScope(
-              level: GeographyLevel.pollingUnit,
-              country: 'Nigeria',
-              zoneId: 'NW',
-              zoneName: 'North West',
-              stateId: 'KD',
-              stateName: 'Kaduna',
-              senatorialDistrictId: 'SD/052/KD',
-              senatorialDistrictName: 'Kaduna North',
-              lgaId: 'KD-ZARIA',
-              lgaName: 'Zaria',
-              wardId: 'KD-ZA-W01',
-              wardName: 'Ward 01',
-              pollingUnitId: 'KD-ZA-W01-PU005',
-              pollingUnitName: 'PU 005',
-            ),
-          ),
-          ExpectedPollingUnit(
-            id: 'KD-JM-W03-PU012',
-            name: 'PU 012',
-            scope: GeographicScope(
-              level: GeographyLevel.pollingUnit,
-              country: 'Nigeria',
-              zoneId: 'NW',
-              zoneName: 'North West',
-              stateId: 'KD',
-              stateName: 'Kaduna',
-              senatorialDistrictId: 'SD/054/KD',
-              senatorialDistrictName: 'Kaduna South',
-              lgaId: 'KD-JEMAA',
-              lgaName: "Jema'a",
-              wardId: 'KD-JM-W03',
-              wardName: 'Ward 03',
-              pollingUnitId: 'KD-JM-W03-PU012',
-              pollingUnitName: 'PU 012',
-            ),
-          ),
-          ExpectedPollingUnit(
-            id: 'KD-JM-W03-PU013',
-            name: 'PU 013',
-            scope: GeographicScope(
-              level: GeographyLevel.pollingUnit,
-              country: 'Nigeria',
-              zoneId: 'NW',
-              zoneName: 'North West',
-              stateId: 'KD',
-              stateName: 'Kaduna',
-              senatorialDistrictId: 'SD/054/KD',
-              senatorialDistrictName: 'Kaduna South',
-              lgaId: 'KD-JEMAA',
-              lgaName: "Jema'a",
-              wardId: 'KD-JM-W03',
-              wardName: 'Ward 03',
-              pollingUnitId: 'KD-JM-W03-PU013',
-              pollingUnitName: 'PU 013',
-            ),
-          ),
-        ],
+  final GeographyRegistry? _geography;
+  final List<ExpectedPollingUnit> _expectedPollingUnits;
+
+  List<ExpectedPollingUnit> get expectedPollingUnits {
+    final geography = _geography;
+    if (geography == null) return _expectedPollingUnits;
+    return geography.pollingUnits
+        .map(_expectedFromCanonical)
+        .toList(growable: false);
+  }
+
+  @Deprecated(
+    'Use CollationEngine.fromGeography with the authoritative registry.',
+  )
+  factory CollationEngine.prototypeSeed() =>
+      CollationEngine.fromGeography(GeographyRegistry.prototypeSeed());
+
+  static ExpectedPollingUnit _expectedFromCanonical(
+    CanonicalPollingUnit unit,
+  ) =>
+      ExpectedPollingUnit(
+        id: unit.scope.pollingUnitId ?? unit.code,
+        name: unit.scope.pollingUnitName ?? unit.displayCode,
+        scope: unit.scope,
       );
 
   CollationSummary summarize(
@@ -191,7 +103,9 @@ class CollationEngine {
 
     final verifiedByPollingUnit = <String, List<ElectionResultSubmission>>{};
     for (final submission in verified) {
-      final puId = submission.pollingUnitScope.pollingUnitId;
+      final puId = _canonicalPollingUnitId(
+        submission.pollingUnitScope.pollingUnitId,
+      );
       if (puId == null) continue;
       verifiedByPollingUnit.putIfAbsent(puId, () => []).add(submission);
     }
@@ -218,7 +132,11 @@ class CollationEngine {
     }
 
     final includedPuIds = included
-        .map((submission) => submission.pollingUnitScope.pollingUnitId)
+        .map(
+          (submission) => _canonicalPollingUnitId(
+            submission.pollingUnitScope.pollingUnitId,
+          ),
+        )
         .whereType<String>()
         .toSet();
     final missing = expectedIds
@@ -234,6 +152,8 @@ class CollationEngine {
         .toList(growable: false)
       ..sort();
 
+    final catalogueGaps = _catalogueGapAreaIds(scope);
+
     return CollationSummary(
       scope: scope,
       expectedPollingUnitCount: expected.length,
@@ -243,10 +163,17 @@ class CollationEngine {
       missingPollingUnitIds: List.unmodifiable(missing),
       conflictingPollingUnitIds: List.unmodifiable(conflicts),
       excludedSubmissionIds: List.unmodifiable(excludedIds),
+      catalogueComplete: catalogueGaps.isEmpty,
+      catalogueGapAreaIds: List.unmodifiable(catalogueGaps),
     );
   }
 
   List<GeographicScope> childScopes(GeographicScope scope) {
+    final geography = _geography;
+    if (geography != null) {
+      return geography.childScopes(scope);
+    }
+
     final children = <String, GeographicScope>{};
     for (final unit in expectedPollingUnits.where((u) => _within(scope, u.scope))) {
       final child = _directChild(scope.level, unit.scope);
@@ -259,10 +186,47 @@ class CollationEngine {
   }
 
   ExpectedPollingUnit? expectedPollingUnit(String id) {
+    final geography = _geography;
+    if (geography != null) {
+      final unit = geography.pollingUnit(id);
+      if (unit != null) return _expectedFromCanonical(unit);
+    }
     for (final unit in expectedPollingUnits) {
       if (unit.id == id) return unit;
     }
     return null;
+  }
+
+  List<String> _catalogueGapAreaIds(GeographicScope scope) {
+    final geography = _geography;
+    if (geography == null) return const [];
+
+    if (scope.level == GeographyLevel.ward ||
+        scope.level == GeographyLevel.pollingUnit) {
+      if (geography.pollingUnitsWithin(scope).isNotEmpty) return const [];
+      final id = scope.level == GeographyLevel.ward
+          ? scope.wardId
+          : scope.pollingUnitId;
+      return id == null ? const [] : [id];
+    }
+
+    final lgas = geography.lgas
+        .where((lga) => GeographyRegistry.scopeContains(scope, lga.scope))
+        .toList(growable: false);
+    final gaps = lgas
+        .where((lga) => geography.pollingUnitsWithin(lga.scope).isEmpty)
+        .map((lga) => lga.id)
+        .toList(growable: false)
+      ..sort();
+    return gaps;
+  }
+
+  String? _canonicalPollingUnitId(String? id) {
+    if (id == null || id.trim().isEmpty) return null;
+    final geography = _geography;
+    if (geography == null) return id;
+    final canonical = geography.pollingUnit(id);
+    return canonical?.scope.pollingUnitId ?? canonical?.code ?? id;
   }
 
   bool _submissionWithin(
