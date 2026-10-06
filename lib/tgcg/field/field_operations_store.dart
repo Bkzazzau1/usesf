@@ -1,8 +1,44 @@
 import 'package:flutter/widgets.dart';
 
+import '../domain/local_id.dart';
 import '../domain/models.dart';
+import '../domain/permissions.dart';
 import '../offline/offline_payloads.dart';
 import '../offline/offline_persistence.dart';
+
+class IncidentStatusTransitionEvent {
+  const IncidentStatusTransitionEvent({
+    required this.id,
+    required this.incidentId,
+    required this.fromStatus,
+    required this.toStatus,
+    required this.actorId,
+    required this.actorRole,
+    required this.changedAt,
+    required this.scope,
+  });
+
+  final String id;
+  final String incidentId;
+  final IncidentStatus fromStatus;
+  final IncidentStatus toStatus;
+  final String actorId;
+  final TgcgRole actorRole;
+  final DateTime changedAt;
+  final GeographicScope scope;
+}
+
+TgcgCapability incidentStatusMutationCapability(IncidentStatus status) =>
+    switch (status) {
+      IncidentStatus.acknowledged => TgcgCapability.acknowledgeIncident,
+      IncidentStatus.assigned ||
+      IncidentStatus.investigating ||
+      IncidentStatus.escalated =>
+        TgcgCapability.assignIncident,
+      IncidentStatus.resolved || IncidentStatus.closed =>
+        TgcgCapability.closeIncident,
+      IncidentStatus.reported => TgcgCapability.createIncident,
+    };
 
 class FieldOperationsController extends ChangeNotifier {
   FieldOperationsController._({
@@ -243,9 +279,18 @@ class FieldOperationsController extends ChangeNotifier {
   final List<FieldIncident> _incidents;
   final List<FieldReport> _reports;
   final OfflinePersistenceController? _persistence;
+  final Map<String, List<IncidentStatusTransitionEvent>> _statusHistory = {};
 
   List<FieldIncident> get incidents => List.unmodifiable(_incidents);
   List<FieldReport> get reports => List.unmodifiable(_reports);
+
+  List<IncidentStatusTransitionEvent> statusHistoryForIncident(
+    String incidentId,
+  ) =>
+      List.unmodifiable(
+        _statusHistory[incidentId] ??
+            const <IncidentStatusTransitionEvent>[],
+      );
 
   Future<void> hydrateFromOffline() async {
     final persistence = _persistence;
@@ -287,6 +332,21 @@ class FieldOperationsController extends ChangeNotifier {
           if (item != null) evidence.add(item);
         }
       }
+      final rawStatusHistory = row['statusHistory'];
+      if (rawStatusHistory is List) {
+        final restoredEvents = <IncidentStatusTransitionEvent>[];
+        for (final value in rawStatusHistory) {
+          final event = _statusEventFromJson(value);
+          if (event != null && event.incidentId == id) {
+            restoredEvents.add(event);
+          }
+        }
+        restoredEvents.sort((a, b) => a.changedAt.compareTo(b.changedAt));
+        if (restoredEvents.isNotEmpty) {
+          _statusHistory[id] = restoredEvents;
+        }
+      }
+
       final restored = FieldIncident(
         id: id,
         title: title,
@@ -465,11 +525,35 @@ class FieldOperationsController extends ChangeNotifier {
     return report;
   }
 
-  void updateIncidentStatus(String incidentId, IncidentStatus status) {
+  Future<bool> updateIncidentStatus(
+    String incidentId,
+    IncidentStatus status, {
+    required String actorId,
+    required TgcgRole actorRole,
+    required GeographicScope authorizedScope,
+  }) async {
     final index = _incidents.indexWhere((item) => item.id == incidentId);
-    if (index < 0) return;
+    if (index < 0) return false;
     final incident = _incidents[index];
-    _incidents[index] = FieldIncident(
+    if (incident.status == status) return true;
+    if (status == IncidentStatus.reported) {
+      throw StateError('An incident cannot be returned to the reported state.');
+    }
+
+    final capability = incidentStatusMutationCapability(status);
+    if (!TgcgPermissionPolicy.may(
+      actorRole,
+      authorizedScope,
+      capability,
+      targetScope: incident.scope,
+    )) {
+      throw StateError(
+        'This account cannot change the incident to ${status.name} in this scope.',
+      );
+    }
+
+    final changedAt = DateTime.now().toUtc();
+    final updated = FieldIncident(
       id: incident.id,
       title: incident.title,
       category: incident.category,
@@ -487,7 +571,90 @@ class FieldOperationsController extends ChangeNotifier {
       evidence: incident.evidence,
       origin: incident.origin,
     );
+    final event = IncidentStatusTransitionEvent(
+      id: newLocalId('INC-EVT', changedAt),
+      incidentId: incident.id,
+      fromStatus: incident.status,
+      toStatus: status,
+      actorId: actorId,
+      actorRole: actorRole,
+      changedAt: changedAt,
+      scope: incident.scope,
+    );
+    final history = <IncidentStatusTransitionEvent>[
+      ...?_statusHistory[incident.id],
+      event,
+    ];
+
+    await _persistence?.persistMutation(
+      entityType: 'field_incident',
+      entityId: updated.id,
+      mutationType: SyncMutationType.update,
+      payload: {
+        ...fieldIncidentToJson(updated),
+        'statusHistory': history.map(_statusEventToJson).toList(growable: false),
+      },
+      scopeKey: scopeStorageKey(updated.scope),
+      ownerId: actorId,
+    );
+
+    _incidents[index] = updated;
+    _statusHistory[incident.id] = history;
     notifyListeners();
+    return true;
+  }
+
+  static Map<String, Object?> _statusEventToJson(
+    IncidentStatusTransitionEvent event,
+  ) =>
+      {
+        'id': event.id,
+        'incidentId': event.incidentId,
+        'fromStatus': event.fromStatus.name,
+        'toStatus': event.toStatus.name,
+        'actorId': event.actorId,
+        'actorRole': event.actorRole.name,
+        'changedAt': event.changedAt.toUtc().toIso8601String(),
+        'scope': geographicScopeToJson(event.scope),
+      };
+
+  static IncidentStatusTransitionEvent? _statusEventFromJson(Object? value) {
+    if (value is! Map) return null;
+    final map = value.map(
+      (key, item) => MapEntry(key.toString(), item),
+    );
+    final id = map['id']?.toString();
+    final incidentId = map['incidentId']?.toString();
+    final fromStatus = _incidentStatus(map['fromStatus']);
+    final toStatus = _incidentStatus(map['toStatus']);
+    final actorId = map['actorId']?.toString();
+    final actorRoleName = map['actorRole']?.toString();
+    final actorRole = TgcgRole.values
+        .where((item) => item.name == actorRoleName)
+        .firstOrNull;
+    final changedAt =
+        DateTime.tryParse(map['changedAt']?.toString() ?? '')?.toUtc();
+    final scope = geographicScopeFromJson(map['scope']);
+    if (id == null ||
+        incidentId == null ||
+        fromStatus == null ||
+        toStatus == null ||
+        actorId == null ||
+        actorRole == null ||
+        changedAt == null ||
+        scope == null) {
+      return null;
+    }
+    return IncidentStatusTransitionEvent(
+      id: id,
+      incidentId: incidentId,
+      fromStatus: fromStatus,
+      toStatus: toStatus,
+      actorId: actorId,
+      actorRole: actorRole,
+      changedAt: changedAt,
+      scope: scope,
+    );
   }
 
   static double? _double(Object? value) {
@@ -545,6 +712,10 @@ class FieldOperationsController extends ChangeNotifier {
     if (parent.level == GeographyLevel.ward) return true;
     return parent.pollingUnitId == child.pollingUnitId;
   }
+}
+
+extension _FirstOrNull<T> on Iterable<T> {
+  T? get firstOrNull => isEmpty ? null : first;
 }
 
 class FieldOperations extends InheritedNotifier<FieldOperationsController> {
