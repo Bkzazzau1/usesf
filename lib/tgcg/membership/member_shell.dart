@@ -34,7 +34,7 @@ class MemberShell extends StatelessWidget {
               tooltip: 'Sign out',
               onPressed: () async {
                 await AssignmentTracking.of(context, listen: false).stop();
-                session.signOut();
+                await session.signOut();
               },
               icon: const Icon(Icons.logout_rounded),
             ),
@@ -84,7 +84,7 @@ class MemberShell extends StatelessWidget {
             tooltip: 'Sign out',
             onPressed: () async {
               await AssignmentTracking.of(context, listen: false).stop();
-              session.signOut();
+              await session.signOut();
             },
             icon: const Icon(Icons.logout_rounded),
           ),
@@ -303,7 +303,7 @@ class _BlockedMemberScaffold extends StatelessWidget {
             tooltip: 'Sign out',
             onPressed: () async {
               await AssignmentTracking.of(context, listen: false).stop();
-              session.signOut();
+              await session.signOut();
             },
             icon: const Icon(Icons.logout_rounded),
           ),
@@ -398,7 +398,7 @@ class _WaitingForAccessScaffoldState extends State<_WaitingForAccessScaffold> {
             tooltip: 'Sign out',
             onPressed: () async {
               await AssignmentTracking.of(context, listen: false).stop();
-              session.signOut();
+              await session.signOut();
             },
             icon: const Icon(Icons.logout_rounded),
           ),
