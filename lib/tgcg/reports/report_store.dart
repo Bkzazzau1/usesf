@@ -1,9 +1,12 @@
 import 'package:flutter/widgets.dart';
 
+import '../domain/local_id.dart';
 import '../domain/models.dart';
 import '../domain/permissions.dart';
 import '../geography/geography_registry.dart';
 import '../governance/governance_store.dart';
+import '../offline/offline_payloads.dart';
+import '../offline/offline_persistence.dart';
 
 enum ReportKind {
   executiveBrief,
@@ -54,8 +57,20 @@ class ReportOperationsController extends ChangeNotifier {
   ReportOperationsController._({
     required GovernanceOperationsController governance,
     required List<ReportExportJob> jobs,
+    OfflinePersistenceController? persistence,
   })  : _governance = governance,
-        _jobs = jobs;
+        _jobs = jobs,
+        _persistence = persistence;
+
+  factory ReportOperationsController.productionFoundation({
+    required GovernanceOperationsController governance,
+    required OfflinePersistenceController persistence,
+  }) =>
+      ReportOperationsController._(
+        governance: governance,
+        jobs: <ReportExportJob>[],
+        persistence: persistence,
+      );
 
   factory ReportOperationsController.prototypeSeed(
     GovernanceOperationsController governance,
@@ -106,8 +121,32 @@ class ReportOperationsController extends ChangeNotifier {
 
   final GovernanceOperationsController _governance;
   final List<ReportExportJob> _jobs;
+  final OfflinePersistenceController? _persistence;
 
   List<ReportExportJob> get jobs => List.unmodifiable(_jobs);
+
+  Future<void> hydrateFromOffline() async {
+    final persistence = _persistence;
+    if (persistence == null) return;
+
+    final rows = await persistence.readEntities(entityType: 'report_export');
+    var changed = false;
+    for (final row in rows) {
+      final restored = _jobFromJson(row);
+      if (restored == null) continue;
+      final index = _jobs.indexWhere((job) => job.id == restored.id);
+      if (index < 0) {
+        _jobs.add(restored);
+      } else {
+        _jobs[index] = restored;
+      }
+      changed = true;
+    }
+    if (changed) {
+      _jobs.sort((a, b) => b.requestedAt.compareTo(a.requestedAt));
+      notifyListeners();
+    }
+  }
 
   List<ReportExportJob> jobsForScope(
     GeographicScope scope, {
@@ -174,7 +213,7 @@ class ReportOperationsController extends ChangeNotifier {
     };
   }
 
-  ReportExportJob? requestExport({
+  Future<ReportExportJob?> requestExport({
     required ReportKind kind,
     required ExportFormat format,
     required GeographicScope targetScope,
@@ -183,7 +222,7 @@ class ReportOperationsController extends ChangeNotifier {
     required GeographicScope userScope,
     Set<TgcgCapability>? effectiveCapabilities,
     int? recordCount,
-  }) {
+  }) async {
     if (!canExportKind(
       kind: kind,
       role: role,
@@ -194,15 +233,24 @@ class ReportOperationsController extends ChangeNotifier {
       return null;
     }
 
+    final requestedAt = DateTime.now().toUtc();
     final job = ReportExportJob(
-      id: 'EXP-${(_jobs.length + 1).toString().padLeft(4, '0')}',
+      id: newLocalId('EXP', requestedAt),
       kind: kind,
       format: format,
       scope: targetScope,
       requestedBy: actorId,
-      requestedAt: DateTime.now().toUtc(),
+      requestedAt: requestedAt,
       status: ExportJobStatus.queued,
       recordCount: recordCount,
+    );
+    await _persistence?.persistMutation(
+      entityType: 'report_export',
+      entityId: job.id,
+      mutationType: SyncMutationType.create,
+      payload: _jobToJson(job),
+      scopeKey: scopeStorageKey(targetScope),
+      ownerId: actorId,
     );
     _jobs.insert(0, job);
     _governance.recordAudit(
@@ -218,14 +266,16 @@ class ReportOperationsController extends ChangeNotifier {
     return job;
   }
 
-  void markGenerating(String id, {required String actorId}) {
+  Future<void> markGenerating(String id, {required String actorId}) async {
     final index = _jobs.indexWhere((job) => job.id == id);
     if (index < 0) return;
-    _jobs[index] = _copyJob(
+    final updated = _copyJob(
       _jobs[index],
       status: ExportJobStatus.generating,
       clearError: true,
     );
+    await _persistUpdate(updated, actorId: actorId);
+    _jobs[index] = updated;
     _governance.recordAudit(
       actorId: actorId,
       action: 'report_export_generating',
@@ -237,15 +287,15 @@ class ReportOperationsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void markCompleted(
+  Future<void> markCompleted(
     String id, {
     required String actorId,
     required String fileName,
     required String contentHash,
-  }) {
+  }) async {
     final index = _jobs.indexWhere((job) => job.id == id);
     if (index < 0) return;
-    _jobs[index] = _copyJob(
+    final updated = _copyJob(
       _jobs[index],
       status: ExportJobStatus.completed,
       completedAt: DateTime.now().toUtc(),
@@ -253,6 +303,8 @@ class ReportOperationsController extends ChangeNotifier {
       contentHash: contentHash,
       clearError: true,
     );
+    await _persistUpdate(updated, actorId: actorId);
+    _jobs[index] = updated;
     _governance.recordAudit(
       actorId: actorId,
       action: 'report_export_completed',
@@ -264,18 +316,20 @@ class ReportOperationsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void markFailed(
+  Future<void> markFailed(
     String id, {
     required String actorId,
     required String error,
-  }) {
+  }) async {
     final index = _jobs.indexWhere((job) => job.id == id);
     if (index < 0) return;
-    _jobs[index] = _copyJob(
+    final updated = _copyJob(
       _jobs[index],
       status: ExportJobStatus.failed,
       error: error,
     );
+    await _persistUpdate(updated, actorId: actorId);
+    _jobs[index] = updated;
     _governance.recordAudit(
       actorId: actorId,
       action: 'report_export_failed',
@@ -285,6 +339,88 @@ class ReportOperationsController extends ChangeNotifier {
       scope: _jobs[index].scope,
     );
     notifyListeners();
+  }
+
+  Future<void> _persistUpdate(
+    ReportExportJob job, {
+    required String actorId,
+  }) async {
+    await _persistence?.persistMutation(
+      entityType: 'report_export',
+      entityId: job.id,
+      mutationType: SyncMutationType.update,
+      payload: _jobToJson(job),
+      scopeKey: scopeStorageKey(job.scope),
+      ownerId: actorId,
+    );
+  }
+
+  static Map<String, Object?> _jobToJson(ReportExportJob job) => {
+        'id': job.id,
+        'kind': job.kind.name,
+        'format': job.format.name,
+        'scope': geographicScopeToJson(job.scope),
+        'requestedBy': job.requestedBy,
+        'requestedAt': job.requestedAt.toUtc().toIso8601String(),
+        'status': job.status.name,
+        'recordCount': job.recordCount,
+        'completedAt': job.completedAt?.toUtc().toIso8601String(),
+        'fileName': job.fileName,
+        'contentHash': job.contentHash,
+        'error': job.error,
+      };
+
+  static ReportExportJob? _jobFromJson(Map<String, Object?> row) {
+    final id = row['id']?.toString();
+    final kind = _enumValue(ReportKind.values, row['kind']);
+    final format = _enumValue(ExportFormat.values, row['format']);
+    final scope = geographicScopeFromJson(row['scope']);
+    final requestedBy = row['requestedBy']?.toString();
+    final requestedAt =
+        DateTime.tryParse(row['requestedAt']?.toString() ?? '')?.toUtc();
+    final status = _enumValue(ExportJobStatus.values, row['status']);
+    final completedRaw = row['completedAt']?.toString();
+    final completedAt = completedRaw == null || completedRaw.isEmpty
+        ? null
+        : DateTime.tryParse(completedRaw)?.toUtc();
+    if (id == null ||
+        kind == null ||
+        format == null ||
+        scope == null ||
+        requestedBy == null ||
+        requestedAt == null ||
+        status == null) {
+      return null;
+    }
+    return ReportExportJob(
+      id: id,
+      kind: kind,
+      format: format,
+      scope: scope,
+      requestedBy: requestedBy,
+      requestedAt: requestedAt,
+      status: status,
+      recordCount: _intValue(row['recordCount']),
+      completedAt: completedAt,
+      fileName: row['fileName']?.toString(),
+      contentHash: row['contentHash']?.toString(),
+      error: row['error']?.toString(),
+    );
+  }
+
+  static T? _enumValue<T extends Enum>(List<T> values, Object? raw) {
+    final name = raw?.toString();
+    if (name == null) return null;
+    for (final value in values) {
+      if (value.name == name) return value;
+    }
+    return null;
+  }
+
+  static int? _intValue(Object? raw) {
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
+    return int.tryParse(raw?.toString() ?? '');
   }
 
   static ReportExportJob _copyJob(
