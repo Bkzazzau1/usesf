@@ -40,11 +40,17 @@ class _GovernancePageState extends State<GovernancePage> {
         ? session.scope
         : governanceScopes.first;
 
-    final canManage = TgcgAccessPolicy.allows(
+    final manageRole = TgcgAccessPolicy.roleFor(
       context,
       TgcgCapability.manageSystemSettings,
       targetScope: scope,
     );
+    final manageScope = TgcgAccessPolicy.authorizingScope(
+      context,
+      TgcgCapability.manageSystemSettings,
+      targetScope: scope,
+    );
+    final canManage = manageRole != null && manageScope != null;
     final canAudit = TgcgAccessPolicy.allows(
       context,
       TgcgCapability.viewAudit,
@@ -182,13 +188,17 @@ class _GovernancePageState extends State<GovernancePage> {
             final detail = _OutboxDetail(
               item: selected,
               canRetry: canManage,
-              onRetry: selected == null
+              onRetry: selected == null ||
+                      manageRole == null ||
+                      manageScope == null
                   ? null
-                  : () => governance.queueForRetry(
+                  : () => _retryOutbox(
+                        context,
+                        governance,
                         selected.id,
-                        actorId: session.accessId.isEmpty
-                            ? session.operatorName
-                            : session.accessId,
+                        session,
+                        manageRole,
+                        manageScope,
                       ),
             );
             if (constraints.maxWidth < 1030) {
@@ -219,13 +229,17 @@ class _GovernancePageState extends State<GovernancePage> {
               filter: settingFilter,
               canManage: canManage,
               onFilter: (value) => setState(() => settingFilter = value),
-              onChanged: (setting, value) => governance.setSetting(
-                settingId: setting.id,
-                value: value,
-                actorId: session.accessId.isEmpty
-                    ? session.operatorName
-                    : session.accessId,
-              ),
+              onChanged: manageRole == null || manageScope == null
+                  ? (_, __) {}
+                  : (setting, value) => _setSetting(
+                        context,
+                        governance,
+                        setting,
+                        value,
+                        session,
+                        manageRole,
+                        manageScope,
+                      ),
             );
             if (constraints.maxWidth < 1030) {
               return Column(
@@ -266,6 +280,54 @@ class _GovernancePageState extends State<GovernancePage> {
           ),
       ],
     );
+  }
+
+  Future<void> _retryOutbox(
+    BuildContext context,
+    GovernanceOperationsController governance,
+    String outboxId,
+    TgcgSessionController session,
+    TgcgRole actorRole,
+    GeographicScope authorizedScope,
+  ) async {
+    try {
+      await governance.queueForRetry(
+        outboxId,
+        actorId:
+            session.accessId.isEmpty ? session.operatorName : session.accessId,
+        actorRole: actorRole,
+        authorizedScope: authorizedScope,
+      );
+    } on StateError catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  }
+
+  Future<void> _setSetting(
+    BuildContext context,
+    GovernanceOperationsController governance,
+    SystemSettingRecord setting,
+    bool value,
+    TgcgSessionController session,
+    TgcgRole actorRole,
+    GeographicScope authorizedScope,
+  ) async {
+    try {
+      await governance.setSetting(
+        settingId: setting.id,
+        value: value,
+        actorId:
+            session.accessId.isEmpty ? session.operatorName : session.accessId,
+        actorRole: actorRole,
+        authorizedScope: authorizedScope,
+      );
+    } on StateError catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.message)));
+    }
   }
 }
 
@@ -347,7 +409,7 @@ class _MetricGrid extends StatelessWidget {
                 width: width,
                 label: 'Safeguards enabled',
                 value: '$enabledSettings/$settingsTotal',
-                detail: 'Configured prototype controls',
+                detail: 'Configured controls',
                 icon: Icons.admin_panel_settings_outlined,
                 tone: TgcgMetricTone.success,
               ),
@@ -879,7 +941,7 @@ class _SettingsPanel extends StatelessWidget {
   Widget build(BuildContext context) => TgcgSectionCard(
         title: 'System safeguards',
         subtitle: canManage
-            ? 'Privileged prototype controls. Production enforcement remains server-side.'
+            ? 'Privileged controls. Server policy remains authoritative after synchronization.'
             : 'Read-only configuration view.',
         trailing: SizedBox(
           width: 185,
@@ -1020,7 +1082,7 @@ class _AuditPanel extends StatelessWidget {
   Widget build(BuildContext context) => TgcgSectionCard(
         title: 'Audit timeline',
         subtitle:
-            'Prototype append-style event history. Production storage must be immutable and server-backed.',
+            'Durable append-style local history with authoritative server reconciliation after synchronization.',
         trailing: TgcgStatusPill(
           label: '${events.length} VISIBLE',
           color: TgcgColors.primary,
