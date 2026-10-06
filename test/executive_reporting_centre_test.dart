@@ -154,7 +154,7 @@ void main() {
         actorId: 'STATE-COORD',
         role: TgcgRole.stateCoordinator,
         userScope: GeographicScope.kaduna,
-        effectiveCapabilities: TgcgPermissionPolicy.capabilities(
+        effectiveCapabilities: TgcgPermissionPolicy.capabilitiesFor(
           TgcgRole.stateCoordinator,
         ),
         recordCount: 23,
@@ -177,7 +177,7 @@ void main() {
         actorId: 'STATE-COORD',
         role: TgcgRole.stateCoordinator,
         userScope: GeographicScope.kaduna,
-        effectiveCapabilities: TgcgPermissionPolicy.capabilities(
+        effectiveCapabilities: TgcgPermissionPolicy.capabilitiesFor(
           TgcgRole.stateCoordinator,
         ),
       );
@@ -193,7 +193,7 @@ void main() {
         actorId: 'SENATORIAL-COORD',
         role: TgcgRole.senatorialCoordinator,
         userScope: GeographicScope.kaduna,
-        effectiveCapabilities: TgcgPermissionPolicy.capabilities(
+        effectiveCapabilities: TgcgPermissionPolicy.capabilitiesFor(
           TgcgRole.senatorialCoordinator,
         ),
       );
@@ -209,7 +209,7 @@ void main() {
         actorId: 'STATE-COORD',
         role: TgcgRole.stateCoordinator,
         userScope: GeographicScope.kaduna,
-        effectiveCapabilities: TgcgPermissionPolicy.capabilities(
+        effectiveCapabilities: TgcgPermissionPolicy.capabilitiesFor(
           TgcgRole.stateCoordinator,
         ),
       );
@@ -220,7 +220,7 @@ void main() {
         actorId: 'STATE-COORD',
         role: TgcgRole.stateCoordinator,
         userScope: GeographicScope.kaduna,
-        effectiveCapabilities: TgcgPermissionPolicy.capabilities(
+        effectiveCapabilities: TgcgPermissionPolicy.capabilitiesFor(
           TgcgRole.stateCoordinator,
         ),
       );
