@@ -402,7 +402,7 @@ class _StateCommunicationsCommandPageState
   }) async {
     setState(() => _sending = true);
     try {
-      final ok = communications.sendBroadcast(
+      final ok = await communications.sendBroadcast(
         title: _broadcastTitle.text,
         body: _broadcastBody.text,
         targetScope: _targetScope,
