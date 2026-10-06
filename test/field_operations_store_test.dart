@@ -333,6 +333,63 @@ void main() {
       );
     });
 
+    test('incident ownership rejects officer outside incident scope',
+        () async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final persistence = OfflinePersistenceController(
+        openDatabase: () async => InMemoryOfflineDatabase(),
+      );
+      await persistence.initialize();
+
+      final geography = GeographyRegistry.prototypeSeed();
+      final membership = MembershipOperationsController.productionFoundation(
+        geography,
+        persistence: persistence,
+      );
+      final zariaOfficer = await membership.createMember(
+        fullName: 'Zaria Response Officer',
+        registrationScope: geography.lga('KD-ZARIA')!.scope,
+      );
+      final store = FieldOperationsController.productionFoundation(
+        persistence: persistence,
+        membership: membership,
+      );
+
+      const scope = GeographicScope(
+        level: GeographyLevel.pollingUnit,
+        country: 'Nigeria',
+        zoneId: 'NW',
+        stateId: 'KD',
+        senatorialDistrictId: 'SD/053/KD',
+        lgaId: 'KD-KADUNA-NORTH',
+        wardId: 'KD-KN-W01',
+        pollingUnitId: 'KD-KN-W01-PU001',
+      );
+      final incident = await store.createIncident(
+        title: 'Ownership scope test',
+        category: 'Operations',
+        severity: IncidentSeverity.medium,
+        scope: scope,
+        reporterId: 'PU-COORD-002',
+        actorRole: TgcgRole.pollingUnitCoordinator,
+        authorizedScope: scope,
+      );
+
+      await expectLater(
+        store.assignIncidentOwnership(
+          incident.id,
+          responsibleMemberId: zariaOfficer.id,
+          actorId: 'STATE-COORD',
+          actorRole: TgcgRole.stateCoordinator,
+          authorizedScope: GeographicScope.kaduna,
+        ),
+        throwsStateError,
+      );
+
+      expect(store.currentOwnershipForIncident(incident.id), isNull);
+      expect(store.ownershipHistoryForIncident(incident.id), isEmpty);
+    });
+
     test('direct status mutation outside actor scope is rejected', () async {
       const zaria = GeographicScope(
         level: GeographyLevel.lga,
