@@ -117,6 +117,15 @@ Assignments are separate from roles.
 - The State coverage exception queue surfaces vacant coordinator roles, PU staffing gaps, stale/mismatched GPS, missing/review coordinates, unresolved incidents and—after result activity begins—missing or conflicting PU results.
 - State Coverage Intelligence is review/intervention only: it does not expose field coordinate capture, evidence capture, incident submission or result submission controls.
 - GPS-active area coordinators and deployed PU members may be contacted through the existing GPS-bound operational-call workflow, and PU drill-down links back to Assignment Control, Evidence Intelligence and Result Intelligence.
+- The State Coordinator's member registry is rendered as Membership Intelligence rather than the shared Member Operations directory used by lower coordinators and field roles.
+- Membership Intelligence accounts statewide for active accounts, Pending Activation identities, blocked/suspicious identities, members without roles, deployed members and GPS-active deployed members.
+- Member readiness is transparent rather than a hidden AI score: active account state contributes 20%, identity readiness 20%, reachable phone/email 10%, at least one active role 15%, managed device 10%, home-PU linkage 10%, and live GPS 15% when deployed. Members without an active assignment are not penalized for lacking live GPS.
+- Blocked/suspicious members always have zero operational readiness and remain blocked regardless of other profile completeness.
+- Legacy system-derived members whose registry record was already verified before the newer identity-review field existed are treated as identity-ready migration records; genuinely pending or suspicious identities remain visible for human review.
+- Membership Intelligence surfaces people exceptions such as no role, deployed without a managed device, deployed without fresh GPS, no contact method, no home PU, pending activation, identity review, blocked access and multiple coordinator posts.
+- Leadership coverage separately accounts for Senatorial, all 23 LGA coordinator posts, loaded Ward coordinator posts and loaded Polling Unit coordinator posts, and lists the actual vacant scopes.
+- Membership Intelligence may call a GPS-active member through the existing operational-call workflow and may hand off to Member Enrolment, Roles & Authorization, Assignment Control, State Coverage Intelligence and Result Intelligence.
+- Membership Intelligence does not duplicate enrolment, role mutation or assignment creation; those remain authoritative in their dedicated modules.
 - Role and assignment history remain auditable after deactivation.
 
 ## Product principles
@@ -136,7 +145,7 @@ Assignments are separate from roles.
 ## Main modules
 
 1. Member self-registration and authentication
-2. Member Operations
+2. Member Operations / State Membership Intelligence
 3. Roles & Authorization
 4. Jobs & Assignment Control
 5. Geographic Operations / State Coverage Intelligence
