@@ -1,7 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 
+import '../domain/local_id.dart';
 import '../domain/models.dart';
-import '../sync/sync_models.dart';
+import '../domain/permissions.dart';
+import '../offline/offline_payloads.dart';
+import '../offline/offline_persistence.dart';
 
 enum SystemSettingCategory { security, sync, evidence, communications }
 
@@ -53,18 +58,35 @@ class RoleAssignmentRecord {
 
 class GovernanceOperationsController extends ChangeNotifier {
   GovernanceOperationsController._({
+    required OfflinePersistenceController? persistence,
     required List<AuditEvent> auditEvents,
-    required List<SyncOutboxItem> outbox,
     required List<SystemSettingRecord> settings,
     required List<RoleAssignmentRecord> roleAssignments,
-  })  : _auditEvents = auditEvents,
-        _outbox = outbox,
+  })  : _persistence = persistence,
+        _auditEvents = auditEvents,
         _settings = settings,
-        _roleAssignments = roleAssignments;
+        _roleAssignments = roleAssignments {
+    _persistence?.addListener(_onPersistenceChanged);
+  }
 
-  factory GovernanceOperationsController.prototypeSeed() {
+  factory GovernanceOperationsController.productionFoundation({
+    required OfflinePersistenceController persistence,
+  }) {
+    final now = DateTime.now().toUtc();
+    return GovernanceOperationsController._(
+      persistence: persistence,
+      auditEvents: const [],
+      settings: _defaultSettings(now),
+      roleAssignments: const [],
+    );
+  }
+
+  factory GovernanceOperationsController.prototypeSeed({
+    OfflinePersistenceController? persistence,
+  }) {
     final now = DateTime.utc(2026, 9, 27, 8, 10);
     return GovernanceOperationsController._(
+      persistence: persistence,
       auditEvents: [
         AuditEvent(
           id: 'AUD-0001',
@@ -85,44 +107,6 @@ class GovernanceOperationsController extends ChangeNotifier {
           timestamp: now.subtract(const Duration(minutes: 32)),
           detail: 'Result accepted into verified-only collation.',
           scope: GeographicScope.kaduna,
-        ),
-      ],
-      outbox: [
-        SyncOutboxItem(
-          id: 'OUT-0001',
-          entityType: 'field_report',
-          entityId: 'RPT-0003',
-          mutationType: SyncMutationType.create,
-          payloadJson: '{"entity":"field_report","id":"RPT-0003"}',
-          mutationVersion: 1,
-          createdAt: now.subtract(const Duration(minutes: 18)),
-          state: SyncState.queued,
-        ),
-        SyncOutboxItem(
-          id: 'OUT-0002',
-          entityType: 'evidence',
-          entityId: 'EVD-0002',
-          mutationType: SyncMutationType.create,
-          payloadJson: '{"entity":"evidence","id":"EVD-0002"}',
-          mutationVersion: 1,
-          createdAt: now.subtract(const Duration(minutes: 27)),
-          state: SyncState.failed,
-          attemptCount: 2,
-          lastAttemptAt: now.subtract(const Duration(minutes: 9)),
-          lastError: 'Connectivity unavailable; encrypted local record retained.',
-        ),
-        SyncOutboxItem(
-          id: 'OUT-0003',
-          entityType: 'member_assignment',
-          entityId: 'ASN-DEMO-001',
-          mutationType: SyncMutationType.update,
-          payloadJson: '{"entity":"agent_assignment","id":"AG-KD-001"}',
-          mutationVersion: 2,
-          createdAt: now.subtract(const Duration(minutes: 41)),
-          state: SyncState.conflict,
-          attemptCount: 1,
-          lastAttemptAt: now.subtract(const Duration(minutes: 36)),
-          lastError: 'Server version is newer than local mutation version.',
         ),
       ],
       settings: [
@@ -216,16 +200,73 @@ class GovernanceOperationsController extends ChangeNotifier {
     );
   }
 
+  final OfflinePersistenceController? _persistence;
   final List<AuditEvent> _auditEvents;
-  final List<SyncOutboxItem> _outbox;
   final List<SystemSettingRecord> _settings;
   final List<RoleAssignmentRecord> _roleAssignments;
 
   List<AuditEvent> get auditEvents => List.unmodifiable(_auditEvents);
-  List<SyncOutboxItem> get outbox => List.unmodifiable(_outbox);
+  List<SyncOutboxItem> get outbox =>
+      _persistence == null ? const [] : _persistence.outbox;
   List<SystemSettingRecord> get settings => List.unmodifiable(_settings);
   List<RoleAssignmentRecord> get roleAssignments =>
       List.unmodifiable(_roleAssignments);
+
+  Future<void> hydrateFromOffline() async {
+    final persistence = _persistence;
+    if (persistence == null) return;
+
+    final auditRows =
+        await persistence.readEntities(entityType: 'governance_audit_event');
+    final settingRows =
+        await persistence.readEntities(entityType: 'governance_system_setting');
+    final roleRows =
+        await persistence.readEntities(entityType: 'governance_role_assignment');
+
+    var changed = false;
+    for (final row in auditRows) {
+      final restored = _auditEventFromJson(row);
+      if (restored == null) continue;
+      final index = _auditEvents.indexWhere((item) => item.id == restored.id);
+      if (index < 0) {
+        _auditEvents.add(restored);
+      } else {
+        _auditEvents[index] = restored;
+      }
+      changed = true;
+    }
+
+    for (final row in settingRows) {
+      final restored = _settingFromJson(row);
+      if (restored == null) continue;
+      final index = _settings.indexWhere((item) => item.id == restored.id);
+      if (index < 0) {
+        _settings.add(restored);
+      } else {
+        _settings[index] = restored;
+      }
+      changed = true;
+    }
+
+    for (final row in roleRows) {
+      final restored = _roleAssignmentFromJson(row);
+      if (restored == null) continue;
+      final index =
+          _roleAssignments.indexWhere((item) => item.id == restored.id);
+      if (index < 0) {
+        _roleAssignments.add(restored);
+      } else {
+        _roleAssignments[index] = restored;
+      }
+      changed = true;
+    }
+
+    if (changed) {
+      _auditEvents.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      _roleAssignments.sort((a, b) => b.assignedAt.compareTo(a.assignedAt));
+      notifyListeners();
+    }
+  }
 
   List<AuditEvent> auditForScope(GeographicScope scope) => _auditEvents
       .where((event) => event.scope == null || _overlaps(scope, event.scope!))
@@ -239,20 +280,29 @@ class GovernanceOperationsController extends ChangeNotifier {
         ..sort((a, b) => b.assignedAt.compareTo(a.assignedAt));
 
   List<SyncOutboxItem> get pendingOutbox =>
-      _outbox.where((item) => item.isPending).toList(growable: false);
+      outbox.where((item) => item.isPending).toList(growable: false);
 
   List<RoleAssignmentRecord> activeRolesForMember(String memberId) =>
       _roleAssignments
           .where((item) => item.subjectId == memberId && item.active)
           .toList(growable: false);
 
-  RoleAssignmentRecord assignRole({
+  Future<RoleAssignmentRecord> assignRole({
     required String subjectId,
     required String subjectName,
     required TgcgRole role,
     required GeographicScope scope,
     required String assignedBy,
-  }) {
+    required TgcgRole actorRole,
+    required GeographicScope authorizedScope,
+  }) async {
+    _requireRoleManagementAuthority(
+      actorRole: actorRole,
+      authorizedScope: authorizedScope,
+      targetRole: role,
+      targetScope: scope,
+    );
+
     for (final current in _roleAssignments) {
       if (current.subjectId == subjectId &&
           current.role == role &&
@@ -262,18 +312,20 @@ class GovernanceOperationsController extends ChangeNotifier {
       }
     }
 
+    final now = DateTime.now().toUtc();
     final record = RoleAssignmentRecord(
-      id: 'ROLE-${(_roleAssignments.length + 1).toString().padLeft(4, '0')}',
+      id: newLocalId('ROLE', now),
       subjectId: subjectId,
       subjectName: subjectName,
       role: role,
       scope: scope,
       assignedBy: assignedBy,
-      assignedAt: DateTime.now().toUtc(),
+      assignedAt: now,
       active: true,
     );
+    await _persistRoleAssignment(record);
     _roleAssignments.insert(0, record);
-    recordAudit(
+    final audit = _appendAudit(
       actorId: assignedBy,
       action: 'role_assigned',
       entityType: 'access_role',
@@ -281,25 +333,37 @@ class GovernanceOperationsController extends ChangeNotifier {
       detail: '${role.name} assigned to $subjectName for ${scope.label}.',
       scope: scope,
     );
+    await _persistAudit(audit);
     return record;
   }
 
-  void revokeRole(
+  Future<void> revokeRole(
     String assignmentId, {
     required String actorId,
-    bool allowStateOverride = false,
-  }) {
+    required TgcgRole actorRole,
+    required GeographicScope authorizedScope,
+  }) async {
     final index = _roleAssignments.indexWhere((item) => item.id == assignmentId);
     if (index < 0) return;
     final current = _roleAssignments[index];
     if (!current.active) return;
-    if (current.assignedBy != actorId && !allowStateOverride) {
+
+    _requireRoleManagementAuthority(
+      actorRole: actorRole,
+      authorizedScope: authorizedScope,
+      targetRole: current.role,
+      targetScope: current.scope,
+    );
+    if (current.assignedBy != actorId &&
+        actorRole != TgcgRole.stateCoordinator &&
+        actorRole != TgcgRole.stateAdministrator) {
       throw StateError(
-        'Only the person who assigned this role, or the State Coordinator, can remove it.',
+        'Only the person who assigned this role, or State-level authority, can remove it.',
       );
     }
+
     final now = DateTime.now().toUtc();
-    _roleAssignments[index] = RoleAssignmentRecord(
+    final updated = RoleAssignmentRecord(
       id: current.id,
       subjectId: current.subjectId,
       subjectName: current.subjectName,
@@ -311,7 +375,9 @@ class GovernanceOperationsController extends ChangeNotifier {
       revokedBy: actorId,
       revokedAt: now,
     );
-    recordAudit(
+    await _persistRoleAssignment(updated);
+    _roleAssignments[index] = updated;
+    final audit = _appendAudit(
       actorId: actorId,
       action: 'role_revoked',
       entityType: 'access_role',
@@ -319,6 +385,7 @@ class GovernanceOperationsController extends ChangeNotifier {
       detail: '${current.role.name} revoked from ${current.subjectName}.',
       scope: current.scope,
     );
+    await _persistAudit(audit);
   }
 
   void recordAudit({
@@ -330,50 +397,71 @@ class GovernanceOperationsController extends ChangeNotifier {
     String? deviceId,
     GeographicScope? scope,
   }) {
-    _auditEvents.insert(
-      0,
-      AuditEvent(
-        id: 'AUD-${(_auditEvents.length + 1).toString().padLeft(4, '0')}',
-        actorId: actorId,
-        action: action,
-        entityType: entityType,
-        entityId: entityId,
-        timestamp: DateTime.now().toUtc(),
-        detail: detail,
-        deviceId: deviceId,
-        scope: scope,
-      ),
+    final event = _appendAudit(
+      actorId: actorId,
+      action: action,
+      entityType: entityType,
+      entityId: entityId,
+      detail: detail,
+      deviceId: deviceId,
+      scope: scope,
     );
-    notifyListeners();
+    if (_persistence != null) {
+      unawaited(_persistAudit(event));
+    }
   }
 
-  void queueForRetry(String outboxId, {required String actorId}) {
-    final index = _outbox.indexWhere((item) => item.id == outboxId);
-    if (index < 0) return;
-    final current = _outbox[index];
-    _outbox[index] = _copyOutbox(
-      current,
-      state: SyncState.queued,
-      lastError: null,
-    );
-    recordAudit(
+  Future<void> queueForRetry(
+    String outboxId, {
+    required String actorId,
+    required TgcgRole actorRole,
+    required GeographicScope authorizedScope,
+  }) async {
+    final persistence = _persistence;
+    if (persistence == null) return;
+    if (!TgcgPermissionPolicy.may(
+      actorRole,
+      authorizedScope,
+      TgcgCapability.manageSystemSettings,
+      targetScope: GeographicScope.kaduna,
+    )) {
+      throw StateError('This account cannot manage the durable sync queue.');
+    }
+
+    final current = outbox.where((item) => item.id == outboxId).firstOrNull;
+    if (current == null) return;
+    await persistence.queueForRetry(outboxId);
+    final audit = _appendAudit(
       actorId: actorId,
       action: 'sync_retry_queued',
       entityType: current.entityType,
       entityId: current.entityId,
       detail: 'Outbox ${current.id} returned to the retry queue.',
+      scope: GeographicScope.kaduna,
     );
+    await _persistAudit(audit);
   }
 
-  void setSetting({
+  Future<void> setSetting({
     required String settingId,
     required bool value,
     required String actorId,
-  }) {
+    required TgcgRole actorRole,
+    required GeographicScope authorizedScope,
+  }) async {
+    if (!TgcgPermissionPolicy.may(
+      actorRole,
+      authorizedScope,
+      TgcgCapability.manageSystemSettings,
+      targetScope: GeographicScope.kaduna,
+    )) {
+      throw StateError('This account cannot change protected system settings.');
+    }
+
     final index = _settings.indexWhere((item) => item.id == settingId);
     if (index < 0) return;
     final current = _settings[index];
-    _settings[index] = SystemSettingRecord(
+    final updated = SystemSettingRecord(
       id: current.id,
       label: current.label,
       category: current.category,
@@ -382,7 +470,9 @@ class GovernanceOperationsController extends ChangeNotifier {
       updatedBy: actorId,
       description: current.description,
     );
-    recordAudit(
+    await _persistSetting(updated);
+    _settings[index] = updated;
+    final audit = _appendAudit(
       actorId: actorId,
       action: 'system_setting_changed',
       entityType: 'system_setting',
@@ -390,26 +480,309 @@ class GovernanceOperationsController extends ChangeNotifier {
       detail: '${current.label} set to $value.',
       scope: GeographicScope.kaduna,
     );
+    await _persistAudit(audit);
   }
 
-  static SyncOutboxItem _copyOutbox(
-    SyncOutboxItem current, {
-    SyncState? state,
-    String? lastError,
-  }) =>
-      SyncOutboxItem(
-        id: current.id,
-        entityType: current.entityType,
-        entityId: current.entityId,
-        mutationType: current.mutationType,
-        payloadJson: current.payloadJson,
-        mutationVersion: current.mutationVersion,
-        createdAt: current.createdAt,
-        state: state ?? current.state,
-        attemptCount: current.attemptCount,
-        lastAttemptAt: current.lastAttemptAt,
-        lastError: lastError,
-      );
+  AuditEvent _appendAudit({
+    required String actorId,
+    required String action,
+    required String entityType,
+    required String entityId,
+    String? detail,
+    String? deviceId,
+    GeographicScope? scope,
+  }) {
+    final now = DateTime.now().toUtc();
+    final event = AuditEvent(
+      id: newLocalId('AUD', now),
+      actorId: actorId,
+      action: action,
+      entityType: entityType,
+      entityId: entityId,
+      timestamp: now,
+      detail: detail,
+      deviceId: deviceId,
+      scope: scope,
+    );
+    _auditEvents.insert(0, event);
+    notifyListeners();
+    return event;
+  }
+
+  Future<void> _persistRoleAssignment(RoleAssignmentRecord record) async {
+    final persistence = _persistence;
+    if (persistence == null) return;
+    await persistence.persistMutation(
+      entityType: 'governance_role_assignment',
+      entityId: record.id,
+      mutationType: SyncMutationType.upsert,
+      scopeKey: scopeStorageKey(record.scope),
+      ownerId: record.subjectId,
+      payload: _roleAssignmentToJson(record),
+    );
+  }
+
+  Future<void> _persistSetting(SystemSettingRecord setting) async {
+    final persistence = _persistence;
+    if (persistence == null) return;
+    await persistence.persistMutation(
+      entityType: 'governance_system_setting',
+      entityId: setting.id,
+      mutationType: SyncMutationType.upsert,
+      scopeKey: scopeStorageKey(GeographicScope.kaduna),
+      ownerId: setting.updatedBy,
+      payload: _settingToJson(setting),
+    );
+  }
+
+  Future<void> _persistAudit(AuditEvent event) async {
+    final persistence = _persistence;
+    if (persistence == null) return;
+    await persistence.persistMutation(
+      entityType: 'governance_audit_event',
+      entityId: event.id,
+      mutationType: SyncMutationType.create,
+      scopeKey: event.scope == null ? null : scopeStorageKey(event.scope!),
+      ownerId: event.actorId,
+      payload: _auditEventToJson(event),
+    );
+  }
+
+  void _onPersistenceChanged() => notifyListeners();
+
+  void _requireRoleManagementAuthority({
+    required TgcgRole actorRole,
+    required GeographicScope authorizedScope,
+    required TgcgRole targetRole,
+    required GeographicScope targetScope,
+  }) {
+    if (!TgcgPermissionPolicy.may(
+      actorRole,
+      authorizedScope,
+      TgcgCapability.manageRoleAssignments,
+      targetScope: targetScope,
+    )) {
+      throw StateError('This account cannot manage roles in the selected scope.');
+    }
+    if (!_roleAssignableBy(actorRole, targetRole)) {
+      throw StateError('This role cannot be assigned by the current authority.');
+    }
+  }
+
+  static bool _roleAssignableBy(TgcgRole actor, TgcgRole target) {
+    if (actor == TgcgRole.stateAdministrator) {
+      return _assignableRoles.contains(target);
+    }
+    final actorRank = _coordinatorRank(actor);
+    if (actorRank < 1) return false;
+    if (_functionalRoles.contains(target)) return true;
+    final targetRank = _coordinatorRank(target);
+    return targetRank >= 0 && targetRank < actorRank;
+  }
+
+  static int _coordinatorRank(TgcgRole role) => switch (role) {
+        TgcgRole.stateCoordinator => 5,
+        TgcgRole.senatorialCoordinator => 4,
+        TgcgRole.lgaCoordinator => 3,
+        TgcgRole.wardCoordinator => 2,
+        TgcgRole.pollingUnitCoordinator => 1,
+        TgcgRole.pollingUnitAgent => 0,
+        _ => -1,
+      };
+
+  static const Set<TgcgRole> _functionalRoles = {
+    TgcgRole.mediaOfficer,
+    TgcgRole.womenMobilizationCoordinator,
+    TgcgRole.youthMobilizationCoordinator,
+    TgcgRole.communicationsOfficer,
+    TgcgRole.logisticsOfficer,
+    TgcgRole.monitoringEvaluationOfficer,
+    TgcgRole.dataEvidenceOfficer,
+    TgcgRole.transportCoordinator,
+    TgcgRole.trainingOfficer,
+    TgcgRole.ictOfficer,
+    TgcgRole.observer,
+    TgcgRole.legalOfficer,
+    TgcgRole.technicalSupport,
+    TgcgRole.readOnlyExecutive,
+  };
+
+  static const Set<TgcgRole> _assignableRoles = {
+    TgcgRole.senatorialCoordinator,
+    TgcgRole.lgaCoordinator,
+    TgcgRole.wardCoordinator,
+    TgcgRole.pollingUnitCoordinator,
+    TgcgRole.pollingUnitAgent,
+    ..._functionalRoles,
+  };
+
+  static List<SystemSettingRecord> _defaultSettings(DateTime now) => [
+        SystemSettingRecord(
+          id: 'SET-MFA',
+          label: 'Administrator MFA required',
+          category: SystemSettingCategory.security,
+          value: true,
+          updatedAt: now,
+          updatedBy: 'SYSTEM',
+          description: 'Privileged administrator access requires MFA.',
+        ),
+        SystemSettingRecord(
+          id: 'SET-EVIDENCE-HASH',
+          label: 'Evidence hash required',
+          category: SystemSettingCategory.evidence,
+          value: true,
+          updatedAt: now,
+          updatedBy: 'SYSTEM',
+          description:
+              'Evidence records require a cryptographic content hash before acceptance.',
+        ),
+        SystemSettingRecord(
+          id: 'SET-OFFLINE-QUEUE',
+          label: 'Offline durable queue enabled',
+          category: SystemSettingCategory.sync,
+          value: true,
+          updatedAt: now,
+          updatedBy: 'SYSTEM',
+          description:
+              'Operational writes remain usable locally while awaiting connectivity.',
+        ),
+      ];
+
+  static Map<String, Object?> _roleAssignmentToJson(
+    RoleAssignmentRecord record,
+  ) =>
+      {
+        'id': record.id,
+        'subjectId': record.subjectId,
+        'subjectName': record.subjectName,
+        'role': record.role.name,
+        'scope': geographicScopeToJson(record.scope),
+        'assignedBy': record.assignedBy,
+        'assignedAt': record.assignedAt.toUtc().toIso8601String(),
+        'active': record.active,
+        'revokedBy': record.revokedBy,
+        'revokedAt': record.revokedAt?.toUtc().toIso8601String(),
+      };
+
+  static RoleAssignmentRecord? _roleAssignmentFromJson(
+    Map<String, Object?> row,
+  ) {
+    final id = row['id']?.toString();
+    final subjectId = row['subjectId']?.toString();
+    final subjectName = row['subjectName']?.toString();
+    final assignedBy = row['assignedBy']?.toString();
+    final assignedAt = _date(row['assignedAt']);
+    final scope = geographicScopeFromJson(row['scope']);
+    final roleName = row['role']?.toString();
+    final role = TgcgRole.values.where((item) => item.name == roleName).firstOrNull;
+    if (id == null ||
+        subjectId == null ||
+        subjectName == null ||
+        assignedBy == null ||
+        assignedAt == null ||
+        scope == null ||
+        role == null) {
+      return null;
+    }
+    return RoleAssignmentRecord(
+      id: id,
+      subjectId: subjectId,
+      subjectName: subjectName,
+      role: role,
+      scope: scope,
+      assignedBy: assignedBy,
+      assignedAt: assignedAt,
+      active: row['active'] != false,
+      revokedBy: row['revokedBy']?.toString(),
+      revokedAt: _date(row['revokedAt']),
+    );
+  }
+
+  static Map<String, Object?> _settingToJson(SystemSettingRecord setting) => {
+        'id': setting.id,
+        'label': setting.label,
+        'category': setting.category.name,
+        'value': setting.value,
+        'updatedAt': setting.updatedAt.toUtc().toIso8601String(),
+        'updatedBy': setting.updatedBy,
+        'description': setting.description,
+      };
+
+  static SystemSettingRecord? _settingFromJson(Map<String, Object?> row) {
+    final id = row['id']?.toString();
+    final label = row['label']?.toString();
+    final updatedAt = _date(row['updatedAt']);
+    final updatedBy = row['updatedBy']?.toString();
+    final categoryName = row['category']?.toString();
+    final category = SystemSettingCategory.values
+        .where((item) => item.name == categoryName)
+        .firstOrNull;
+    if (id == null ||
+        label == null ||
+        updatedAt == null ||
+        updatedBy == null ||
+        category == null) {
+      return null;
+    }
+    return SystemSettingRecord(
+      id: id,
+      label: label,
+      category: category,
+      value: row['value'] == true,
+      updatedAt: updatedAt,
+      updatedBy: updatedBy,
+      description: row['description']?.toString(),
+    );
+  }
+
+  static Map<String, Object?> _auditEventToJson(AuditEvent event) => {
+        'id': event.id,
+        'actorId': event.actorId,
+        'action': event.action,
+        'entityType': event.entityType,
+        'entityId': event.entityId,
+        'timestamp': event.timestamp.toUtc().toIso8601String(),
+        'detail': event.detail,
+        'deviceId': event.deviceId,
+        'scope': event.scope == null ? null : geographicScopeToJson(event.scope!),
+      };
+
+  static AuditEvent? _auditEventFromJson(Map<String, Object?> row) {
+    final id = row['id']?.toString();
+    final actorId = row['actorId']?.toString();
+    final action = row['action']?.toString();
+    final entityType = row['entityType']?.toString();
+    final entityId = row['entityId']?.toString();
+    final timestamp = _date(row['timestamp']);
+    if (id == null ||
+        actorId == null ||
+        action == null ||
+        entityType == null ||
+        entityId == null ||
+        timestamp == null) {
+      return null;
+    }
+    return AuditEvent(
+      id: id,
+      actorId: actorId,
+      action: action,
+      entityType: entityType,
+      entityId: entityId,
+      timestamp: timestamp,
+      detail: row['detail']?.toString(),
+      deviceId: row['deviceId']?.toString(),
+      scope: geographicScopeFromJson(row['scope']),
+    );
+  }
+
+  static DateTime? _date(Object? value) =>
+      DateTime.tryParse(value?.toString() ?? '')?.toUtc();
+
+  @override
+  void dispose() {
+    _persistence?.removeListener(_onPersistenceChanged);
+    super.dispose();
+  }
 
   static bool _sameScope(GeographicScope a, GeographicScope b) =>
       a.level == b.level &&
