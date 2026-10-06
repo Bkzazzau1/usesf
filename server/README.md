@@ -15,6 +15,9 @@ remote service is reachable its decision is authoritative across devices.
 - re-provisioning a responder clears the central lockout
 - unknown service numbers use the same PBKDF2 workload and failure policy
 - responder scopes are checked server-side before authentication succeeds
+- successful connected login issues an opaque responder session token
+- server session tokens expire after 8 hours and are stored only as SHA-256 hashes
+- re-provisioning or disabling a responder revokes all of that responder's active sessions
 
 For a horizontally scaled deployment, move the two tables in
 `security_responder_auth_server.py` to a shared transactional database such as
@@ -79,10 +82,35 @@ No admin token is required or accepted by the client.
 When the endpoint is configured:
 
 - authenticated / rejected / locked server decisions are authoritative;
+- successful authentication returns an opaque in-memory session token;
+- the app validates that token every 30 seconds while the Security Portal is active;
+- a centrally disabled responder is signed out on the next validation cycle;
+- the app signs Security Officers out whenever it leaves the foreground, requiring reauthentication on return;
+- local Security Officer sessions also expire after 15 minutes of inactivity and after 8 hours absolutely;
 - TLS errors, malformed responses and HTTP server errors fail closed;
 - DNS/refused-connection/socket unavailability and request timeouts fall back to
   the existing secure local verifier so emergency response can continue
   offline.
+
+## Disable a responder and revoke sessions
+
+This is a trusted administrative backend action. It immediately marks the
+responder inactive and revokes all active central responder sessions.
+
+```bash
+curl -X POST https://api.example.org/v1/security/responders/disable \
+  -H "Authorization: Bearer $USESF_ADMIN_PROVISION_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agencyId": "AGENCY-POLICE",
+    "serviceNumber": "AP/12345"
+  }'
+```
+
+Connected clients poll session validity every 30 seconds. Offline devices
+cannot learn about a central revocation until connectivity returns; their local
+15-minute inactivity, 8-hour absolute lifetime, and background-lock controls
+still apply.
 
 ## Tests
 
