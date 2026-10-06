@@ -64,7 +64,8 @@ class _SecurityPortalLoginPageState extends State<SecurityPortalLoginPage> {
 
     setState(() => _signingIn = true);
     try {
-      final responder = await emergency.verifyResponderCredential(
+      final authentication =
+          await emergency.authenticateResponderCredential(
         agencyId: agency.id,
         serviceNumber: serviceNumber,
         accessCode: _accessCode.text,
@@ -73,20 +74,30 @@ class _SecurityPortalLoginPageState extends State<SecurityPortalLoginPage> {
       if (!context.mounted) return;
 
       final governance = GovernanceOperations.of(context, listen: false);
-      if (responder == null) {
+      final responder = authentication.responder;
+      if (authentication.status !=
+              ResponderAuthenticationStatus.authenticated ||
+          responder == null) {
+        final locked =
+            authentication.status == ResponderAuthenticationStatus.locked;
         governance.recordAudit(
           actorId: serviceNumber,
-          action: 'security_portal_sign_in_rejected',
+          action: locked
+              ? 'security_portal_sign_in_locked'
+              : 'security_portal_sign_in_rejected',
           entityType: 'emergency_agency',
           entityId: agency.id,
-          detail:
-              'Rejected security portal sign-in for ${agency.shortName} within ${scope.label}.',
+          detail: locked
+              ? 'Security portal sign-in temporarily locked after repeated failed credentials for ${agency.shortName} within ${scope.label}.'
+              : 'Rejected security portal sign-in for ${agency.shortName} within ${scope.label}.',
           scope: scope,
         );
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'Invalid responder credential or unauthorized command area.',
+              locked
+                  ? 'Too many failed attempts. Security Portal access is temporarily locked.'
+                  : 'Invalid responder credential or unauthorized command area.',
             ),
           ),
         );
