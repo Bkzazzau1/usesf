@@ -13,6 +13,14 @@ class ResultOperationsController extends ChangeNotifier {
   })  : _submissions = submissions,
         _persistence = persistence;
 
+  factory ResultOperationsController.productionFoundation({
+    required OfflinePersistenceController persistence,
+  }) =>
+      ResultOperationsController._(
+        submissions: const [],
+        persistence: persistence,
+      );
+
   factory ResultOperationsController.prototypeSeed({
     OfflinePersistenceController? persistence,
   }) {

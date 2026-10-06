@@ -133,7 +133,8 @@ class _TgcgAppState extends State<TgcgApp> {
     fieldOperationsController = FieldOperationsController.prototypeSeed(
       persistence: offlinePersistenceController,
     );
-    resultOperationsController = ResultOperationsController.prototypeSeed(
+    resultOperationsController =
+        ResultOperationsController.productionFoundation(
       persistence: offlinePersistenceController,
     );
     communicationsController =
