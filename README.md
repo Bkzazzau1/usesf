@@ -136,6 +136,15 @@ Assignments are separate from roles.
 - Identity cases are visible statewide, but identity approval/suspicious marking remains a backend/System Admin human-review authority. The State Coordinator is never given silent or automatic face/PVC approval authority by this module.
 - State AI Review Centre hands cases to Membership Intelligence, Assignment Control, Evidence Intelligence and Result Intelligence rather than creating a second mutation path for those domains.
 - AI never silently closes, verifies, approves or changes the underlying operational record.
+- The State Coordinator's Reports & Exports module is rendered as Executive Reporting Centre and moved into the command/intelligence surface; lower authorized roles retain the scoped Reports & Exports workflow.
+- Executive Reporting Centre composes its briefing from the authoritative Coverage, Membership, Assignment, Incident, Evidence, AI Review and Result stores. It does not create a parallel reporting database or overwrite source records.
+- The statewide Executive Brief is a first-class audited report kind. It is State-scope only and may be requested by the State Coordinator, State Administrator or Situation Room Director when the caller also has report-export authority.
+- The Executive Brief summarizes State readiness, all 23 LGA readiness states, leadership gaps, membership/deployment readiness, open incidents, AI review workload, evidence-integrity coverage and polling-unit result accounting.
+- Executive priorities are aggregated decision items rather than raw operational-event spam: critical AI reviews, high/critical incidents, result conflicts, LGA leadership vacancies, PU staffing gaps, GPS gaps, missing results and critical LGA readiness.
+- The LGA performance board uses the same transparent Coverage Readiness score and marks unloaded LGA polling-unit catalogues as Catalogue Pending rather than inventing percentages.
+- Executive report packages reuse the audited export queue for Executive Brief, Incident Summary, Membership & Deployment, Verified Result Accounting and Evidence Package. Artifact generation/download still depends on the backend export worker.
+- State Coordinator report visibility does not grant Audit Trail or Sync Outbox access unless the underlying audit capability exists.
+- Executive result figures remain USESF internal/unofficial operational accounting and do not constitute an official election declaration.
 - Role and assignment history remain auditable after deactivation.
 
 ## Product principles
@@ -167,7 +176,7 @@ Assignments are separate from roles.
 11. Situation Room and Live Operations
 12. Communications, discussion and meeting rooms
 13. Media Intelligence
-14. Reporting, audit and governance
+14. Reports & Exports / State Executive Reporting Centre
 15. System Monitoring
 
 ## Architecture direction
