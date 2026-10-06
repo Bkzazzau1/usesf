@@ -364,14 +364,26 @@ class _SecurityResponsePortalPageState extends State<SecurityResponsePortalPage>
       );
       return;
     }
-    final dispatch = emergency.assign(
-      incidentId: incident.id,
-      agencyId: agencyId,
-      scope: incident.scope,
-      priority: priority,
-      actorId: actor,
-      instructions: instructions.text,
-    );
+    EmergencyDispatch dispatch;
+    try {
+      dispatch = await emergency.assign(
+        incidentId: incident.id,
+        agencyId: agencyId,
+        scope: incident.scope,
+        priority: priority,
+        actorId: actor,
+        instructions: instructions.text,
+      );
+    } catch (_) {
+      instructions.dispose();
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Emergency response could not be queued securely.'),
+        ),
+      );
+      return;
+    }
     instructions.dispose();
     try {
       await field.updateIncidentStatus(
@@ -907,15 +919,16 @@ class _DispatchDetail extends StatelessWidget {
                     .map(
                       (status) => FilledButton.tonalIcon(
                         onPressed: responseAllowed
-                            ? () {
+                            ? () async {
                                 try {
-                                  emergency.updateStatus(
+                                  await emergency.updateStatus(
                                     dispatchId: item.id,
                                     status: status,
                                     actorId: actorId,
                                     actingAgencyId:
                                         agencyRestricted ? actingAgencyId : null,
                                   );
+                                  if (!context.mounted) return;
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
@@ -924,8 +937,18 @@ class _DispatchDetail extends StatelessWidget {
                                     ),
                                   );
                                 } on StateError catch (error) {
+                                  if (!context.mounted) return;
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(content: Text(error.message)),
+                                  );
+                                } catch (_) {
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Response status could not be saved securely.',
+                                      ),
+                                    ),
                                   );
                                 }
                               }
