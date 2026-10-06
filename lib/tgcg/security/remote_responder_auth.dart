@@ -21,6 +21,8 @@ class RemoteResponderAuthenticationResult {
     this.serviceNumber,
     this.displayName,
     this.authorizedScope,
+    this.sessionToken,
+    this.sessionExpiresAt,
     this.lockedUntil,
     this.message,
   });
@@ -31,7 +33,28 @@ class RemoteResponderAuthenticationResult {
   final String? serviceNumber;
   final String? displayName;
   final GeographicScope? authorizedScope;
+  final String? sessionToken;
+  final DateTime? sessionExpiresAt;
   final DateTime? lockedUntil;
+  final String? message;
+}
+
+enum RemoteResponderSessionStatus {
+  active,
+  revoked,
+  unavailable,
+  serverError,
+}
+
+class RemoteResponderSessionResult {
+  const RemoteResponderSessionResult({
+    required this.status,
+    this.sessionExpiresAt,
+    this.message,
+  });
+
+  final RemoteResponderSessionStatus status;
+  final DateTime? sessionExpiresAt;
   final String? message;
 }
 
@@ -41,6 +64,10 @@ abstract interface class RemoteResponderAuthGateway {
     required String serviceNumber,
     required String accessCode,
     required GeographicScope requestedScope,
+  });
+
+  Future<RemoteResponderSessionResult> validateSession({
+    required String sessionToken,
   });
 }
 
@@ -97,11 +124,17 @@ class HttpRemoteResponderAuthGateway implements RemoteResponderAuthGateway {
         final displayName = payload['displayName']?.toString();
         final authorizedScope =
             geographicScopeFromJson(payload['authorizedScope']);
+        final sessionToken = payload['sessionToken']?.toString();
+        final sessionExpiresAt =
+            DateTime.tryParse(payload['sessionExpiresAt']?.toString() ?? '')
+                ?.toUtc();
         if (responderId == null ||
             remoteAgencyId == null ||
             remoteService == null ||
             displayName == null ||
-            authorizedScope == null) {
+            authorizedScope == null ||
+            sessionToken == null ||
+            sessionExpiresAt == null) {
           return const RemoteResponderAuthenticationResult(
             status: RemoteResponderAuthenticationStatus.serverError,
             message: 'Malformed responder authentication response.',
@@ -114,6 +147,8 @@ class HttpRemoteResponderAuthGateway implements RemoteResponderAuthGateway {
           serviceNumber: remoteService,
           displayName: displayName,
           authorizedScope: authorizedScope,
+          sessionToken: sessionToken,
+          sessionExpiresAt: sessionExpiresAt,
         );
       }
 
@@ -168,16 +203,78 @@ class HttpRemoteResponderAuthGateway implements RemoteResponderAuthGateway {
     }
   }
 
+  @override
+  Future<RemoteResponderSessionResult> validateSession({
+    required String sessionToken,
+  }) async {
+    try {
+      final response = await _postJson(
+        '/v1/security/responders/session/validate',
+        const <String, Object?>{},
+        bearerToken: sessionToken,
+      );
+      final payload = _decodeObject(response.body);
+      if (response.statusCode == HttpStatus.ok) {
+        final expiresAt =
+            DateTime.tryParse(payload['sessionExpiresAt']?.toString() ?? '')
+                ?.toUtc();
+        return RemoteResponderSessionResult(
+          status: RemoteResponderSessionStatus.active,
+          sessionExpiresAt: expiresAt,
+        );
+      }
+      if (response.statusCode == HttpStatus.unauthorized ||
+          response.statusCode == HttpStatus.forbidden) {
+        return const RemoteResponderSessionResult(
+          status: RemoteResponderSessionStatus.revoked,
+        );
+      }
+      return RemoteResponderSessionResult(
+        status: RemoteResponderSessionStatus.serverError,
+        message: 'Responder session validation returned HTTP ${response.statusCode}.',
+      );
+    } on SocketException catch (error) {
+      return RemoteResponderSessionResult(
+        status: RemoteResponderSessionStatus.unavailable,
+        message: error.message,
+      );
+    } on TimeoutException {
+      return const RemoteResponderSessionResult(
+        status: RemoteResponderSessionStatus.unavailable,
+        message: 'Responder session validation timed out.',
+      );
+    } on HandshakeException catch (error) {
+      return RemoteResponderSessionResult(
+        status: RemoteResponderSessionStatus.serverError,
+        message: error.message,
+      );
+    } on HttpException catch (error) {
+      return RemoteResponderSessionResult(
+        status: RemoteResponderSessionStatus.serverError,
+        message: error.message,
+      );
+    } on FormatException catch (error) {
+      return RemoteResponderSessionResult(
+        status: RemoteResponderSessionStatus.serverError,
+        message: error.message,
+      );
+    }
+  }
+
   Future<_HttpJsonResponse> _postJson(
     String path,
-    Map<String, Object?> payload,
-  ) async {
+    Map<String, Object?> payload, {
+    String? bearerToken,
+  }) async {
     final client = HttpClient();
     try {
       final target = baseUri.resolve(path);
       final request = await client.postUrl(target).timeout(timeout);
       request.headers.contentType = ContentType.json;
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      if (bearerToken != null && bearerToken.isNotEmpty) {
+        request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $bearerToken');
+      }
       request.write(jsonEncode(payload));
       final response = await request.close().timeout(timeout);
       final body = await utf8.decoder.bind(response).join().timeout(timeout);
