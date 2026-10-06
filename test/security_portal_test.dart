@@ -30,19 +30,19 @@ void main() {
       );
     });
 
-    test('session carries the agency and clears it on sign-out', () {
-      final session = TgcgSessionController()
-        ..signIn(
-          role: TgcgRole.securityOfficer,
-          operatorName: 'Insp. Musa Bello',
-          accessId: 'AP/12345',
-          agencyId: 'AGENCY-POLICE',
-        );
+    test('session carries the agency and clears it on sign-out', () async {
+      final session = TgcgSessionController();
+      await session.signIn(
+        role: TgcgRole.securityOfficer,
+        operatorName: 'Insp. Musa Bello',
+        accessId: 'AP/12345',
+        agencyId: 'AGENCY-POLICE',
+      );
 
       expect(session.agencyId, 'AGENCY-POLICE');
       expect(roleLabel(session.role!), 'Security Officer');
 
-      session.signOut();
+      await session.signOut();
       expect(session.agencyId, isNull);
       expect(session.isAuthenticated, isFalse);
     });
