@@ -70,6 +70,37 @@ void main() {
       expect(TgcgPermissionPolicy.scopeAllows(zaria, sabonGari), isFalse);
     });
 
+    test('State Coordinator is command-only for field operations', () {
+      expect(
+        TgcgPermissionPolicy.allows(
+          TgcgRole.stateCoordinator,
+          TgcgCapability.createIncident,
+        ),
+        isFalse,
+      );
+      expect(
+        TgcgPermissionPolicy.allows(
+          TgcgRole.stateCoordinator,
+          TgcgCapability.submitFieldReport,
+        ),
+        isFalse,
+      );
+      expect(
+        TgcgPermissionPolicy.allows(
+          TgcgRole.stateCoordinator,
+          TgcgCapability.acknowledgeIncident,
+        ),
+        isTrue,
+      );
+      expect(
+        TgcgPermissionPolicy.allows(
+          TgcgRole.stateCoordinator,
+          TgcgCapability.assignIncident,
+        ),
+        isTrue,
+      );
+    });
+
     test('polling-unit agent can submit results but cannot verify them', () {
       expect(
         TgcgPermissionPolicy.allows(

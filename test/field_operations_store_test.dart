@@ -52,6 +52,8 @@ void main() {
         severity: IncidentSeverity.medium,
         scope: scope,
         reporterId: 'MEM-FIELD-001',
+        actorRole: TgcgRole.pollingUnitCoordinator,
+        authorizedScope: scope,
         summary: 'Gate access delayed for operational review.',
       );
       final report = await store.submitFieldReport(
@@ -59,6 +61,8 @@ void main() {
         summary: 'Access issue reported and queued for coordinator review.',
         scope: scope,
         reporterId: 'MEM-FIELD-001',
+        actorRole: TgcgRole.pollingUnitCoordinator,
+        authorizedScope: scope,
         incidentId: incident.id,
       );
 
@@ -92,6 +96,51 @@ void main() {
           (item) => const {'RPT-0002', 'RPT-0003'}.contains(item.id),
         ),
         isFalse,
+      );
+    });
+
+    test('State Coordinator cannot directly create field incidents or reports',
+        () async {
+      final store = FieldOperationsController.prototypeSeed();
+      const scope = GeographicScope(
+        level: GeographyLevel.pollingUnit,
+        country: 'Nigeria',
+        zoneId: 'NW',
+        zoneName: 'North West',
+        stateId: 'KD',
+        stateName: 'Kaduna',
+        senatorialDistrictId: 'SD/053/KD',
+        senatorialDistrictName: 'Kaduna Central',
+        lgaId: 'KD-KADUNA-NORTH',
+        lgaName: 'Kaduna North',
+        wardId: 'KD-KN-W01',
+        wardName: 'Ward 01',
+        pollingUnitId: 'KD-KN-W01-PU001',
+        pollingUnitName: 'PU 001',
+      );
+
+      await expectLater(
+        store.createIncident(
+          title: 'Should be rejected',
+          category: 'Access',
+          severity: IncidentSeverity.low,
+          scope: scope,
+          reporterId: 'STATE-COORD',
+          actorRole: TgcgRole.stateCoordinator,
+          authorizedScope: GeographicScope.kaduna,
+        ),
+        throwsStateError,
+      );
+      await expectLater(
+        store.submitFieldReport(
+          category: 'Operational update',
+          summary: 'Should be rejected',
+          scope: scope,
+          reporterId: 'STATE-COORD',
+          actorRole: TgcgRole.stateCoordinator,
+          authorizedScope: GeographicScope.kaduna,
+        ),
+        throwsStateError,
       );
     });
 

@@ -508,12 +508,27 @@ class _FieldMonitoringPageState extends State<FieldMonitoringPage> {
                       origin: RecordOrigin.localEntry,
                     ),
                 ];
+                final actorRole = TgcgAccessPolicy.roleFor(
+                  context,
+                  TgcgCapability.createIncident,
+                  targetScope: scope,
+                  listen: false,
+                );
+                final authorizedScope = TgcgAccessPolicy.authorizingScope(
+                  context,
+                  TgcgCapability.createIncident,
+                  targetScope: scope,
+                  listen: false,
+                );
+                if (actorRole == null || authorizedScope == null) return;
                 final incident = await store.createIncident(
                   title: title.text,
                   category: category,
                   severity: severity,
                   scope: scope,
                   reporterId: reporterId,
+                  actorRole: actorRole,
+                  authorizedScope: authorizedScope,
                   summary: summary.text,
                   assignmentId: selectedAssignment?.id,
                   deviceId: managedDevice?.id,
@@ -679,6 +694,19 @@ class _FieldMonitoringPageState extends State<FieldMonitoringPage> {
             FilledButton.icon(
               onPressed: () async {
                 if (summary.text.trim().isEmpty) return;
+                final actorRole = TgcgAccessPolicy.roleFor(
+                  context,
+                  TgcgCapability.submitFieldReport,
+                  targetScope: scope,
+                  listen: false,
+                );
+                final authorizedScope = TgcgAccessPolicy.authorizingScope(
+                  context,
+                  TgcgCapability.submitFieldReport,
+                  targetScope: scope,
+                  listen: false,
+                );
+                if (actorRole == null || authorizedScope == null) return;
                 final report = await store.submitFieldReport(
                   category: category,
                   summary: summary.text,
@@ -686,6 +714,8 @@ class _FieldMonitoringPageState extends State<FieldMonitoringPage> {
                   reporterId: session.accessId.isEmpty
                       ? session.operatorName
                       : session.accessId,
+                  actorRole: actorRole,
+                  authorizedScope: authorizedScope,
                   incidentId: incidentId,
                 );
                 if (dialogContext.mounted) {

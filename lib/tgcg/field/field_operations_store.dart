@@ -463,6 +463,8 @@ class FieldOperationsController extends ChangeNotifier {
     required IncidentSeverity severity,
     required GeographicScope scope,
     required String reporterId,
+    required TgcgRole actorRole,
+    required GeographicScope authorizedScope,
     String? summary,
     String? assignmentId,
     String? deviceId,
@@ -470,6 +472,16 @@ class FieldOperationsController extends ChangeNotifier {
     double? longitude,
     List<EvidenceAttachment> evidence = const [],
   }) async {
+    if (!TgcgPermissionPolicy.may(
+      actorRole,
+      authorizedScope,
+      TgcgCapability.createIncident,
+      targetScope: scope,
+    )) {
+      throw StateError(
+        'This account cannot capture incidents in the selected scope.',
+      );
+    }
     final incident = FieldIncident(
       id: 'INC-${(_incidents.length + 1).toString().padLeft(4, '0')}',
       title: title.trim(),
@@ -506,9 +518,21 @@ class FieldOperationsController extends ChangeNotifier {
     required String summary,
     required GeographicScope scope,
     required String reporterId,
+    required TgcgRole actorRole,
+    required GeographicScope authorizedScope,
     String? incidentId,
     List<EvidenceAttachment> evidence = const [],
   }) async {
+    if (!TgcgPermissionPolicy.may(
+      actorRole,
+      authorizedScope,
+      TgcgCapability.submitFieldReport,
+      targetScope: scope,
+    )) {
+      throw StateError(
+        'This account cannot submit field reports in the selected scope.',
+      );
+    }
     final report = FieldReport(
       id: 'RPT-${(_reports.length + 1).toString().padLeft(4, '0')}',
       category: category.trim(),
