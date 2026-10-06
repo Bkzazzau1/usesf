@@ -86,6 +86,52 @@ class _ResponderCredential {
   final String hash;
 }
 
+enum ResponderAuthenticationStatus {
+  authenticated,
+  rejected,
+  locked,
+}
+
+class ResponderAuthenticationResult {
+  const ResponderAuthenticationResult._({
+    required this.status,
+    this.responder,
+    this.lockedUntil,
+  });
+
+  const ResponderAuthenticationResult.authenticated(
+    EmergencyResponderProfile responder,
+  ) : this._(
+          status: ResponderAuthenticationStatus.authenticated,
+          responder: responder,
+        );
+
+  const ResponderAuthenticationResult.rejected()
+      : this._(status: ResponderAuthenticationStatus.rejected);
+
+  const ResponderAuthenticationResult.locked(DateTime lockedUntil)
+      : this._(
+          status: ResponderAuthenticationStatus.locked,
+          lockedUntil: lockedUntil,
+        );
+
+  final ResponderAuthenticationStatus status;
+  final EmergencyResponderProfile? responder;
+  final DateTime? lockedUntil;
+}
+
+class _ResponderLoginAttemptState {
+  const _ResponderLoginAttemptState({
+    required this.failedAttempts,
+    required this.windowStartedAt,
+    this.lockedUntil,
+  });
+
+  final int failedAttempts;
+  final DateTime windowStartedAt;
+  final DateTime? lockedUntil;
+}
+
 class EmergencyDispatch {
   const EmergencyDispatch({
     required this.id,
@@ -533,63 +579,100 @@ class EmergencyResponseController extends ChangeNotifier {
     return responder;
   }
 
+  Future<ResponderAuthenticationResult> authenticateResponderCredential({
+    required String agencyId,
+    required String serviceNumber,
+    required String accessCode,
+    required GeographicScope requestedScope,
+  }) async {
+    final normalizedService = _normalizeServiceNumber(serviceNumber);
+    final attemptKey =
+        _responderAttemptKey(agencyId, normalizedService);
+    final now = DateTime.now().toUtc();
+    final attemptState = await _readAttemptState(attemptKey);
+
+    if (attemptState?.lockedUntil != null &&
+        now.isBefore(attemptState!.lockedUntil!)) {
+      return ResponderAuthenticationResult.locked(
+        attemptState.lockedUntil!,
+      );
+    }
+    if (attemptState?.lockedUntil != null &&
+        !now.isBefore(attemptState!.lockedUntil!)) {
+      await _credentialStorage.delete(key: attemptKey);
+    }
+
+    final agency = agencyById(agencyId);
+    EmergencyResponderProfile? responder;
+    if (agency != null && agency.active) {
+      for (final item in _responders) {
+        if (item.active &&
+            item.agencyId == agencyId &&
+            _normalizeServiceNumber(item.serviceNumber) == normalizedService) {
+          responder = item;
+          break;
+        }
+      }
+    }
+
+    final credentialValid = responder == null
+        ? await _runDummyCredentialCheck(accessCode)
+        : await _verifyStoredResponderCredential(
+            responder.id,
+            accessCode,
+          );
+
+    if (!credentialValid) {
+      final lockedUntil = await _registerFailedAttempt(
+        attemptKey: attemptKey,
+        previous: attemptState,
+        now: now,
+      );
+      return lockedUntil == null
+          ? const ResponderAuthenticationResult.rejected()
+          : ResponderAuthenticationResult.locked(lockedUntil);
+    }
+
+    await _credentialStorage.delete(key: attemptKey);
+
+    if (agency == null ||
+        !agency.active ||
+        responder == null ||
+        !_within(agency.coverage, requestedScope) ||
+        !_within(responder.authorizedScope, requestedScope)) {
+      return const ResponderAuthenticationResult.rejected();
+    }
+
+    return ResponderAuthenticationResult.authenticated(responder);
+  }
+
   Future<EmergencyResponderProfile?> verifyResponderCredential({
     required String agencyId,
     required String serviceNumber,
     required String accessCode,
     required GeographicScope requestedScope,
   }) async {
-    final agency = agencyById(agencyId);
-    if (agency == null || !agency.active || accessCode.isEmpty) return null;
-
-    final normalizedService = _normalizeServiceNumber(serviceNumber);
-    EmergencyResponderProfile? responder;
-    for (final item in _responders) {
-      if (item.active &&
-          item.agencyId == agencyId &&
-          _normalizeServiceNumber(item.serviceNumber) == normalizedService) {
-        responder = item;
-        break;
-      }
-    }
-    if (responder == null ||
-        !_within(agency.coverage, requestedScope) ||
-        !_within(responder.authorizedScope, requestedScope)) {
-      return null;
-    }
-
-    final stored = await _credentialStorage.read(
-      key: _responderCredentialKey(responder.id),
+    final result = await authenticateResponderCredential(
+      agencyId: agencyId,
+      serviceNumber: serviceNumber,
+      accessCode: accessCode,
+      requestedScope: requestedScope,
     );
-    if (stored == null || stored.isEmpty) return null;
-    try {
-      final decoded = jsonDecode(stored);
-      if (decoded is! Map ||
-          decoded['salt'] is! String ||
-          decoded['hash'] is! String) {
-        return null;
-      }
-      final credential = _ResponderCredential(
-        salt: decoded['salt'] as String,
-        hash: decoded['hash'] as String,
-      );
-      final actual = base64UrlEncode(
-        await _deriveAccessCode(
-          accessCode,
-          base64Url.decode(credential.salt),
-        ),
-      );
-      if (!_constantTimeEquals(credential.hash, actual)) return null;
-      return responder;
-    } catch (_) {
-      return null;
-    }
+    return result.status == ResponderAuthenticationStatus.authenticated
+        ? result.responder
+        : null;
   }
 
   Future<void> clearLocalCredentials() async {
     for (final responder in _responders) {
       await _credentialStorage.delete(
         key: _responderCredentialKey(responder.id),
+      );
+      await _credentialStorage.delete(
+        key: _responderAttemptKey(
+          responder.agencyId,
+          _normalizeServiceNumber(responder.serviceNumber),
+        ),
       );
     }
   }
@@ -932,6 +1015,105 @@ class EmergencyResponseController extends ChangeNotifier {
     );
   }
 
+  Future<_ResponderLoginAttemptState?> _readAttemptState(
+    String attemptKey,
+  ) async {
+    final raw = await _credentialStorage.read(key: attemptKey);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return null;
+      final failedAttempts =
+          int.tryParse(decoded['failedAttempts']?.toString() ?? '');
+      final windowStartedAt = DateTime.tryParse(
+        decoded['windowStartedAt']?.toString() ?? '',
+      )?.toUtc();
+      final lockedRaw = decoded['lockedUntil']?.toString();
+      final lockedUntil = lockedRaw == null || lockedRaw.isEmpty
+          ? null
+          : DateTime.tryParse(lockedRaw)?.toUtc();
+      if (failedAttempts == null || windowStartedAt == null) return null;
+      return _ResponderLoginAttemptState(
+        failedAttempts: failedAttempts,
+        windowStartedAt: windowStartedAt,
+        lockedUntil: lockedUntil,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<DateTime?> _registerFailedAttempt({
+    required String attemptKey,
+    required _ResponderLoginAttemptState? previous,
+    required DateTime now,
+  }) async {
+    final withinWindow = previous != null &&
+        now.difference(previous.windowStartedAt) <
+            _responderFailureWindow;
+    final failedAttempts = withinWindow
+        ? previous.failedAttempts + 1
+        : 1;
+    final windowStartedAt =
+        withinWindow ? previous.windowStartedAt : now;
+    final lockedUntil = failedAttempts >= _responderMaxFailures
+        ? now.add(_responderLockoutDuration)
+        : null;
+    await _credentialStorage.write(
+      key: attemptKey,
+      value: jsonEncode({
+        'failedAttempts': failedAttempts,
+        'windowStartedAt': windowStartedAt.toIso8601String(),
+        'lockedUntil': lockedUntil?.toIso8601String(),
+      }),
+    );
+    return lockedUntil;
+  }
+
+  Future<bool> _verifyStoredResponderCredential(
+    String responderId,
+    String accessCode,
+  ) async {
+    final stored = await _credentialStorage.read(
+      key: _responderCredentialKey(responderId),
+    );
+    if (stored == null || stored.isEmpty) {
+      await _runDummyCredentialCheck(accessCode);
+      return false;
+    }
+    try {
+      final decoded = jsonDecode(stored);
+      if (decoded is! Map ||
+          decoded['salt'] is! String ||
+          decoded['hash'] is! String) {
+        await _runDummyCredentialCheck(accessCode);
+        return false;
+      }
+      final credential = _ResponderCredential(
+        salt: decoded['salt'] as String,
+        hash: decoded['hash'] as String,
+      );
+      final actual = base64UrlEncode(
+        await _deriveAccessCode(
+          accessCode,
+          base64Url.decode(credential.salt),
+        ),
+      );
+      return _constantTimeEquals(credential.hash, actual);
+    } catch (_) {
+      await _runDummyCredentialCheck(accessCode);
+      return false;
+    }
+  }
+
+  static Future<bool> _runDummyCredentialCheck(String accessCode) async {
+    await _deriveAccessCode(
+      accessCode,
+      _dummyResponderSalt,
+    );
+    return false;
+  }
+
   static Future<_ResponderCredential> _newResponderCredential(
     String accessCode,
   ) async {
@@ -967,8 +1149,40 @@ class EmergencyResponseController extends ChangeNotifier {
   static String _normalizeServiceNumber(String value) =>
       value.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '');
 
+  static const int _responderMaxFailures = 5;
+  static const Duration _responderFailureWindow = Duration(minutes: 15);
+  static const Duration _responderLockoutDuration = Duration(minutes: 15);
+  static const List<int> _dummyResponderSalt = <int>[
+    0x55,
+    0x53,
+    0x45,
+    0x53,
+    0x46,
+    0x2d,
+    0x53,
+    0x45,
+    0x43,
+    0x55,
+    0x52,
+    0x49,
+    0x54,
+    0x59,
+    0x2d,
+    0x31,
+  ];
+
   static String _responderCredentialKey(String responderId) =>
       'usesf.security.responder.$responderId.access_code';
+
+  static String _responderAttemptKey(
+    String agencyId,
+    String normalizedServiceNumber,
+  ) {
+    final identity = base64UrlEncode(
+      utf8.encode('$agencyId|$normalizedServiceNumber'),
+    ).replaceAll('=', '');
+    return 'usesf.security.responder.$identity.attempts';
+  }
 
   static bool _constantTimeEquals(String a, String b) {
     if (a.length != b.length) return false;
