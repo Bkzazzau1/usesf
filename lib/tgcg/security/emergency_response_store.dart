@@ -97,6 +97,7 @@ enum ResponderSessionValidationStatus {
   active,
   revoked,
   unavailable,
+  serverError,
 }
 
 class ResponderAuthenticationResult {
@@ -641,6 +642,9 @@ class EmergencyResponseController extends ChangeNotifier {
             return const ResponderAuthenticationResult.rejected();
           }
           await _credentialStorage.delete(key: attemptKey);
+          await _credentialStorage.delete(
+            key: _centralRevocationKey(agencyId, normalizedService),
+          );
           EmergencyResponderProfile? responder;
           for (final item in _responders) {
             if (item.id == remoteResponderId ||
@@ -686,6 +690,12 @@ class EmergencyResponseController extends ChangeNotifier {
               ? const ResponderAuthenticationResult.rejected()
               : ResponderAuthenticationResult.locked(localLockedUntil);
         case RemoteResponderAuthenticationStatus.unavailable:
+          final centrallyRevoked = await _credentialStorage.read(
+            key: _centralRevocationKey(agencyId, normalizedService),
+          );
+          if (centrallyRevoked == 'true') {
+            return const ResponderAuthenticationResult.rejected();
+          }
           break;
         case RemoteResponderAuthenticationStatus.serverError:
           return const ResponderAuthenticationResult.rejected();
@@ -751,22 +761,32 @@ class EmergencyResponseController extends ChangeNotifier {
 
   Future<ResponderSessionValidationStatus> validateConnectedSession({
     required String sessionToken,
+    required String agencyId,
+    required String serviceNumber,
   }) async {
     final remoteAuth = _remoteAuth;
     if (remoteAuth == null) {
       return ResponderSessionValidationStatus.unavailable;
     }
+    final normalizedService = _normalizeServiceNumber(serviceNumber);
     final result = await remoteAuth.validateSession(sessionToken: sessionToken);
-    return switch (result.status) {
-      RemoteResponderSessionStatus.active =>
-        ResponderSessionValidationStatus.active,
-      RemoteResponderSessionStatus.revoked =>
-        ResponderSessionValidationStatus.revoked,
-      RemoteResponderSessionStatus.unavailable =>
-        ResponderSessionValidationStatus.unavailable,
-      RemoteResponderSessionStatus.serverError =>
-        ResponderSessionValidationStatus.revoked,
-    };
+    switch (result.status) {
+      case RemoteResponderSessionStatus.active:
+        await _credentialStorage.delete(
+          key: _centralRevocationKey(agencyId, normalizedService),
+        );
+        return ResponderSessionValidationStatus.active;
+      case RemoteResponderSessionStatus.revoked:
+        await _credentialStorage.write(
+          key: _centralRevocationKey(agencyId, normalizedService),
+          value: 'true',
+        );
+        return ResponderSessionValidationStatus.revoked;
+      case RemoteResponderSessionStatus.unavailable:
+        return ResponderSessionValidationStatus.unavailable;
+      case RemoteResponderSessionStatus.serverError:
+        return ResponderSessionValidationStatus.serverError;
+    }
   }
 
   Future<EmergencyResponderProfile?> verifyResponderCredential({
@@ -793,6 +813,12 @@ class EmergencyResponseController extends ChangeNotifier {
       );
       await _credentialStorage.delete(
         key: _responderAttemptKey(
+          responder.agencyId,
+          _normalizeServiceNumber(responder.serviceNumber),
+        ),
+      );
+      await _credentialStorage.delete(
+        key: _centralRevocationKey(
           responder.agencyId,
           _normalizeServiceNumber(responder.serviceNumber),
         ),
@@ -1313,6 +1339,16 @@ class EmergencyResponseController extends ChangeNotifier {
 
   static String _responderCredentialKey(String responderId) =>
       'usesf.security.responder.$responderId.access_code';
+
+  static String _centralRevocationKey(
+    String agencyId,
+    String normalizedServiceNumber,
+  ) {
+    final identity = base64UrlEncode(
+      utf8.encode('$agencyId|$normalizedServiceNumber'),
+    ).replaceAll('=', '');
+    return 'usesf.security.responder.$identity.central_revoked';
+  }
 
   static String _responderAttemptKey(
     String agencyId,
