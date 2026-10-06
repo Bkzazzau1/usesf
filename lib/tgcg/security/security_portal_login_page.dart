@@ -123,6 +123,8 @@ class _SecurityPortalLoginPageState extends State<SecurityPortalLoginPage> {
         accessId: responder.serviceNumber,
         scope: scope,
         agencyId: agency.id,
+        securitySessionToken: authentication.remoteSessionToken,
+        securitySessionExpiresAt: authentication.remoteSessionExpiresAt,
       );
     } finally {
       if (mounted) setState(() => _signingIn = false);
