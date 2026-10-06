@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import '../devices/managed_device_store.dart';
+import '../domain/local_id.dart';
 import '../domain/models.dart';
 import '../domain/permissions.dart';
 import '../governance/governance_store.dart';
@@ -249,6 +250,44 @@ class BulkCommunicationsController extends ChangeNotifier {
         [..._jobs]..sort((a, b) => b.createdAt.compareTo(a.createdAt)),
       );
 
+  Future<void> hydrateFromOffline() async {
+    final persistence = _persistence;
+    if (persistence == null) return;
+
+    final preferenceRows =
+        await persistence.readEntities(entityType: 'communication_preference');
+    final jobRows =
+        await persistence.readEntities(entityType: 'bulk_delivery_job');
+    var changed = false;
+
+    for (final row in preferenceRows) {
+      final preference = _preferenceFromPayload(row);
+      if (preference == null ||
+          _membership.memberById(preference.memberId) == null) {
+        continue;
+      }
+      _preferences[preference.memberId] = preference;
+      changed = true;
+    }
+
+    for (final row in jobRows) {
+      final job = _jobFromPayload(row);
+      if (job == null) continue;
+      final index = _jobs.indexWhere((item) => item.id == job.id);
+      if (index < 0) {
+        _jobs.add(job);
+      } else {
+        _jobs[index] = job;
+      }
+      changed = true;
+    }
+
+    if (changed) {
+      _jobs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      notifyListeners();
+    }
+  }
+
   List<CommunicationContact> get contacts => _membership.members
       .map(_contactForMember)
       .toList(growable: false);
@@ -427,7 +466,7 @@ class BulkCommunicationsController extends ChangeNotifier {
     );
     final now = DateTime.now().toUtc();
     final job = BulkDeliveryJob(
-      id: 'BULK-${(now.microsecondsSinceEpoch % 1000000000).toString().padLeft(9, '0')}',
+      id: newLocalId('BULK', now),
       title: cleanTitle,
       body: cleanBody,
       purpose: purpose,
@@ -490,6 +529,7 @@ class BulkCommunicationsController extends ChangeNotifier {
         'body': value.body,
         'purpose': value.purpose.name,
         'target_scope': scopeStorageKey(value.targetScope),
+        'target_scope_json': geographicScopeToJson(value.targetScope),
         'channels': value.channels.map((item) => item.name).toList(),
         'created_by': value.createdBy,
         'created_at': value.createdAt.toIso8601String(),
@@ -505,6 +545,202 @@ class BulkCommunicationsController extends ChangeNotifier {
         'target_roles': value.targetRoles.map((item) => item.name).toList(),
         'target_member_ids': value.targetMemberIds,
       };
+
+  CommunicationPreference? _preferenceFromPayload(
+    Map<String, Object?> row,
+  ) {
+    final memberId = row['member_id']?.toString();
+    final updatedAt =
+        DateTime.tryParse(row['updated_at']?.toString() ?? '')?.toUtc();
+    final updatedBy = row['updated_by']?.toString();
+    final source = row['source']?.toString();
+    if (memberId == null ||
+        updatedAt == null ||
+        updatedBy == null ||
+        source == null) {
+      return null;
+    }
+    return CommunicationPreference(
+      memberId: memberId,
+      smsOptIn: row['sms_opt_in'] == true,
+      pushOptIn: row['push_opt_in'] == true,
+      emailOptIn: row['email_opt_in'] == true,
+      voiceOptIn: row['voice_opt_in'] == true,
+      suppressed: row['suppressed'] == true,
+      updatedAt: updatedAt,
+      updatedBy: updatedBy,
+      source: source,
+    );
+  }
+
+  BulkDeliveryJob? _jobFromPayload(Map<String, Object?> row) {
+    final id = row['id']?.toString();
+    final title = row['title']?.toString();
+    final body = row['body']?.toString();
+    final purpose = _enumValue(
+      BulkCommunicationPurpose.values,
+      row['purpose'],
+    );
+    final targetScope = _scopeFromPayload(
+      row['target_scope_json'],
+      row['target_scope'],
+    );
+    final channels = _enumList(
+      BulkCommunicationChannel.values,
+      row['channels'],
+    );
+    final createdBy = row['created_by']?.toString();
+    final createdAt =
+        DateTime.tryParse(row['created_at']?.toString() ?? '')?.toUtc();
+    final scheduledRaw = row['scheduled_for']?.toString();
+    final scheduledFor = scheduledRaw == null || scheduledRaw.isEmpty
+        ? null
+        : DateTime.tryParse(scheduledRaw)?.toUtc();
+    final state = _enumValue(BulkDeliveryJobState.values, row['state']);
+    final targetContactCount = _intValue(row['target_contact_count']);
+    final eligibleRecipientCount = _intValue(row['eligible_recipient_count']);
+    final suppressedCount = _intValue(row['suppressed_count']);
+    final channelPlan = _channelPlanFromPayload(row['channel_plan']);
+    final targetRoles = _enumList(TgcgRole.values, row['target_roles']);
+    final targetMemberIds = _stringList(row['target_member_ids']);
+
+    if (id == null ||
+        title == null ||
+        body == null ||
+        purpose == null ||
+        targetScope == null ||
+        channels.isEmpty ||
+        createdBy == null ||
+        createdAt == null ||
+        state == null ||
+        targetContactCount == null ||
+        eligibleRecipientCount == null ||
+        suppressedCount == null ||
+        channelPlan == null) {
+      return null;
+    }
+
+    return BulkDeliveryJob(
+      id: id,
+      title: title,
+      body: body,
+      purpose: purpose,
+      targetScope: targetScope,
+      channels: List.unmodifiable(channels),
+      createdBy: createdBy,
+      createdAt: createdAt,
+      scheduledFor: scheduledFor,
+      state: state,
+      targetContactCount: targetContactCount,
+      eligibleRecipientCount: eligibleRecipientCount,
+      suppressedCount: suppressedCount,
+      channelPlan: Map.unmodifiable(channelPlan),
+      targetRoles: List.unmodifiable(targetRoles),
+      targetMemberIds: List.unmodifiable(targetMemberIds),
+      sentCount: _intValue(row['sent_count']) ?? 0,
+      deliveredCount: _intValue(row['delivered_count']) ?? 0,
+      failedCount: _intValue(row['failed_count']) ?? 0,
+    );
+  }
+
+  GeographicScope? _scopeFromPayload(Object? fullScope, Object? legacyKey) {
+    final restored = geographicScopeFromJson(fullScope);
+    if (restored != null) return restored;
+
+    final key = legacyKey?.toString();
+    if (key == null || key.isEmpty) return null;
+
+    final candidates = <GeographicScope>[
+      for (final state in _membership.geography.states) state.scope,
+      for (final district in _membership.geography.senatorialDistricts)
+        district.scope,
+      for (final lga in _membership.geography.lgas) lga.scope,
+      ..._wardScopes(),
+      for (final unit in _membership.geography.pollingUnits) unit.scope,
+    ];
+    for (final scope in candidates) {
+      if (scopeStorageKey(scope) == key) return scope;
+    }
+    return null;
+  }
+
+  List<GeographicScope> _wardScopes() {
+    final wards = <String, GeographicScope>{};
+    for (final unit in _membership.geography.pollingUnits) {
+      final scope = unit.scope;
+      final wardId = scope.wardId;
+      if (wardId == null) continue;
+      wards.putIfAbsent(
+        wardId,
+        () => GeographicScope(
+          level: GeographyLevel.ward,
+          country: scope.country,
+          zoneId: scope.zoneId,
+          zoneName: scope.zoneName,
+          stateId: scope.stateId,
+          stateName: scope.stateName,
+          senatorialDistrictId: scope.senatorialDistrictId,
+          senatorialDistrictName: scope.senatorialDistrictName,
+          lgaId: scope.lgaId,
+          lgaName: scope.lgaName,
+          wardId: wardId,
+          wardName: scope.wardName,
+        ),
+      );
+    }
+    return wards.values.toList(growable: false);
+  }
+
+  static T? _enumValue<T extends Enum>(List<T> values, Object? raw) {
+    final name = raw?.toString();
+    if (name == null) return null;
+    for (final value in values) {
+      if (value.name == name) return value;
+    }
+    return null;
+  }
+
+  static List<T> _enumList<T extends Enum>(List<T> values, Object? raw) {
+    if (raw is! List) return const [];
+    final result = <T>[];
+    for (final item in raw) {
+      final value = _enumValue(values, item);
+      if (value != null) result.add(value);
+    }
+    return result;
+  }
+
+  static List<String> _stringList(Object? raw) {
+    if (raw is! List) return const [];
+    return raw
+        .map((item) => item.toString())
+        .where((item) => item.trim().isNotEmpty)
+        .toList(growable: false);
+  }
+
+  static Map<BulkCommunicationChannel, int>? _channelPlanFromPayload(
+    Object? raw,
+  ) {
+    if (raw is! Map) return null;
+    final result = <BulkCommunicationChannel, int>{
+      for (final channel in BulkCommunicationChannel.values) channel: 0,
+    };
+    for (final entry in raw.entries) {
+      final channel = _enumValue(
+        BulkCommunicationChannel.values,
+        entry.key,
+      );
+      final count = _intValue(entry.value);
+      if (channel != null && count != null) result[channel] = count;
+    }
+    return result;
+  }
+
+  static int? _intValue(Object? raw) {
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
+    return int.tryParse(raw?.toString() ?? '');
+  }
 }
 
 class BulkCommunications
