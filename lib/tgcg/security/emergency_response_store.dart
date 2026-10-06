@@ -560,6 +560,12 @@ class EmergencyResponseController extends ChangeNotifier {
       rethrow;
     }
 
+    await _credentialStorage.delete(
+      key: _responderAttemptKey(
+        responder.agencyId,
+        _normalizeServiceNumber(responder.serviceNumber),
+      ),
+    );
     if (existingIndex < 0) {
       _responders.add(responder);
     } else {
