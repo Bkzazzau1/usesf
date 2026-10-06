@@ -147,19 +147,22 @@ void main() {
       );
     });
 
-    test('assigning exact LGA Coordinator increases leadership coverage', () {
+    test('assigning exact LGA Coordinator increases leadership coverage',
+        () async {
       final lga = geography.lga('KD-ZARIA')!;
       final before = buildLeadershipCoverage(
         membership: membership,
         governance: governance,
       );
 
-      governance.assignRole(
+      await governance.assignRole(
         subjectId: 'MEM-0001',
         subjectName: membership.memberById('MEM-0001')!.fullName,
         role: TgcgRole.lgaCoordinator,
         scope: lga.scope,
         assignedBy: 'STATE-COORD',
+        actorRole: TgcgRole.stateCoordinator,
+        authorizedScope: GeographicScope.kaduna,
       );
 
       final after = buildLeadershipCoverage(
@@ -186,12 +189,14 @@ void main() {
       final member = membership.memberById('MEM-0001')!;
       final lga = geography.lga('KD-ZARIA')!;
 
-      governance.assignRole(
+      await governance.assignRole(
         subjectId: member.id,
         subjectName: member.fullName,
         role: TgcgRole.mediaOfficer,
         scope: lga.scope,
         assignedBy: 'STATE-COORD',
+        actorRole: TgcgRole.stateCoordinator,
+        authorizedScope: GeographicScope.kaduna,
       );
       await assignments.createAssignment(
         title: 'Membership intelligence GPS test',
@@ -228,7 +233,8 @@ void main() {
       expect(after.readinessState, MemberReadinessState.deployed);
     });
 
-    test('multiple coordinator posts are surfaced for human attention', () {
+    test('multiple coordinator posts are surfaced for human attention',
+        () async {
       final member = membership.memberById('MEM-0001')!;
       final lga = geography.lga('KD-ZARIA')!;
       final wardScope = geography.pollingUnits
@@ -249,19 +255,23 @@ void main() {
         wardName: wardScope.wardName,
       );
 
-      governance.assignRole(
+      await governance.assignRole(
         subjectId: member.id,
         subjectName: member.fullName,
         role: TgcgRole.lgaCoordinator,
         scope: lga.scope,
         assignedBy: 'STATE-COORD',
+        actorRole: TgcgRole.stateCoordinator,
+        authorizedScope: GeographicScope.kaduna,
       );
-      governance.assignRole(
+      await governance.assignRole(
         subjectId: member.id,
         subjectName: member.fullName,
         role: TgcgRole.wardCoordinator,
         scope: ward,
         assignedBy: 'STATE-COORD',
+        actorRole: TgcgRole.stateCoordinator,
+        authorizedScope: GeographicScope.kaduna,
       );
 
       final value = snapshot(member.id);
