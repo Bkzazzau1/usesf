@@ -193,9 +193,38 @@ class _FieldMonitoringPageState extends State<FieldMonitoringPage> {
               canAcknowledge: canAcknowledge,
               canAssign: canAssign,
               canClose: canClose,
-              onStatusChanged: (status) {
+              onStatusChanged: (status) async {
                 if (selected == null) return;
-                store.updateIncidentStatus(selected.id, status);
+                final capability = incidentStatusMutationCapability(status);
+                final actorRole = TgcgAccessPolicy.roleFor(
+                  context,
+                  capability,
+                  targetScope: selected.scope,
+                  listen: false,
+                );
+                final authorizedScope = TgcgAccessPolicy.authorizingScope(
+                  context,
+                  capability,
+                  targetScope: selected.scope,
+                  listen: false,
+                );
+                if (actorRole == null || authorizedScope == null) return;
+                try {
+                  await store.updateIncidentStatus(
+                    selected.id,
+                    status,
+                    actorId: session.accessId.isEmpty
+                        ? session.operatorName
+                        : session.accessId,
+                    actorRole: actorRole,
+                    authorizedScope: authorizedScope,
+                  );
+                } on StateError catch (error) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(error.message)),
+                  );
+                }
               },
             );
             if (constraints.maxWidth < 1050) {
