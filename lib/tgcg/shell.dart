@@ -652,7 +652,9 @@ class _OperatorCard extends StatelessWidget {
                 ),
                 IconButton(
                   tooltip: 'Sign out',
-                  onPressed: session.signOut,
+                  onPressed: () async {
+                    await session.signOut();
+                  },
                   visualDensity: VisualDensity.compact,
                   icon: const Icon(Icons.logout_rounded, color: Color(0xFFA4AAB9), size: 18),
                 ),
