@@ -1,4 +1,5 @@
 import '../domain/models.dart';
+import '../geography/geography_registry.dart';
 
 class ExpectedPollingUnit {
   const ExpectedPollingUnit({
@@ -44,133 +45,39 @@ class CollationSummary {
 }
 
 class CollationEngine {
-  const CollationEngine({required this.expectedPollingUnits});
+  const CollationEngine({
+    required List<ExpectedPollingUnit> expectedPollingUnits,
+  })  : _geography = null,
+        _expectedPollingUnits = expectedPollingUnits;
 
-  final List<ExpectedPollingUnit> expectedPollingUnits;
+  CollationEngine.fromGeography(GeographyRegistry geography)
+      : _geography = geography,
+        _expectedPollingUnits = const [];
 
-  factory CollationEngine.prototypeSeed() => CollationEngine(
-        expectedPollingUnits: const [
-          ExpectedPollingUnit(
-            id: 'KD-KN-W01-PU001',
-            name: 'PU 001',
-            scope: GeographicScope(
-              level: GeographyLevel.pollingUnit,
-              country: 'Nigeria',
-              zoneId: 'NW',
-              zoneName: 'North West',
-              stateId: 'KD',
-              stateName: 'Kaduna',
-              senatorialDistrictId: 'SD/053/KD',
-              senatorialDistrictName: 'Kaduna Central',
-              lgaId: 'KD-KADUNA-NORTH',
-              lgaName: 'Kaduna North',
-              wardId: 'KD-KN-W01',
-              wardName: 'Ward 01',
-              pollingUnitId: 'KD-KN-W01-PU001',
-              pollingUnitName: 'PU 001',
-            ),
-          ),
-          ExpectedPollingUnit(
-            id: 'KD-KN-W01-PU002',
-            name: 'PU 002',
-            scope: GeographicScope(
-              level: GeographyLevel.pollingUnit,
-              country: 'Nigeria',
-              zoneId: 'NW',
-              zoneName: 'North West',
-              stateId: 'KD',
-              stateName: 'Kaduna',
-              senatorialDistrictId: 'SD/053/KD',
-              senatorialDistrictName: 'Kaduna Central',
-              lgaId: 'KD-KADUNA-NORTH',
-              lgaName: 'Kaduna North',
-              wardId: 'KD-KN-W01',
-              wardName: 'Ward 01',
-              pollingUnitId: 'KD-KN-W01-PU002',
-              pollingUnitName: 'PU 002',
-            ),
-          ),
-          ExpectedPollingUnit(
-            id: 'KD-ZA-W01-PU004',
-            name: 'PU 004',
-            scope: GeographicScope(
-              level: GeographyLevel.pollingUnit,
-              country: 'Nigeria',
-              zoneId: 'NW',
-              zoneName: 'North West',
-              stateId: 'KD',
-              stateName: 'Kaduna',
-              senatorialDistrictId: 'SD/052/KD',
-              senatorialDistrictName: 'Kaduna North',
-              lgaId: 'KD-ZARIA',
-              lgaName: 'Zaria',
-              wardId: 'KD-ZA-W01',
-              wardName: 'Ward 01',
-              pollingUnitId: 'KD-ZA-W01-PU004',
-              pollingUnitName: 'PU 004',
-            ),
-          ),
-          ExpectedPollingUnit(
-            id: 'KD-ZA-W01-PU005',
-            name: 'PU 005',
-            scope: GeographicScope(
-              level: GeographyLevel.pollingUnit,
-              country: 'Nigeria',
-              zoneId: 'NW',
-              zoneName: 'North West',
-              stateId: 'KD',
-              stateName: 'Kaduna',
-              senatorialDistrictId: 'SD/052/KD',
-              senatorialDistrictName: 'Kaduna North',
-              lgaId: 'KD-ZARIA',
-              lgaName: 'Zaria',
-              wardId: 'KD-ZA-W01',
-              wardName: 'Ward 01',
-              pollingUnitId: 'KD-ZA-W01-PU005',
-              pollingUnitName: 'PU 005',
-            ),
-          ),
-          ExpectedPollingUnit(
-            id: 'KD-JM-W03-PU012',
-            name: 'PU 012',
-            scope: GeographicScope(
-              level: GeographyLevel.pollingUnit,
-              country: 'Nigeria',
-              zoneId: 'NW',
-              zoneName: 'North West',
-              stateId: 'KD',
-              stateName: 'Kaduna',
-              senatorialDistrictId: 'SD/054/KD',
-              senatorialDistrictName: 'Kaduna South',
-              lgaId: 'KD-JEMAA',
-              lgaName: "Jema'a",
-              wardId: 'KD-JM-W03',
-              wardName: 'Ward 03',
-              pollingUnitId: 'KD-JM-W03-PU012',
-              pollingUnitName: 'PU 012',
-            ),
-          ),
-          ExpectedPollingUnit(
-            id: 'KD-JM-W03-PU013',
-            name: 'PU 013',
-            scope: GeographicScope(
-              level: GeographyLevel.pollingUnit,
-              country: 'Nigeria',
-              zoneId: 'NW',
-              zoneName: 'North West',
-              stateId: 'KD',
-              stateName: 'Kaduna',
-              senatorialDistrictId: 'SD/054/KD',
-              senatorialDistrictName: 'Kaduna South',
-              lgaId: 'KD-JEMAA',
-              lgaName: "Jema'a",
-              wardId: 'KD-JM-W03',
-              wardName: 'Ward 03',
-              pollingUnitId: 'KD-JM-W03-PU013',
-              pollingUnitName: 'PU 013',
-            ),
-          ),
-        ],
+  final GeographyRegistry? _geography;
+  final List<ExpectedPollingUnit> _expectedPollingUnits;
+
+  List<ExpectedPollingUnit> get expectedPollingUnits {
+    final geography = _geography;
+    if (geography == null) return _expectedPollingUnits;
+    return geography.pollingUnits
+        .map(_expectedFromCanonical)
+        .toList(growable: false);
+  }
+
+  @Deprecated(
+    'Use CollationEngine.fromGeography with the authoritative registry.',
+  )
+  factory CollationEngine.prototypeSeed() =>
+      CollationEngine.fromGeography(GeographyRegistry.prototypeSeed());
+
+  static ExpectedPollingUnit _expectedFromCanonical(
+    CanonicalPollingUnit unit,
+  ) =>
+      ExpectedPollingUnit(
+        id: unit.scope.pollingUnitId ?? unit.code,
+        name: unit.scope.pollingUnitName ?? unit.displayCode,
+        scope: unit.scope,
       );
 
   CollationSummary summarize(
@@ -247,6 +154,11 @@ class CollationEngine {
   }
 
   List<GeographicScope> childScopes(GeographicScope scope) {
+    final geography = _geography;
+    if (geography != null) {
+      return geography.childScopes(scope);
+    }
+
     final children = <String, GeographicScope>{};
     for (final unit in expectedPollingUnits.where((u) => _within(scope, u.scope))) {
       final child = _directChild(scope.level, unit.scope);
@@ -259,6 +171,11 @@ class CollationEngine {
   }
 
   ExpectedPollingUnit? expectedPollingUnit(String id) {
+    final geography = _geography;
+    if (geography != null) {
+      final unit = geography.pollingUnit(id);
+      if (unit != null) return _expectedFromCanonical(unit);
+    }
     for (final unit in expectedPollingUnits) {
       if (unit.id == id) return unit;
     }
