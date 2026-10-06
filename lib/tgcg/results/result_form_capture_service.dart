@@ -87,7 +87,10 @@ class ResultFormCaptureService {
   }
 
   Future<void> dispose() async {
-    await _recognizer?.close();
+    final recognizer = _recognizer;
+    if (recognizer != null) {
+      await recognizer.close();
+    }
     await _evidenceService.dispose();
   }
 }
@@ -101,6 +104,7 @@ class ResultFormParser {
   }) {
     final partyVotes = <String, int>{};
     for (final party in const ['P1', 'P2', 'P3', 'P4']) {
+      final spacedParty = party.replaceFirst('P', 'P ');
       final value = _extract(
         rawText,
         [
@@ -109,7 +113,7 @@ class ResultFormParser {
             caseSensitive: false,
           ),
           RegExp(
-            '\\b${party.replaceAll('P', 'P ')}\\b[^0-9]{0,24}([0-9][0-9,]*)',
+            '\\b$spacedParty\\b[^0-9]{0,24}([0-9][0-9,]*)',
             caseSensitive: false,
           ),
         ],
