@@ -103,7 +103,7 @@ class HttpRemoteResponderAuthGateway implements RemoteResponderAuthGateway {
             displayName == null ||
             authorizedScope == null) {
           return const RemoteResponderAuthenticationResult(
-            status: RemoteResponderAuthenticationStatus.unavailable,
+            status: RemoteResponderAuthenticationStatus.serverError,
             message: 'Malformed responder authentication response.',
           );
         }
