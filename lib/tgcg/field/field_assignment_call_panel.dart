@@ -4,7 +4,6 @@ import '../access/access_policy.dart';
 import '../assignments/assignment_control_actions.dart';
 import '../assignments/assignment_store.dart';
 import '../devices/managed_device_store.dart';
-import '../domain/models.dart';
 import '../domain/permissions.dart';
 import '../membership/membership_store.dart';
 import '../meeting/operational_call_store.dart';

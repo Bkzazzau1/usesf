@@ -112,12 +112,10 @@ Future<void> showStateCoordinatorCallMemberDialog(
             )) {
           selectedMemberId = null;
         }
-        if (selectedMemberId == null) {
-          selectedMemberId = visible
+        selectedMemberId ??= visible
               .where((member) => calls.gpsActiveForMember(member.id))
               .map((member) => member.id)
               .firstOrNull;
-        }
 
         return AlertDialog(
           title: const Text('Call member'),

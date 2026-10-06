@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../access/access_policy.dart';
-import '../domain/models.dart';
 import '../domain/permissions.dart';
 import '../governance/governance_store.dart';
 import '../session.dart';
