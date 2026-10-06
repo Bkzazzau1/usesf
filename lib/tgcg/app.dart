@@ -42,7 +42,8 @@ class TgcgApp extends StatefulWidget {
   State<TgcgApp> createState() => _TgcgAppState();
 }
 
-class _TgcgAppState extends State<TgcgApp> {
+class _TgcgAppState extends State<TgcgApp>
+    with WidgetsBindingObserver {
   late TgcgSessionController sessionController;
   late OfflinePersistenceController offlinePersistenceController;
   late MembershipOperationsController membershipOperationsController;
@@ -60,12 +61,65 @@ class _TgcgAppState extends State<TgcgApp> {
   late BulkCommunicationsController bulkCommunicationsController;
   late ReportOperationsController reportOperationsController;
   late EmergencyResponseController emergencyResponseController;
+  Timer? _securitySessionWatchdog;
+  bool _validatingSecuritySession = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _createControllers();
+    _securitySessionWatchdog = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => unawaited(_enforceSecuritySession()),
+    );
     unawaited(_initializePersistenceAndHydrate());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_enforceSecuritySession());
+      return;
+    }
+    sessionController.lockForBackground();
+  }
+
+  Future<void> _enforceSecuritySession() async {
+    if (!sessionController.isSecuritySession ||
+        !sessionController.isAuthenticated) {
+      return;
+    }
+    if (sessionController.enforceSecurityExpiry()) return;
+
+    final token = sessionController.securitySessionToken;
+    if (token == null || token.isEmpty || _validatingSecuritySession) {
+      return;
+    }
+
+    _validatingSecuritySession = true;
+    try {
+      final validation =
+          await emergencyResponseController.validateConnectedSession(
+        sessionToken: token,
+      );
+      if (!mounted ||
+          !sessionController.isSecuritySession ||
+          sessionController.securitySessionToken != token) {
+        return;
+      }
+      if (validation == ResponderSessionValidationStatus.revoked) {
+        sessionController.signOut(
+          reason: SessionTerminationReason.centrallyRevoked,
+        );
+      }
+    } finally {
+      _validatingSecuritySession = false;
+    }
+  }
+
+  void _recordSecurityActivity() {
+    sessionController.recordActivity();
   }
 
   Future<void> _initializePersistenceAndHydrate() async {
@@ -224,6 +278,8 @@ class _TgcgAppState extends State<TgcgApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _securitySessionWatchdog?.cancel();
     sessionController.dispose();
     fieldOperationsController.dispose();
     resultOperationsController.dispose();
@@ -280,15 +336,20 @@ class _TgcgAppState extends State<TgcgApp> {
                                       controller: fieldOperationsController,
                                       child: ResultOperations(
                                         controller: resultOperationsController,
-                                        child: MaterialApp(
-                                          navigatorKey: tgcgNavigatorKey,
-                                          debugShowCheckedModeBanner: false,
-                                          title: 'USESF',
-                                          theme: _theme(),
-                                          home: OperationalCallOverlay(
-                                            child: _AuthenticationGate(
-                                              onResetPresentation:
-                                                  _resetPresentation,
+                                        child: Listener(
+                                          behavior: HitTestBehavior.translucent,
+                                          onPointerDown: (_) =>
+                                              _recordSecurityActivity(),
+                                          child: MaterialApp(
+                                            navigatorKey: tgcgNavigatorKey,
+                                            debugShowCheckedModeBanner: false,
+                                            title: 'USESF',
+                                            theme: _theme(),
+                                            home: OperationalCallOverlay(
+                                              child: _AuthenticationGate(
+                                                onResetPresentation:
+                                                    _resetPresentation,
+                                              ),
                                             ),
                                           ),
                                         ),
