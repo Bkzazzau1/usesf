@@ -51,6 +51,31 @@ class ResultIntegrityPolicy {
       notes.add('A possible duplicate or conflicting submission was detected.');
     }
 
+    final formEvidencePresent =
+        submission.source != SubmissionSource.app ||
+        submission.resultForm != null;
+    if (!formEvidencePresent) {
+      notes.add(
+        'App result submission has no captured result-form evidence.',
+      );
+    }
+
+    final ocrProcessed =
+        submission.source != SubmissionSource.app ||
+        submission.resultForm == null ||
+        ocrPartyVotes != null;
+    if (!ocrProcessed) {
+      notes.add(
+        'Captured app result form has not been processed by OCR.',
+      );
+    }
+
+    if (ocrConfidence != null && ocrConfidence < .85) {
+      notes.add(
+        'OCR extraction quality is below the automatic review threshold.',
+      );
+    }
+
     bool? ocrMatchedManualEntry;
     if (ocrPartyVotes != null) {
       ocrMatchedManualEntry = _mapsMatch(
@@ -70,6 +95,8 @@ class ResultIntegrityPolicy {
       duplicateSuspected: duplicateSuspected,
       pollingUnitMatched: pollingUnitMatched,
       agentScopeMatched: agentScopeMatched,
+      formEvidencePresent: formEvidencePresent,
+      ocrProcessed: ocrProcessed,
       ocrConfidence: ocrConfidence,
       ocrMatchedManualEntry: ocrMatchedManualEntry,
       notes: List.unmodifiable(notes),
