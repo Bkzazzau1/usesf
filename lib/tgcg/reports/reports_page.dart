@@ -346,11 +346,11 @@ class _ReportsPageState extends State<ReportsPage> {
     );
   }
 
-  void _requestExport(
+  Future<void> _requestExport(
     BuildContext context,
     _ReportDescriptor descriptor,
     ExportFormat format,
-  ) {
+  ) async {
     final session = TgcgSession.of(context, listen: false);
     final store = ReportOperations.of(context, listen: false);
     final scope = TgcgAccessPolicy.authorizingScope(
@@ -366,7 +366,8 @@ class _ReportsPageState extends State<ReportsPage> {
       listen: false,
     );
     if (role == null) return;
-    final job = store.requestExport(
+    try {
+      final job = await store.requestExport(
       kind: descriptor.kind,
       format: format,
       targetScope: scope,
@@ -379,18 +380,27 @@ class _ReportsPageState extends State<ReportsPage> {
         scope,
         listen: false,
       ),
-      recordCount: descriptor.recordCount,
-    );
+        recordCount: descriptor.recordCount,
+      );
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          job == null
-              ? 'Export request was not authorized for this report type or scope.'
-              : '${job.id} queued. Artifact download remains unavailable until the export worker completes it.',
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            job == null
+                ? 'Export request was not authorized for this report type or scope.'
+                : '${job.id} queued. Artifact download remains unavailable until the export worker completes it.',
+          ),
         ),
-      ),
-    );
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Export could not be queued securely on this device.'),
+        ),
+      );
+    }
   }
 }
 
