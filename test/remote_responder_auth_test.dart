@@ -39,6 +39,11 @@ class _FakeRemoteResponderAuth implements RemoteResponderAuthGateway {
     validationCalls += 1;
     return validationResult;
   }
+
+  @override
+  Future<void> revokeSession({
+    required String sessionToken,
+  }) async {}
 }
 
 void main() {
