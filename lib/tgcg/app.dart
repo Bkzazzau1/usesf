@@ -42,8 +42,7 @@ class TgcgApp extends StatefulWidget {
   State<TgcgApp> createState() => _TgcgAppState();
 }
 
-class _TgcgAppState extends State<TgcgApp>
-    with WidgetsBindingObserver {
+class _TgcgAppState extends State<TgcgApp> {
   late TgcgSessionController sessionController;
   late OfflinePersistenceController offlinePersistenceController;
   late MembershipOperationsController membershipOperationsController;
@@ -63,26 +62,25 @@ class _TgcgAppState extends State<TgcgApp>
   late EmergencyResponseController emergencyResponseController;
   Timer? _securitySessionWatchdog;
   bool _validatingSecuritySession = false;
+  bool _sessionRestoreComplete = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     _createControllers();
     _securitySessionWatchdog = Timer.periodic(
       const Duration(seconds: 30),
       (_) => unawaited(_enforceSecuritySession()),
     );
+    unawaited(_restoreSession());
     unawaited(_initializePersistenceAndHydrate());
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      unawaited(_enforceSecuritySession());
-      return;
-    }
-    sessionController.lockForBackground();
+  Future<void> _restoreSession() async {
+    await sessionController.restorePersistedSession();
+    if (!mounted) return;
+    setState(() => _sessionRestoreComplete = true);
+    unawaited(_enforceSecuritySession());
   }
 
   Future<void> _enforceSecuritySession() async {
@@ -90,8 +88,6 @@ class _TgcgAppState extends State<TgcgApp>
         !sessionController.isAuthenticated) {
       return;
     }
-    if (sessionController.enforceSecurityExpiry()) return;
-
     final token = sessionController.securitySessionToken;
     if (token == null || token.isEmpty || _validatingSecuritySession) {
       return;
@@ -102,8 +98,8 @@ class _TgcgAppState extends State<TgcgApp>
       final agencyId = sessionController.agencyId;
       final serviceNumber = sessionController.accessId;
       if (agencyId == null || agencyId.isEmpty || serviceNumber.isEmpty) {
-        sessionController.signOut(
-          reason: SessionTerminationReason.centralValidationFailed,
+        await sessionController.signOut(
+          reason: SessionTerminationReason.accountUnavailable,
         );
         return;
       }
@@ -119,22 +115,13 @@ class _TgcgAppState extends State<TgcgApp>
         return;
       }
       if (validation == ResponderSessionValidationStatus.revoked) {
-        sessionController.signOut(
+        await sessionController.signOut(
           reason: SessionTerminationReason.centrallyRevoked,
-        );
-      } else if (validation ==
-          ResponderSessionValidationStatus.serverError) {
-        sessionController.signOut(
-          reason: SessionTerminationReason.centralValidationFailed,
         );
       }
     } finally {
       _validatingSecuritySession = false;
     }
-  }
-
-  void _recordSecurityActivity() {
-    sessionController.recordActivity();
   }
 
   Future<void> _initializePersistenceAndHydrate() async {
@@ -235,6 +222,8 @@ class _TgcgAppState extends State<TgcgApp>
       persistence: offlinePersistenceController,
       remoteAuth: HttpRemoteResponderAuthGateway.fromEnvironmentOrNull(),
     );
+    sessionController.onSecuritySessionSignOut =
+        emergencyResponseController.revokeConnectedSession;
   }
 
   Future<void> _resetPresentation() async {
@@ -257,6 +246,7 @@ class _TgcgAppState extends State<TgcgApp>
     final oldEmergency = emergencyResponseController;
 
     try {
+      await oldSession.signOut();
       await oldMembership.clearLocalCredentials();
       await oldEmergency.clearLocalCredentials();
       await oldOffline.clearPresentationData();
@@ -267,7 +257,10 @@ class _TgcgAppState extends State<TgcgApp>
     await oldOffline.close();
     if (!mounted) return;
 
-    setState(_createControllers);
+    setState(() {
+      _createControllers();
+      _sessionRestoreComplete = true;
+    });
     unawaited(_initializePersistenceAndHydrate());
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -293,7 +286,6 @@ class _TgcgAppState extends State<TgcgApp>
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _securitySessionWatchdog?.cancel();
     sessionController.dispose();
     fieldOperationsController.dispose();
@@ -351,21 +343,18 @@ class _TgcgAppState extends State<TgcgApp>
                                       controller: fieldOperationsController,
                                       child: ResultOperations(
                                         controller: resultOperationsController,
-                                        child: Listener(
-                                          behavior: HitTestBehavior.translucent,
-                                          onPointerDown: (_) =>
-                                              _recordSecurityActivity(),
-                                          child: MaterialApp(
-                                            navigatorKey: tgcgNavigatorKey,
-                                            debugShowCheckedModeBanner: false,
-                                            title: 'USESF',
-                                            theme: _theme(),
-                                            home: OperationalCallOverlay(
-                                              child: _AuthenticationGate(
-                                                onResetPresentation:
-                                                    _resetPresentation,
-                                              ),
-                                            ),
+                                        child: MaterialApp(
+                                          navigatorKey: tgcgNavigatorKey,
+                                          debugShowCheckedModeBanner: false,
+                                          title: 'USESF',
+                                          theme: _theme(),
+                                          home: OperationalCallOverlay(
+                                            child: _sessionRestoreComplete
+                                                ? _AuthenticationGate(
+                                                    onResetPresentation:
+                                                        _resetPresentation,
+                                                  )
+                                                : const _SessionRestoreView(),
                                           ),
                                         ),
                                       ),
@@ -636,6 +625,25 @@ class _TgcgAppState extends State<TgcgApp>
       ),
     );
   }
+}
+
+class _SessionRestoreView extends StatelessWidget {
+  const _SessionRestoreView();
+
+  @override
+  Widget build(BuildContext context) => const Scaffold(
+        backgroundColor: TgcgColors.canvas,
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TgcgLogo(size: 72),
+              SizedBox(height: 18),
+              CircularProgressIndicator(),
+            ],
+          ),
+        ),
+      );
 }
 
 class _AuthenticationGate extends StatelessWidget {
