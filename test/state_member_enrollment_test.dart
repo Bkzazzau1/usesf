@@ -130,12 +130,14 @@ void main() {
         phone: '+2348077777777',
       );
 
-      final role = governance.assignRole(
+      final role = await governance.assignRole(
         subjectId: member.id,
         subjectName: member.fullName,
         role: TgcgRole.mediaOfficer,
         scope: GeographicScope.kaduna,
         assignedBy: 'STATE-COORD',
+        actorRole: TgcgRole.stateCoordinator,
+        authorizedScope: GeographicScope.kaduna,
       );
 
       expect(member.isPendingActivation, isTrue);

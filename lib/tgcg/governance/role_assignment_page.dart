@@ -219,19 +219,12 @@ class _RoleAssignmentPageState extends State<RoleAssignmentPage> {
                           item: item,
                           onRevoke: item.active &&
                                   _mayRevokeRole(session, item)
-                              ? () {
-                                  final actorId = session.accessId.isEmpty
-                                      ? session.operatorName
-                                      : session.accessId;
-                                  governance.revokeRole(
-                                    item.id,
-                                    actorId: actorId,
-                                    allowStateOverride:
-                                        currentRole == TgcgRole.stateCoordinator ||
-                                            currentRole ==
-                                                TgcgRole.stateAdministrator,
-                                  );
-                                }
+                              ? () => _revoke(
+                                    context,
+                                    session,
+                                    governance,
+                                    item,
+                                  )
                               : null,
                         ),
                       )
@@ -242,13 +235,13 @@ class _RoleAssignmentPageState extends State<RoleAssignmentPage> {
     );
   }
 
-  void _assign(
+  Future<void> _assign(
     BuildContext context,
     TgcgSessionController session,
     MembershipOperationsController membership,
     GovernanceOperationsController governance,
     List<_ScopeOption> scopes,
-  ) {
+  ) async {
     final memberId = selectedMemberId;
     final scopeKey = selectedScopeKey;
     if (memberId == null || scopeKey == null) return;
@@ -256,22 +249,80 @@ class _RoleAssignmentPageState extends State<RoleAssignmentPage> {
     final scope = scopes.where((item) => item.key == scopeKey).firstOrNull;
     if (member == null || scope == null) return;
 
-    governance.assignRole(
-      subjectId: member.id,
-      subjectName: member.fullName,
-      role: selectedRole,
-      scope: scope.scope,
-      assignedBy: session.accessId.isEmpty ? session.operatorName : session.accessId,
+    final actorRole = TgcgAccessPolicy.roleFor(
+      context,
+      TgcgCapability.manageRoleAssignments,
+      targetScope: scope.scope,
+      listen: false,
     );
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '${roleLabel(selectedRole)} assigned to ${member.fullName} for ${scope.label}.',
+    final authorizedScope = TgcgAccessPolicy.authorizingScope(
+      context,
+      TgcgCapability.manageRoleAssignments,
+      targetScope: scope.scope,
+      listen: false,
+    );
+    if (actorRole == null || authorizedScope == null) return;
+
+    try {
+      await governance.assignRole(
+        subjectId: member.id,
+        subjectName: member.fullName,
+        role: selectedRole,
+        scope: scope.scope,
+        assignedBy:
+            session.accessId.isEmpty ? session.operatorName : session.accessId,
+        actorRole: actorRole,
+        authorizedScope: authorizedScope,
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${roleLabel(selectedRole)} assigned to ${member.fullName} for ${scope.label}.',
+          ),
         ),
-      ),
+      );
+      setState(() {});
+    } on StateError catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  }
+
+  Future<void> _revoke(
+    BuildContext context,
+    TgcgSessionController session,
+    GovernanceOperationsController governance,
+    RoleAssignmentRecord record,
+  ) async {
+    final actorRole = TgcgAccessPolicy.roleFor(
+      context,
+      TgcgCapability.manageRoleAssignments,
+      targetScope: record.scope,
+      listen: false,
     );
-    setState(() {});
+    final authorizedScope = TgcgAccessPolicy.authorizingScope(
+      context,
+      TgcgCapability.manageRoleAssignments,
+      targetScope: record.scope,
+      listen: false,
+    );
+    if (actorRole == null || authorizedScope == null) return;
+
+    try {
+      await governance.revokeRole(
+        record.id,
+        actorId:
+            session.accessId.isEmpty ? session.operatorName : session.accessId,
+        actorRole: actorRole,
+        authorizedScope: authorizedScope,
+      );
+    } on StateError catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.message)));
+    }
   }
 
   List<TgcgRole> _rolesAssignableBy(TgcgRole actorRole) {

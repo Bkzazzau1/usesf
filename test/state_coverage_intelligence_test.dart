@@ -117,16 +117,18 @@ void main() {
 
   group('Coordinator readiness', () {
     test('adding the exact LGA Coordinator fills the coordinator component',
-        () {
+        () async {
       final lga = geography.lga('KD-ZARIA')!;
       final before = snapshot(lga.scope);
 
-      governance.assignRole(
+      await governance.assignRole(
         subjectId: 'MEM-0001',
         subjectName: membership.memberById('MEM-0001')!.fullName,
         role: TgcgRole.lgaCoordinator,
         scope: lga.scope,
         assignedBy: 'STATE-COORD',
+        actorRole: TgcgRole.stateCoordinator,
+        authorizedScope: GeographicScope.kaduna,
       );
 
       final after = snapshot(lga.scope);

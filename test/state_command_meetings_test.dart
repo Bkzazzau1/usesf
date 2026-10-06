@@ -92,13 +92,15 @@ void main() {
       expect(audience.gpsReady, 0);
     });
 
-    test('group IDs intersect with the selected role', () {
-      governance.assignRole(
+    test('group IDs intersect with the selected role', () async {
+      await governance.assignRole(
         subjectId: 'MEM-0001',
         subjectName: membership.memberById('MEM-0001')!.fullName,
         role: TgcgRole.mediaOfficer,
         scope: GeographicScope.kaduna,
         assignedBy: 'STATE-COORD',
+        actorRole: TgcgRole.stateCoordinator,
+        authorizedScope: GeographicScope.kaduna,
       );
 
       final audience = resolveCommandMeetingAudience(

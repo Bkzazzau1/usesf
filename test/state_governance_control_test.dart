@@ -44,7 +44,30 @@ void main() {
       devices: devices,
       persistence: persistence,
     );
-    governance = GovernanceOperationsController.prototypeSeed();
+    governance = GovernanceOperationsController.prototypeSeed(
+      persistence: persistence,
+    );
+    final queued = await persistence.persistMutation(
+      entityType: 'field_report',
+      entityId: 'RPT-GOV-QUEUED',
+      mutationType: SyncMutationType.create,
+      payload: const {'id': 'RPT-GOV-QUEUED'},
+    );
+    final failed = await persistence.persistMutation(
+      entityType: 'evidence',
+      entityId: 'EVD-GOV-FAILED',
+      mutationType: SyncMutationType.create,
+      payload: const {'id': 'EVD-GOV-FAILED'},
+    );
+    final conflict = await persistence.persistMutation(
+      entityType: 'member_assignment',
+      entityId: 'ASN-GOV-CONFLICT',
+      mutationType: SyncMutationType.update,
+      payload: const {'id': 'ASN-GOV-CONFLICT'},
+    );
+    await persistence.markFailed(failed.outbox.id, 'offline');
+    await persistence.markConflict(conflict.outbox.id, 'newer server version');
+    expect(queued.outbox.state, SyncState.queued);
   });
 
   StateGovernanceSnapshot snapshot() => buildStateGovernanceSnapshot(
@@ -125,19 +148,22 @@ void main() {
       );
     });
 
-    test('duplicate active holders for one leadership post are critical', () {
+    test('duplicate active holders for one leadership post are critical',
+        () async {
       final existing = governance.roleAssignments.firstWhere(
         (item) =>
             item.active &&
             item.role == TgcgRole.senatorialCoordinator,
       );
 
-      governance.assignRole(
+      await governance.assignRole(
         subjectId: 'MEM-0001',
         subjectName: membership.memberById('MEM-0001')!.fullName,
         role: existing.role,
         scope: existing.scope,
         assignedBy: 'STATE-COORD',
+        actorRole: TgcgRole.stateCoordinator,
+        authorizedScope: GeographicScope.kaduna,
       );
 
       final value = snapshot();
@@ -152,13 +178,16 @@ void main() {
       );
     });
 
-    test('coordinator role at the wrong geography level is critical', () {
-      governance.assignRole(
+    test('coordinator role at the wrong geography level is critical',
+        () async {
+      await governance.assignRole(
         subjectId: 'MEM-0001',
         subjectName: membership.memberById('MEM-0001')!.fullName,
         role: TgcgRole.lgaCoordinator,
         scope: GeographicScope.kaduna,
         assignedBy: 'STATE-COORD',
+        actorRole: TgcgRole.stateCoordinator,
+        authorizedScope: GeographicScope.kaduna,
       );
 
       final value = snapshot();
@@ -172,23 +201,28 @@ void main() {
       expect(risk.memberId, 'MEM-0001');
     });
 
-    test('one member holding multiple coordinator posts is surfaced', () {
+    test('one member holding multiple coordinator posts is surfaced',
+        () async {
       final district = geography.senatorialDistricts.first.scope;
       final lga = geography.lgas.first.scope;
 
-      governance.assignRole(
+      await governance.assignRole(
         subjectId: 'MEM-0001',
         subjectName: membership.memberById('MEM-0001')!.fullName,
         role: TgcgRole.senatorialCoordinator,
         scope: district,
         assignedBy: 'STATE-COORD',
+        actorRole: TgcgRole.stateCoordinator,
+        authorizedScope: GeographicScope.kaduna,
       );
-      governance.assignRole(
+      await governance.assignRole(
         subjectId: 'MEM-0001',
         subjectName: membership.memberById('MEM-0001')!.fullName,
         role: TgcgRole.lgaCoordinator,
         scope: lga,
         assignedBy: 'STATE-COORD',
+        actorRole: TgcgRole.stateCoordinator,
+        authorizedScope: GeographicScope.kaduna,
       );
 
       final value = snapshot();
@@ -237,11 +271,13 @@ void main() {
     });
 
     test('disabled backend safeguard is visible as critical but not a new power',
-        () {
-      governance.setSetting(
+        () async {
+      await governance.setSetting(
         settingId: 'SET-EVIDENCE-HASH',
         value: false,
         actorId: 'SYSTEM-ADMIN',
+        actorRole: TgcgRole.stateAdministrator,
+        authorizedScope: GeographicScope.kaduna,
       );
 
       final value = snapshot();
