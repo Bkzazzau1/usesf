@@ -25,6 +25,7 @@ PBKDF2_ITERATIONS = 120_000
 MAX_FAILURES = 5
 FAILURE_WINDOW = timedelta(minutes=15)
 LOCKOUT_DURATION = timedelta(minutes=15)
+SESSION_LIFETIME = timedelta(hours=8)
 DUMMY_SALT = b"USESF-SECURITY-1"
 DUMMY_HASH = hashlib.pbkdf2_hmac(
     "sha256",
@@ -95,6 +96,13 @@ class AuthenticationResult:
     locked_until: datetime | None = None
 
 
+@dataclass(frozen=True)
+class SessionValidationResult:
+    status: str
+    responder: dict[str, Any] | None = None
+    expires_at: datetime | None = None
+
+
 class ResponderAuthService:
     def __init__(self, database_path: str | Path):
         self.database_path = str(database_path)
@@ -137,6 +145,23 @@ class ResponderAuthService:
                     updated_at TEXT NOT NULL,
                     PRIMARY KEY (agency_id, service_number)
                 );
+
+                CREATE TABLE IF NOT EXISTS security_responder_sessions (
+                    session_token_hash TEXT PRIMARY KEY,
+                    responder_id TEXT NOT NULL,
+                    agency_id TEXT NOT NULL,
+                    service_number TEXT NOT NULL,
+                    issued_at TEXT NOT NULL,
+                    expires_at TEXT NOT NULL,
+                    last_seen_at TEXT NOT NULL,
+                    revoked_at TEXT,
+                    FOREIGN KEY (responder_id)
+                        REFERENCES security_responders(responder_id)
+                        ON DELETE CASCADE
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_security_sessions_responder
+                    ON security_responder_sessions(responder_id);
                 """
             )
 
@@ -200,6 +225,15 @@ class ResponderAuthService:
                 WHERE agency_id = ? AND service_number = ?
                 """,
                 (agency_id.strip(), normalized_service),
+            )
+            connection.execute(
+                """
+                UPDATE security_responder_sessions
+                SET revoked_at = ?
+                WHERE agency_id = ? AND service_number = ?
+                  AND revoked_at IS NULL
+                """,
+                (_iso(now), agency_id.strip(), normalized_service),
             )
             connection.commit()
 
@@ -299,6 +333,26 @@ class ResponderAuthService:
                 """,
                 (agency_id, normalized_service),
             )
+            session_token = secrets.token_urlsafe(32)
+            session_token_hash = self._hash_session_token(session_token)
+            expires_at = current_time + SESSION_LIFETIME
+            connection.execute(
+                """
+                INSERT INTO security_responder_sessions (
+                    session_token_hash, responder_id, agency_id, service_number,
+                    issued_at, expires_at, last_seen_at, revoked_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)
+                """,
+                (
+                    session_token_hash,
+                    responder["responder_id"],
+                    responder["agency_id"],
+                    responder["service_number"],
+                    _iso(current_time),
+                    _iso(expires_at),
+                    _iso(current_time),
+                ),
+            )
             connection.commit()
             return AuthenticationResult(
                 status="authenticated",
@@ -308,8 +362,116 @@ class ResponderAuthService:
                     "serviceNumber": responder["service_number"],
                     "displayName": responder["display_name"],
                     "authorizedScope": authorized_scope,
+                    "sessionToken": session_token,
+                    "sessionExpiresAt": _iso(expires_at),
                 },
             )
+
+    @staticmethod
+    def _hash_session_token(session_token: str) -> str:
+        return hashlib.sha256(session_token.encode("utf-8")).hexdigest()
+
+    def validate_session(
+        self,
+        session_token: str,
+        *,
+        now: datetime | None = None,
+    ) -> SessionValidationResult:
+        current_time = (now or _utcnow()).astimezone(timezone.utc)
+        token_hash = self._hash_session_token(session_token)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                """
+                SELECT s.responder_id, s.agency_id, s.service_number,
+                       s.expires_at, s.revoked_at,
+                       r.display_name, r.authorized_scope_json, r.active
+                FROM security_responder_sessions AS s
+                JOIN security_responders AS r
+                  ON r.responder_id = s.responder_id
+                WHERE s.session_token_hash = ?
+                """,
+                (token_hash,),
+            ).fetchone()
+
+            if row is None:
+                connection.commit()
+                return SessionValidationResult(status="revoked")
+
+            expires_at = _parse_time(row["expires_at"])
+            revoked_at = _parse_time(row["revoked_at"])
+            if (
+                revoked_at is not None
+                or not row["active"]
+                or expires_at is None
+                or current_time >= expires_at
+            ):
+                if revoked_at is None:
+                    connection.execute(
+                        """
+                        UPDATE security_responder_sessions
+                        SET revoked_at = ?
+                        WHERE session_token_hash = ?
+                        """,
+                        (_iso(current_time), token_hash),
+                    )
+                connection.commit()
+                return SessionValidationResult(
+                    status="revoked",
+                    expires_at=expires_at,
+                )
+
+            connection.execute(
+                """
+                UPDATE security_responder_sessions
+                SET last_seen_at = ?
+                WHERE session_token_hash = ?
+                """,
+                (_iso(current_time), token_hash),
+            )
+            authorized_scope = json.loads(row["authorized_scope_json"])
+            connection.commit()
+            return SessionValidationResult(
+                status="active",
+                expires_at=expires_at,
+                responder={
+                    "responderId": row["responder_id"],
+                    "agencyId": row["agency_id"],
+                    "serviceNumber": row["service_number"],
+                    "displayName": row["display_name"],
+                    "authorizedScope": authorized_scope,
+                },
+            )
+
+    def disable_responder(
+        self,
+        *,
+        agency_id: str,
+        service_number: str,
+    ) -> bool:
+        normalized_service = _normalize_service_number(service_number)
+        now = _utcnow()
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            updated = connection.execute(
+                """
+                UPDATE security_responders
+                SET active = 0, updated_at = ?
+                WHERE agency_id = ? AND service_number = ?
+                """,
+                (_iso(now), agency_id.strip(), normalized_service),
+            ).rowcount
+            connection.execute(
+                """
+                UPDATE security_responder_sessions
+                SET revoked_at = ?
+                WHERE agency_id = ? AND service_number = ?
+                  AND revoked_at IS NULL
+                """,
+                (_iso(now), agency_id.strip(), normalized_service),
+            )
+            connection.commit()
+            return updated > 0
 
     @staticmethod
     def _register_failure(
