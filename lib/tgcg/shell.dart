@@ -16,6 +16,7 @@ import 'evidence/evidence_intelligence_page.dart';
 import 'field/field_monitoring_page.dart';
 import 'field/situation_room_page.dart';
 import 'geography/geography_page.dart';
+import 'geography/state_coverage_intelligence_page.dart';
 import 'governance/governance_page.dart';
 import 'governance/role_assignment_page.dart';
 import 'media/media_intelligence_page.dart';
@@ -96,6 +97,9 @@ class _TgcgShellState extends State<TgcgShell> {
     final resultIntelligence =
         allowed.contains(TgcgModule.resultCapture) &&
         session.role == TgcgRole.stateCoordinator;
+    final coverageIntelligence =
+        allowed.contains(TgcgModule.geography) &&
+        session.role == TgcgRole.stateCoordinator;
     final destinations = _destinations
         .where((item) => allowed.contains(item.module))
         .map(
@@ -115,6 +119,15 @@ class _TgcgShellState extends State<TgcgShell> {
                 item.module,
                 'Result Intelligence',
                 Icons.analytics_outlined,
+                item.group,
+              );
+            }
+            if (item.module == TgcgModule.geography &&
+                coverageIntelligence) {
+              return _Destination(
+                item.module,
+                'State Coverage Intelligence',
+                Icons.public_rounded,
                 item.group,
               );
             }
@@ -194,6 +207,7 @@ class _TgcgShellState extends State<TgcgShell> {
                             selectedModule: selectedModule,
                             evidenceIntelligence: evidenceIntelligence,
                             resultIntelligence: resultIntelligence,
+                            coverageIntelligence: coverageIntelligence,
                             showAlerts: allowed.contains(TgcgModule.alertCenter),
                             onAlerts: () => _select(TgcgModule.alertCenter),
                             onTour: () => _openTour(allowed),
@@ -235,7 +249,10 @@ class _TgcgShellState extends State<TgcgShell> {
         TgcgModule.roleAssignment => RoleAssignmentPage(
             initialMemberId: _preferredRoleMemberId,
           ),
-        TgcgModule.geography => const GeographyPage(),
+        TgcgModule.geography =>
+          session.role == TgcgRole.stateCoordinator
+              ? StateCoverageIntelligencePage(onOpenModule: _select)
+              : const GeographyPage(),
         TgcgModule.assignmentControl => const AssignmentControlPage(),
         TgcgModule.liveOperations => const LiveOperationsPage(),
         TgcgModule.aiVerification => const AiVerificationPage(),
@@ -559,6 +576,7 @@ class _CommandBar extends StatelessWidget {
     required this.selectedModule,
     required this.evidenceIntelligence,
     required this.resultIntelligence,
+    required this.coverageIntelligence,
     required this.showAlerts,
     required this.onAlerts,
     required this.onTour,
@@ -567,6 +585,7 @@ class _CommandBar extends StatelessWidget {
   final TgcgModule selectedModule;
   final bool evidenceIntelligence;
   final bool resultIntelligence;
+  final bool coverageIntelligence;
   final bool showAlerts;
   final VoidCallback onAlerts;
   final VoidCallback onTour;
@@ -606,6 +625,7 @@ class _CommandBar extends StatelessWidget {
               selectedModule,
               evidenceIntelligence: evidenceIntelligence,
               resultIntelligence: resultIntelligence,
+              coverageIntelligence: coverageIntelligence,
             ),
             style: const TextStyle(color: TgcgColors.ink, fontSize: 14, fontWeight: FontWeight.w900),
           ),
@@ -748,12 +768,16 @@ String _moduleLabel(
   TgcgModule module, {
   bool evidenceIntelligence = false,
   bool resultIntelligence = false,
+  bool coverageIntelligence = false,
 }) => switch (module) {
       TgcgModule.overview => 'Command Overview',
       TgcgModule.memberEnrollment => 'Member Enrolment',
       TgcgModule.membershipNetwork => 'Registered Members',
       TgcgModule.roleAssignment => 'Role Assignment',
-      TgcgModule.geography => 'Geographic Operations',
+      TgcgModule.geography =>
+        coverageIntelligence
+            ? 'State Coverage Intelligence'
+            : 'Geographic Operations',
       TgcgModule.assignmentControl => 'Assignment Control Centre',
       TgcgModule.liveOperations => 'Live Operations',
       TgcgModule.aiVerification => 'AI Verification Centre',
