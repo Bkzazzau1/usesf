@@ -79,13 +79,8 @@ class StateCommunicationSnapshot {
       .length;
   int get providerReady =>
       providers.where((item) => item.state == ProviderConnectionState.ready).length;
-  int get providerProblems => providers
-      .where(
-        (item) =>
-            item.state == ProviderConnectionState.degraded ||
-            item.state == ProviderConnectionState.unavailable,
-      )
-      .length;
+  int get providerProblems =>
+      providers.where((item) => item.state != ProviderConnectionState.ready).length;
   int get openCalls => calls.where((item) => item.isOpen).length;
 }
 
@@ -178,8 +173,9 @@ List<StateCommunicationException> buildStateCommunicationExceptions(
   if (snapshot.providerProblems > 0) {
     items.add(
       StateCommunicationException(
-        title: 'Communication provider degraded',
-        detail: '${snapshot.providerProblems} provider connection(s) need attention.',
+        title: 'Communication provider readiness gap',
+        detail:
+            '${snapshot.providerProblems} provider connection(s) are not ready for delivery.',
         severity: 3,
         module: TgcgModule.bulkCommunications,
       ),
