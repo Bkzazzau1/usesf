@@ -21,7 +21,6 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
   TgcgRole selectedRole = TgcgRole.situationRoomDirector;
   String? selectedDistrictId;
   bool obscurePassword = true;
-  bool rememberDevice = true;
   bool showSignIn = false;
 
   @override
@@ -32,7 +31,7 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
     super.dispose();
   }
 
-  void _signIn() {
+  Future<void> _signIn() async {
     final membership = MembershipOperations.of(context, listen: false);
     var scope = GeographicScope.kaduna;
     if (selectedRole == TgcgRole.senatorialCoordinator) {
@@ -42,7 +41,7 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
           membership.geography.senatorialDistrict(districtId)?.scope ?? scope;
     }
 
-    TgcgSession.of(context, listen: false).signIn(
+    await TgcgSession.of(context, listen: false).signIn(
       role: selectedRole,
       operatorName: nameController.text,
       accessId: accessIdController.text,
@@ -397,23 +396,12 @@ class _TgcgLoginPageState extends State<TgcgLoginPage> {
                   ),
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Checkbox(
-                  value: rememberDevice,
-                  onChanged: (value) =>
-                      setState(() => rememberDevice = value ?? false),
-                ),
-                const Text(
-                  'Remember this device',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-                const Spacer(),
-                TextButton(
-                  onPressed: () {},
-                  child: const Text('Access support'),
-                ),
-              ],
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () {},
+                child: const Text('Access support'),
+              ),
             ),
             const SizedBox(height: 12),
             SizedBox(
